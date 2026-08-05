@@ -1,0 +1,8 @@
+{
+  "name": "indo-por-ai-live-real",
+  "version": "1.0.0",
+  "private": true,
+  "engines": {
+    "node": ">=18"
+  }
+}

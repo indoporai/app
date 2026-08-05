@@ -1,5 +1,5 @@
 
-const CACHE = "indo-por-ai-descobertas-instagram-v6";
+const CACHE = "indo-por-ai-live-real-v8";
 const CORE = [
   "./",
   "index.html",

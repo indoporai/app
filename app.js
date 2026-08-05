@@ -31,7 +31,7 @@ function bind(){
  document.querySelectorAll('[data-modal]').forEach(b=>b.onclick=()=>showModal(b.dataset.modal));
  document.querySelectorAll('[data-map]').forEach(b=>b.onclick=()=>window.open('https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(b.dataset.map),'_blank'));
  document.querySelectorAll('[data-profile]').forEach(b=>b.onclick=()=>setProfile(b.dataset.profile));
- document.querySelectorAll('#liveBtn').forEach(b=>b.onclick=toggleLive);
+ document.querySelectorAll('#liveBtn').forEach(b=>b.onclick=()=>window.location.href='live-real.html');
  document.querySelectorAll('#addPhoto').forEach(b=>b.onclick=()=>photoInput.click());
  document.querySelectorAll('[data-mode]').forEach(b=>b.onclick=()=>{state.mode=b.dataset.mode;state.route='today';toast('Modo alterado');render()});
  document.querySelectorAll('[data-day]').forEach(b=>b.onclick=()=>{state.tripDay=Number(b.dataset.day);render()});

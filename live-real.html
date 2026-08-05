@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#0f7f86">
+  <title>Indo por Aí — Live Real</title>
+  <link rel="stylesheet" href="live-real.css?v=1">
+</head>
+<body>
+  <main class="live-page">
+    <header class="live-header">
+      <a href="index.html" class="back">← Voltar</a>
+      <strong>Indo por Aí</strong>
+      <span>LIVE</span>
+    </header>
+
+    <section class="hero-live">
+      <small>MODO DURANTE</small>
+      <h1>Transmissão ao vivo da viagem</h1>
+      <p>Use um celular como guia e outro como espectador.</p>
+    </section>
+
+    <section class="live-card">
+      <h2>Celular do guia</h2>
+      <p>Crie uma sala privada e abra a câmera.</p>
+      <button id="createLive" class="primary">🔴 Iniciar transmissão</button>
+
+      <div id="hostResult" class="host-result hidden">
+        <label>Código da transmissão</label>
+        <div class="code-row">
+          <strong id="roomCode"></strong>
+          <button id="copyCode" class="secondary">Copiar</button>
+        </div>
+        <button id="openHost" class="primary">Abrir câmera do guia</button>
+      </div>
+    </section>
+
+    <section class="live-card">
+      <h2>Celular do cliente</h2>
+      <p>Digite o código mostrado no celular do guia.</p>
+
+      <label for="viewerName">Nome</label>
+      <input id="viewerName" value="Viajante" maxlength="50">
+
+      <label for="joinCode">Código da transmissão</label>
+      <input id="joinCode" placeholder="indo-por-ai-...">
+
+      <button id="joinLive" class="primary">Assistir transmissão</button>
+    </section>
+
+    <div id="status" class="status" aria-live="polite"></div>
+
+    <section class="notice">
+      <strong>Teste privado</strong>
+      <p>A sala expira automaticamente. O espectador entra com câmera e microfone desligados.</p>
+    </section>
+  </main>
+
+  <script src="live-real.js?v=1"></script>
+</body>
+</html>
