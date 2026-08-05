@@ -55,3 +55,12 @@ body{min-height:100vh}.app-shell{width:min(100%,520px);min-height:100vh;margin:a
 .tomorrow-card{background:linear-gradient(135deg,#143f48,#0f7f86);color:#fff}
 .tomorrow-card p{color:rgba(255,255,255,.8)}
 @media(max-width:380px){.trip-summary-card{align-items:flex-start;flex-direction:column}.trip-summary-card .btn{width:100%}}
+
+.smart-discovery-list{display:flex;flex-direction:column;gap:10px}
+.smart-discovery-card{width:100%;display:grid;grid-template-columns:48px 1fr 16px;align-items:center;gap:12px;text-align:left;border:1px solid rgba(15,127,134,.08);background:#fff;border-radius:20px;padding:15px;box-shadow:var(--shadow);color:inherit}
+.smart-discovery-card h3{margin:3px 0 5px}.smart-discovery-card p{margin:0 0 4px;font-weight:800;color:#3f666b}.smart-discovery-card small{color:#718286;line-height:1.35}
+.smart-icon{width:48px;height:48px;border-radius:16px;background:linear-gradient(135deg,#fff5d8,#e6f7f3);display:grid;place-items:center;font-size:24px}
+.discovery-detail-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:16px 0}.discovery-detail-grid>div{background:#f5f8f7;border-radius:14px;padding:12px;text-align:center}.discovery-detail-grid small,.discovery-detail-grid strong{display:block}
+.instagram-footer{display:grid;grid-template-columns:54px 1fr auto;gap:14px;align-items:center;background:linear-gradient(135deg,#fff,#fff6e7,#e8f7f4);border-radius:24px;padding:18px;border:1px solid rgba(244,122,42,.12);box-shadow:var(--shadow)}
+.instagram-mark{width:54px;height:54px;border-radius:18px;background:linear-gradient(135deg,#7a3cff,#ff4f81,#ff9d33);color:#fff;display:grid;place-items:center;font-size:28px;font-weight:900}.instagram-footer h3{margin:3px 0 5px}.instagram-footer p{margin:0 0 3px}.instagram-footer small{color:#738083}
+@media(max-width:390px){.instagram-footer{grid-template-columns:48px 1fr}.instagram-footer .btn{grid-column:1/-1;width:100%}}

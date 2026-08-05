@@ -1,5 +1,5 @@
 
-const CACHE = "indo-por-ai-roteiro-before-v5";
+const CACHE = "indo-por-ai-descobertas-instagram-v6";
 const CORE = [
   "./",
   "index.html",
