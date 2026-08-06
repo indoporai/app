@@ -1,0 +1,15 @@
+{
+  "name":"Indo por Aí com a Gente",
+  "short_name":"Indo por Aí",
+  "description":"Planejamento, acompanhamento, comunidade e memórias de viagem.",
+  "start_url":"./?source=pwa",
+  "scope":"./",
+  "display":"standalone",
+  "background_color":"#fff8ef",
+  "theme_color":"#075568",
+  "orientation":"portrait-primary",
+  "icons":[
+    {"src":"assets/icon-192.png","sizes":"192x192","type":"image/png","purpose":"any maskable"},
+    {"src":"assets/icon-512.png","sizes":"512x512","type":"image/png","purpose":"any maskable"}
+  ]
+}
