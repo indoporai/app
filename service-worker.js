@@ -1,5 +1,5 @@
 
-const CACHE = "indo-por-ai-live-real-v8";
+const CACHE = "indo-por-ai-modelo-ideal-completo-v9";
 const CORE = [
   "./",
   "index.html",
