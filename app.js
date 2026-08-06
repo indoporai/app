@@ -14,6 +14,17 @@ const state={route:'today',mode:'during',profile:savedProfile,leadStage:'new',tr
 ]};
 const titles={today:'Hoje',trip:'Minha Viagem',explore:'Explorar',community:'Grupo da viagem',memories:'Memórias',prospect:'Planejar viagem'};
 
+document.addEventListener('click', event => {
+ const modeButton = event.target.closest('[data-mode]');
+ if(!modeButton) return;
+ event.preventDefault();
+ event.stopPropagation();
+ state.mode = modeButton.dataset.mode;
+ state.route = 'today';
+ render();
+});
+
+
 setTimeout(()=>document.querySelector('#splash').classList.add('hide'),1800);
 if('serviceWorker' in navigator) navigator.serviceWorker.register('./service-worker.js');
 function money(n){return new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(n)}
@@ -33,7 +44,7 @@ function bind(){
  document.querySelectorAll('[data-profile]').forEach(b=>b.onclick=()=>setProfile(b.dataset.profile));
  document.querySelectorAll('#liveBtn').forEach(b=>b.onclick=toggleLive);
  document.querySelectorAll('#addPhoto').forEach(b=>b.onclick=()=>photoInput.click());
- document.querySelectorAll('[data-mode]').forEach(b=>b.onclick=()=>{state.mode=b.dataset.mode;state.route='today';toast('Modo alterado');render()});
+
  document.querySelectorAll('[data-day]').forEach(b=>b.onclick=()=>{state.tripDay=Number(b.dataset.day);render()});
  const realLiveBtn=document.querySelector('#realLiveBtn');
  if(realLiveBtn)realLiveBtn.onclick=()=>window.location.href='live-real.html';
@@ -44,7 +55,7 @@ function bind(){
   navigator.geolocation.getCurrentPosition(()=>toast('Localização compartilhada por 1 hora'),()=>toast('Autorize a localização no Safari'),{enableHighAccuracy:true,timeout:10000});
  };
  document.querySelectorAll('[data-person]').forEach(b=>b.onclick=()=>toast(`Centralizando em ${b.dataset.person}`));
- document.querySelectorAll('[data-open-movie]').forEach(btn=>btn.onclick=openTravelMovie);
+ document.querySelectorAll('[data-open-movie]').forEach(btn=>btn.onclick=()=>openTravelMovie());
  document.querySelectorAll('[data-open-album]').forEach(btn=>btn.onclick=()=>{state.route='memories';render();});
  document.querySelectorAll('[data-memory-day]').forEach(btn=>btn.onclick=()=>showMemoryDay(btn.dataset.memoryDay));
  const instagramBtn=document.querySelector('#instagramBtn');
@@ -103,108 +114,46 @@ function beforeView(){return `<section class="hero before-hero"><span class="eye
  <section class="section"><div class="section-head"><h2>Momento Indo por Aí</h2><span class="chip orange">Exclusivo</span></div><button class="card discovery-card" id="preTripSurprise"><div class="discovery-spark">✨</div><div><span class="eyebrow">Descoberta para sua viagem</span><h3>Quinta da Pacheca</h3><p>Uma experiência especial no Vale do Douro, escolhida para combinar com seu perfil.</p><div class="discovery-meta"><span>🍷 Gastronomia</span><span>⭐ 4,9</span><span>Dia 4</span></div></div><span class="discovery-arrow">›</span></button></section>
  <section class="section"><div class="section-head"><h2>Acompanhamento das compras</h2></div><div class="timeline"><div class="timeline-item"><span class="status done">✓</span><div><b>Passagem emitida</b><small>Valor final aprovado</small></div><strong>R$ 5.290</strong></div><div class="timeline-item"><span class="status done">✓</span><div><b>Hotel confirmado</b><small>Pagamento concluído</small></div><strong>R$ 4.180</strong></div><div class="timeline-item"><span class="status doing">!</span><div><b>Passeio no Douro</b><small>Opção enviada para aprovação</small></div><button class="btn btn-primary">Aprovar</button></div></div></section><section class="section"><div class="instagram-footer"><div class="instagram-mark">◎</div><div><span class="eyebrow">Comunidade Indo por Aí</span><h3>Viajar é colecionar histórias.</h3><p>Fotos, dicas e bastidores em <b>@indo.por.ai.com.a.gente</b></p><small>Uma comunidade com mais de 21 mil apaixonados por viagens.</small></div><button class="btn btn-primary" id="instagramBtn">Ver Instagram</button></div></section>`}
 function afterView(){return `<section class="memory-hero">
-  <div class="memory-hero-overlay">
-    <span class="eyebrow">Depois da viagem</span>
-    <h1>Portugal virou uma história para guardar.</h1>
-    <p>10 dias · 4 cidades · 624 fotos · 27 vídeos</p>
-    <div class="memory-hero-actions">
-      <button class="btn btn-primary" data-open-movie>▶ Assistir ao filme</button>
-      <button class="btn btn-light" data-open-album>Abrir álbum</button>
-    </div>
-  </div>
+ <div class="memory-hero-overlay">
+   <span class="eyebrow">Depois da viagem</span>
+   <h1>Portugal virou uma história para guardar.</h1>
+   <p>10 dias · 4 cidades · 624 fotos · 27 vídeos</p>
+   <div class="memory-hero-actions"><button class="btn btn-primary" data-open-movie="true">▶ Assistir ao filme</button><button class="btn btn-light" data-open-album="true">Abrir álbum</button></div>
+ </div>
+</section>${modeCard()}
+<section class="section"><div class="section-head"><div><span class="eyebrow">Filme da viagem</span><h2>Portugal 2026</h2></div><span class="chip orange">2min 38s</span></div>
+ <button class="travel-movie-card" data-open-movie="true">
+   <div class="movie-poster"><div class="movie-sky"></div><div class="movie-river"></div><div class="movie-city">🏘️</div><span class="movie-play">▶</span><div class="movie-caption"><small>UM FILME INDO POR AÍ</small><strong>Portugal 2026</strong><span>Renato & família</span></div></div>
+   <div class="movie-info"><div><b>Seu filme está pronto</b><small>Mapa animado, melhores momentos, estatísticas e créditos finais.</small></div><span>›</span></div>
+ </button>
 </section>
-${modeCard()}
-<section class="section">
-  <div class="section-head">
-    <div><span class="eyebrow">Filme da viagem</span><h2>Portugal 2026</h2></div>
-    <span class="chip orange">2min 38s</span>
-  </div>
-  <button class="travel-movie-card" data-open-movie>
-    <div class="movie-poster">
-      <div class="movie-sun"></div>
-      <div class="movie-hills"></div>
-      <div class="movie-river"></div>
-      <div class="movie-city">🏘️</div>
-      <span class="movie-play">▶</span>
-      <div class="movie-caption">
-        <small>UM FILME INDO POR AÍ</small>
-        <strong>Portugal 2026</strong>
-        <span>Renato & família</span>
-      </div>
-    </div>
-    <div class="movie-info">
-      <div><b>Seu filme está pronto</b><small>Uma demonstração com mapa, capítulos e melhores momentos.</small></div>
-      <span>›</span>
-    </div>
-  </button>
+<section class="section"><div class="section-head"><div><span class="eyebrow">Álbum de lembranças</span><h2>Uma história por dia</h2></div><button data-open-album="true">Ver tudo</button></div>
+ <div class="memory-story-grid">
+   <button class="memory-story day-one" data-memory-day="Dia 1 · Chegada ao Porto"><span>Dia 1</span><strong>Chegada ao Porto</strong><small>18 fotos · 2 vídeos</small></button>
+   <button class="memory-story day-two" data-memory-day="Dia 2 · Clássicos do Porto"><span>Dia 2</span><strong>Clássicos do Porto</strong><small>42 fotos · 4 vídeos</small></button>
+   <button class="memory-story day-three" data-memory-day="Dia 3 · Vale do Douro"><span>Dia 3</span><strong>Vale do Douro</strong><small>68 fotos · 6 vídeos</small></button>
+   <button class="memory-story day-four" data-memory-day="Dia 4 · Lisboa"><span>Dia 4</span><strong>Primeiro dia em Lisboa</strong><small>55 fotos · 3 vídeos</small></button>
+ </div>
 </section>
-<section class="section">
-  <div class="section-head">
-    <div><span class="eyebrow">Álbum de lembranças</span><h2>Uma história por dia</h2></div>
-    <button data-open-album>Ver tudo</button>
-  </div>
-  <div class="memory-story-grid">
-    <button class="memory-story day-one" data-memory-day="Dia 1 · Chegada ao Porto"><span>Dia 1</span><strong>Chegada ao Porto</strong><small>18 fotos · 2 vídeos</small></button>
-    <button class="memory-story day-two" data-memory-day="Dia 2 · Clássicos do Porto"><span>Dia 2</span><strong>Clássicos do Porto</strong><small>42 fotos · 4 vídeos</small></button>
-    <button class="memory-story day-three" data-memory-day="Dia 3 · Vale do Douro"><span>Dia 3</span><strong>Vale do Douro</strong><small>68 fotos · 6 vídeos</small></button>
-    <button class="memory-story day-four" data-memory-day="Dia 4 · Lisboa"><span>Dia 4</span><strong>Primeiro dia em Lisboa</strong><small>55 fotos · 3 vídeos</small></button>
-  </div>
+<section class="section"><div class="section-head"><h2>Melhor momento</h2><span class="chip green">Escolhido para você</span></div>
+ <div class="best-moment-card"><div class="best-moment-photo"><span>🌅</span></div><div><span class="eyebrow">Momento favorito</span><h3>Pôr do sol no Douro</h3><p>17 curtidas da família · foto mais compartilhada da viagem.</p><button class="btn btn-dark" data-memory-day="Pôr do sol no Douro">Relembrar</button></div></div>
 </section>
-<section class="section">
-  <div class="section-head"><h2>Melhor momento</h2><span class="chip green">Escolhido para você</span></div>
-  <div class="best-moment-card">
-    <div class="best-moment-photo">🌅</div>
-    <div>
-      <span class="eyebrow">Momento favorito</span>
-      <h3>Pôr do sol no Douro</h3>
-      <p>17 curtidas da família · foto mais compartilhada da viagem.</p>
-      <button class="btn btn-dark" data-memory-day="Pôr do sol no Douro">Relembrar</button>
-    </div>
-  </div>
-</section>
-<section class="section">
-  <div class="section-head"><h2>Estatísticas da viagem</h2><span class="chip green">Concluída</span></div>
-  <div class="activity-grid">
-    <div class="activity-card"><span>🚶</span><strong>118 km</strong><small>caminhados</small></div>
-    <div class="activity-card"><span>📸</span><strong>624</strong><small>fotos</small></div>
-    <div class="activity-card"><span>🍽️</span><strong>21</strong><small>restaurantes</small></div>
-    <div class="activity-card"><span>🏰</span><strong>34</strong><small>atrações</small></div>
-  </div>
-</section>
-<section class="section">
-  <div class="section-head">
-    <div><span class="eyebrow">Passaporte Indo por Aí</span><h2>Selos conquistados</h2></div>
-    <span class="chip orange">6 selos</span>
-  </div>
-  <div class="stamp-grid">
-    <button class="passport-stamp" data-memory-day="Portugal 2026"><span>🇵🇹</span><b>Portugal</b><small>2026</small></button>
-    <button class="passport-stamp" data-memory-day="Explorador da Ribeira"><span>🌉</span><b>Ribeira</b><small>Explorador</small></button>
-    <button class="passport-stamp" data-memory-day="Vale do Douro"><span>🍷</span><b>Douro</b><small>Wine lover</small></button>
-    <button class="passport-stamp" data-memory-day="Lisboa de Elétrico"><span>🚋</span><b>Lisboa</b><small>Elétrico 28</small></button>
-    <button class="passport-stamp" data-memory-day="Viagem em Família"><span>👨‍👩‍👧</span><b>Família</b><small>Juntos</small></button>
-    <button class="passport-stamp" data-memory-day="100 km explorados"><span>🏆</span><b>100 km</b><small>Explorados</small></button>
-  </div>
-</section>
-<section class="section">
-  <div class="book-card">
-    <div class="book-cover"><span>PORTUGAL</span><strong>2026</strong><small>Uma história Indo por Aí</small></div>
-    <div>
-      <span class="eyebrow">Livro da viagem</span>
-      <h3>205 páginas de lembranças</h3>
-      <p>Fotos, mapa, roteiro, restaurantes, mensagens, estatísticas e selos reunidos em um livro digital.</p>
-      <div class="book-actions"><button class="btn btn-primary" data-memory-day="Prévia do Livro da Viagem">Visualizar</button><button class="btn btn-light">Gerar PDF</button></div>
-    </div>
-  </div>
-</section>`}
-function modeCard(){return `<section class="section"><div class="card mode-card">
-  <span class="eyebrow">Simular momento da jornada</span>
-  <h2>${state.mode==='before'?'Preparando sua viagem':state.mode==='during'?'Vivendo sua viagem':'Reviva suas melhores memórias'}</h2>
-  <div class="mode-switch">
-    <button data-mode="before" class="${state.mode==='before'?'active':''}">Antes</button>
-    <button data-mode="during" class="${state.mode==='during'?'active':''}">Durante</button>
-    <button data-mode="after" class="${state.mode==='after'?'active':''}">Depois</button>
-  </div>
-</div></section>`}
+<section class="section"><div class="section-head"><h2>Sua jornada</h2><span class="chip green">Concluída</span></div><div class="activity-grid">
+ <div class="activity-card"><span>🚶</span><strong>118 km</strong><small>caminhados</small></div>
+ <div class="activity-card"><span>📸</span><strong>624</strong><small>fotos</small></div>
+ <div class="activity-card"><span>🍽️</span><strong>21</strong><small>restaurantes</small></div>
+ <div class="activity-card"><span>🏰</span><strong>34</strong><small>atrações</small></div>
+</div></section>
+<section class="section"><div class="section-head"><div><span class="eyebrow">Passaporte Indo por Aí</span><h2>Selos conquistados</h2></div><span class="chip orange">6 selos</span></div><div class="stamp-grid">
+ <button class="passport-stamp"><span>🇵🇹</span><b>Portugal</b><small>2026</small></button>
+ <button class="passport-stamp"><span>🌉</span><b>Ribeira</b><small>Explorador</small></button>
+ <button class="passport-stamp"><span>🍷</span><b>Douro</b><small>Wine lover</small></button>
+ <button class="passport-stamp"><span>🚋</span><b>Lisboa</b><small>Elétrico 28</small></button>
+ <button class="passport-stamp"><span>👨‍👩‍👧</span><b>Família</b><small>Juntos</small></button>
+ <button class="passport-stamp"><span>🏆</span><b>100 km</b><small>Explorados</small></button>
+</div></section>
+<section class="section"><div class="book-card"><div class="book-cover"><span>PORTUGAL</span><strong>2026</strong><small>Uma história Indo por Aí</small></div><div><span class="eyebrow">Livro da viagem</span><h3>205 páginas de lembranças</h3><p>Fotos, mapa, roteiro, restaurantes, mensagens, estatísticas e selos reunidos em um livro digital.</p><div class="book-actions"><button class="btn btn-primary">Visualizar</button><button class="btn btn-light">Gerar PDF</button></div></div></div></section>`}
+function modeCard(){return `<section class="section"><div class="card mode-card"><span class="eyebrow">Simular momento da jornada</span><h2>${state.mode==='before'?'Preparando sua viagem':state.mode==='during'?'Vivendo sua viagem':'Reviva suas melhores memórias'}</h2><div class="mode-switch"><button type="button" data-mode="before" class="${state.mode==='before'?'active':''}">Antes</button><button type="button" data-mode="during" class="${state.mode==='during'?'active':''}">Durante</button><button type="button" data-mode="after" class="${state.mode==='after'?'active':''}">Depois</button></div></div></section>`}
 function tripView(){
  const itineraries={
   1:[
@@ -250,77 +199,24 @@ function tripView(){
 <button class="smart-discovery-card" data-discovery='{"icon":"📸","name":"Miradouro da Vitória","rating":"⭐ 4,7","reviews":"2.109","description":"Mirante gratuito com uma das vistas mais bonitas do Porto, perfeito para fotos no fim da tarde.","distance":"400 m","detour":"12 min","price":"Grátis"}'><span class="smart-icon">📸</span><div><span class="eyebrow">Joia escondida</span><h3>Miradouro da Vitória</h3><p>⭐ 4,7 · 400 m · +12 min</p><small>Boa opção se houver tempo entre duas atividades.</small></div><span>›</span></button>
 </div></section><section class="section"><div class="card tomorrow-card"><span class="eyebrow">Prepare-se para amanhã</span><h3>${day===1?'Clássicos do Porto':day===2?'Vale do Douro':day===3?'Coimbra e Lisboa':'Primeiro dia em Lisboa'}</h3><p>Veja o clima, horário de saída, documentos e o que levar.</p><button class="btn btn-dark" data-modal="<h2>Amanhã</h2><p>☀️ Previsão: 23°C</p><p>👟 Use calçado confortável</p><p>🎟️ Leve o voucher disponível no app</p><p>🚐 Saída prevista: 08:00</p>">Ver preparação</button></div></section>`;
 }
-function exploreView(){return `<section class="section map-page-head">
-  <div class="section-head">
-    <div><span class="eyebrow">Mapa do dia</span><h2>Porto · Dia ${state.tripDay||1}</h2><p>6 paradas · 7,4 km · 4h20 de roteiro</p></div>
-    <span class="chip green">Rota ativa</span>
-  </div>
-</section>
-<section class="section">
-  <div class="route-map-fixed">
-    <svg viewBox="0 0 360 420" role="img" aria-label="Seis destinos do roteiro interligados e três pessoas no mapa">
-      <rect x="0" y="0" width="360" height="420" rx="24" class="map-bg"/>
-      <path d="M42 355 C85 320 68 260 120 238 C175 214 150 165 212 151 C270 138 270 88 318 58" class="day-route"/>
-      <g class="destination"><circle cx="42" cy="355" r="18"/><text x="42" y="361">1</text></g>
-      <g class="destination"><circle cx="88" cy="296" r="18"/><text x="88" y="302">2</text></g>
-      <g class="destination"><circle cx="120" cy="238" r="18"/><text x="120" y="244">3</text></g>
-      <g class="destination"><circle cx="176" cy="178" r="18"/><text x="176" y="184">4</text></g>
-      <g class="destination"><circle cx="254" cy="125" r="18"/><text x="254" y="131">5</text></g>
-      <g class="destination"><circle cx="318" cy="58" r="18"/><text x="318" y="64">6</text></g>
-      <g class="map-person person-me"><circle cx="146" cy="272" r="12"/><text x="163" y="277">Você</text></g>
-      <g class="map-person person-a"><circle cx="235" cy="204" r="12"/><text x="252" y="209">Ana</text></g>
-      <g class="map-person person-b"><circle cx="292" cy="298" r="12"/><text x="309" y="303">João</text></g>
-    </svg>
-    <div class="map-legend-fixed"><span><i class="legend-route"></i>Roteiro</span><span><i class="legend-me"></i>Você</span><span><i class="legend-group"></i>Grupo</span></div>
-  </div>
-  <div class="map-actions">
-    <button class="btn btn-primary" id="shareLocationBtn">Compartilhar localização</button>
-    <button class="btn btn-light" data-map="Torre dos Clérigos Porto">Abrir no Google Maps</button>
-  </div>
-</section>
-<section class="section">
-  <div class="section-head"><h2>Pontos do roteiro</h2><span class="chip">A pé</span></div>
-  <div class="map-stop-list">
-    <button class="map-stop"><span>1</span><div><b>Hotel</b><small>08:30 · Saída</small></div><em>0 km</em></button>
-    <button class="map-stop"><span>2</span><div><b>Torre dos Clérigos</b><small>09:00 · 18 min</small></div><em>1,2 km</em></button>
-    <button class="map-stop"><span>3</span><div><b>Livraria Lello</b><small>10:30 · 6 min</small></div><em>350 m</em></button>
-    <button class="map-stop"><span>4</span><div><b>Taberna dos Mercadores</b><small>13:00 · 14 min</small></div><em>900 m</em></button>
-    <button class="map-stop"><span>5</span><div><b>Cruzeiro no Douro</b><small>16:00 · 8 min</small></div><em>550 m</em></button>
-    <button class="map-stop"><span>6</span><div><b>Retorno ao hotel</b><small>19:00 · 22 min</small></div><em>1,8 km</em></button>
-  </div>
-</section>
-<section class="section">
-  <div class="section-head"><h2>Pessoas no mapa</h2><span class="chip green">3 online</span></div>
-  <div class="people-map-list">
-    <button data-person="Ana"><span class="avatar">A</span><div><b>Ana</b><small>280 m de você · agora</small></div><span>Ver rota</span></button>
-    <button data-person="João"><span class="avatar">J</span><div><b>João</b><small>620 m de você · há 1 min</small></div><span>Ver rota</span></button>
-  </div>
-</section>`}
+function exploreView(){return `<section class="section" style="margin-top:0"><div class="section-head"><div><span class="eyebrow">Roteiro inteligente</span><h2>Mapa do dia</h2></div><span class="chip">🚶 8,4 km</span></div></section><section class="section"><div class="map-wrap"><div class="map-grid"></div><div class="river"></div><svg class="route-svg" viewBox="0 0 400 500"><path d="M95 90 C120 170, 260 120, 245 215 S145 300, 215 355 S300 390, 280 430" fill="none" stroke="#147ce5" stroke-width="5" stroke-linecap="round" stroke-dasharray="8 10"/></svg><div class="pin p1"><span>1</span></div><div class="pin p2"><span>2</span></div><div class="pin p3"><span>3</span></div><div class="pin p4"><span>4</span></div><button class="map-fab">➤</button><div class="map-card"><div><b>Torre dos Clérigos</b><p>350 m · 5 min caminhando</p></div><button class="btn btn-primary" data-map="Torre dos Clérigos Porto">Ir agora</button></div></div></section>
+ <section class="section"><div class="section-head"><div><span class="eyebrow">Rota completa do dia</span><h2>Todos os pontos interligados</h2></div><span class="chip green">6 paradas</span></div><div class="route-summary"><div class="route-line"></div><div class="route-stop"><span>1</span><div><b>Hotel</b><small>08:30 · saída</small></div></div><div class="route-stop"><span>2</span><div><b>Torre dos Clérigos</b><small>09:00 · 1,2 km</small></div></div><div class="route-stop"><span>3</span><div><b>Livraria Lello</b><small>10:30 · 350 m</small></div></div><div class="route-stop"><span>4</span><div><b>Taberna dos Mercadores</b><small>13:00 · 900 m</small></div></div><div class="route-stop"><span>5</span><div><b>Cruzeiro no Douro</b><small>16:00 · 550 m</small></div></div><div class="route-stop"><span>6</span><div><b>Retorno ao hotel</b><small>19:00 · 1,8 km</small></div></div></div></section>
+ <section class="section"><div class="section-head"><h2>Mapa do grupo</h2><span class="chip green">3 online</span></div><div class="people-map-list"><button data-person="Ana"><span class="avatar">A</span><div><b>Ana</b><small>280 m de você · agora</small></div><span>Ver rota</span></button><button data-person="João"><span class="avatar">J</span><div><b>João</b><small>620 m de você · há 1 min</small></div><span>Ver rota</span></button></div><button class="btn btn-primary btn-block" id="shareLocationBtn">Compartilhar minha localização</button><p class="privacy-note">A localização fica desativada por padrão e pode ser encerrada a qualquer momento.</p></section>`}
 function communityView(){return `<section class="section" style="margin-top:0"><div class="section-head"><div><span class="eyebrow">Portugal 2026 · 28 pessoas</span><h2>Grupo da viagem</h2></div><button id="liveBtn">🔴 Iniciar live</button></div><div class="card"><div class="people"><div class="person"><i>RF</i><small>Renato</small></div><div class="person"><i>MS</i><small>Marina</small></div><div class="person"><i>CS</i><small>Carlos</small></div><div class="person"><i>JS</i><small>Julia</small></div><div class="person"><i>+8</i><small>Mais</small></div></div></div></section><section class="section"><div class="message guide"><b>📢 Aviso do guia</b><br>Amanhã sairemos às 8h30. O ponto de encontro será na recepção do hotel.<small>09:30</small></div><div class="chat">${state.messages.map(m=>`<div class="message ${m.type==='me'?'me':m.type==='guide'?'guide':''}"><b>${m.name}</b><br>${m.text}<small>${m.time}</small></div>`).join('')}</div><div class="composer"><input id="messageInput" placeholder="Digite uma mensagem..."/><button class="btn btn-purple" id="sendMessage">➤</button></div></section>`}
-function memoriesView(){return `<section class="album-hero">
-  <span class="eyebrow">Álbum da viagem</span>
-  <h1>Portugal 2026</h1>
-  <p>Organizado automaticamente por dias, lugares e momentos.</p>
-  <div class="album-stats"><span>📸 624 fotos</span><span>🎥 27 vídeos</span><span>📍 34 lugares</span></div>
-</section>
-<section class="section">
-  <div class="section-head"><h2>Dias da viagem</h2><button id="addPhoto">+ Adicionar foto</button></div>
-  <div class="album-timeline">
-    <button class="album-day" data-memory-day="Dia 1 · Chegada ao Porto"><div class="album-day-cover cover-airport">✈️</div><div><span>Dia 1</span><h3>Chegada ao Porto</h3><p>Aeroporto, hotel, Ribeira e primeiro jantar.</p><small>18 fotos · 2 vídeos</small></div><b>›</b></button>
-    <button class="album-day" data-memory-day="Dia 2 · Clássicos do Porto"><div class="album-day-cover cover-city">🏰</div><div><span>Dia 2</span><h3>Clássicos do Porto</h3><p>Clérigos, Livraria Lello e Cruzeiro das Seis Pontes.</p><small>42 fotos · 4 vídeos</small></div><b>›</b></button>
-    <button class="album-day" data-memory-day="Dia 3 · Vale do Douro"><div class="album-day-cover cover-wine">🍷</div><div><span>Dia 3</span><h3>Vale do Douro</h3><p>Vinícola, almoço harmonizado e passeio de barco.</p><small>68 fotos · 6 vídeos</small></div><b>›</b></button>
-    <button class="album-day" data-memory-day="Dia 4 · Lisboa"><div class="album-day-cover cover-lisbon">🚋</div><div><span>Dia 4</span><h3>Lisboa</h3><p>Belém, elétrico, miradouros e jantar de despedida.</p><small>55 fotos · 3 vídeos</small></div><b>›</b></button>
-  </div>
-</section>
-<section class="section">
-  <div class="section-head"><h2>Momentos favoritos</h2><span class="chip orange">Selecionados por IA</span></div>
-  <div class="favorite-grid">
-    <button data-memory-day="Pôr do sol no Douro"><span>🌅</span><b>Pôr do sol</b><small>Douro</small></button>
-    <button data-memory-day="Primeiro brinde"><span>🥂</span><b>Primeiro brinde</b><small>Porto</small></button>
-    <button data-memory-day="Passeio em família"><span>👨‍👩‍👧</span><b>Em família</b><small>Lisboa</small></button>
-    <button data-memory-day="Vista da Ribeira"><span>🌉</span><b>Ribeira</b><small>Porto</small></button>
-  </div>
-</section>`}
+function memoriesView(){return `<section class="album-hero"><span class="eyebrow">Álbum da viagem</span><h1>Portugal 2026</h1><p>Organizado automaticamente por dias, lugares e momentos.</p><div class="album-stats"><span>📸 624 fotos</span><span>🎥 27 vídeos</span><span>📍 34 lugares</span></div></section>
+<section class="section"><div class="section-head"><h2>Dias da viagem</h2><button id="addPhoto">+ Adicionar foto</button></div><div class="album-timeline">
+ <button class="album-day" data-memory-day="Dia 1 · Chegada ao Porto"><div class="album-day-cover cover-airport">✈️</div><div><span>Dia 1</span><h3>Chegada ao Porto</h3><p>Aeroporto, hotel, Ribeira e primeiro jantar.</p><small>18 fotos · 2 vídeos</small></div><b>›</b></button>
+ <button class="album-day" data-memory-day="Dia 2 · Clássicos do Porto"><div class="album-day-cover cover-city">🏰</div><div><span>Dia 2</span><h3>Clássicos do Porto</h3><p>Clérigos, Livraria Lello e Cruzeiro das Seis Pontes.</p><small>42 fotos · 4 vídeos</small></div><b>›</b></button>
+ <button class="album-day" data-memory-day="Dia 3 · Vale do Douro"><div class="album-day-cover cover-wine">🍷</div><div><span>Dia 3</span><h3>Vale do Douro</h3><p>Vinícola, almoço harmonizado e passeio de barco.</p><small>68 fotos · 6 vídeos</small></div><b>›</b></button>
+ <button class="album-day" data-memory-day="Dia 4 · Lisboa"><div class="album-day-cover cover-lisbon">🚋</div><div><span>Dia 4</span><h3>Lisboa</h3><p>Belém, elétrico, miradouros e jantar de despedida.</p><small>55 fotos · 3 vídeos</small></div><b>›</b></button>
+</div></section>
+<section class="section"><div class="section-head"><h2>Momentos favoritos</h2><span class="chip orange">Selecionados por IA</span></div><div class="favorite-grid">
+ <button data-memory-day="Pôr do sol no Douro"><span>🌅</span><b>Pôr do sol</b><small>Douro</small></button>
+ <button data-memory-day="Primeiro brinde"><span>🥂</span><b>Primeiro brinde</b><small>Porto</small></button>
+ <button data-memory-day="Passeio em família"><span>👨‍👩‍👧</span><b>Em família</b><small>Lisboa</small></button>
+ <button data-memory-day="Vista da Ribeira"><span>🌉</span><b>Ribeira</b><small>Porto</small></button>
+</div></section>
+<section class="section"><div class="section-head"><h2>Fotos adicionadas por você</h2></div><div class="photo-grid">${state.photos.length?state.photos.map((src,i)=>`<div class="photo"><img src="${src}" alt="Foto da viagem"><em>Memória ${i+1}</em></div>`).join(''):`<div class="empty-memory"><span>📷</span><h3>Seu álbum está esperando novas memórias</h3><p>Adicione fotos do celular para visualizar aqui.</p><button class="btn btn-primary" id="addPhoto">Adicionar fotos</button></div>`}</div></section>`}
 function liveView(){return `<section class="live-stage"><img class="live-video" src="https://images.unsplash.com/photo-1555881400-74d7acaacd8b?auto=format&fit=crop&w=1200&q=85" alt="Simulação de transmissão em Porto"><div class="live-top"><span class="live-badge">● AO VIVO · ${timeFmt(state.liveSeconds)}</span><span>👥 ${state.liveViewers}</span></div><div class="live-comments"><div class="live-comment"><b>João</b> Onde nos encontramos?</div><div class="live-comment"><b>Marina</b> Que lugar lindo! ❤️</div><div class="live-comment"><b>Você</b> Entrada principal, direto ao ponto 1.</div></div><div class="live-reactions" id="liveReactions"></div><div class="live-controls"><button id="livePhoto">📷</button><button id="liveMic">🎙️</button><button class="hang" id="liveBtn">✕</button><button id="shareLocation">📍</button></div></section><section class="section"><div class="live-metrics"><div class="card"><strong>${state.liveViewers}</strong><small>Assistindo</small></div><div class="card"><strong>${state.reactions}</strong><small>Reações</small></div><div class="card"><strong>${state.messages.length}</strong><small>Mensagens</small></div></div><div class="live-actions"><button data-reaction="❤️">❤️ Curtir</button><button data-reaction="👏">👏 Aplaudir</button><button data-reaction="🔥">🔥 Incrível</button></div></section><section class="section"><div class="card"><h3>Simulação do Modo Live</h3><p>O cronômetro, audiência, reações, foto, microfone e localização funcionam localmente para você testar a experiência.</p></div></section>`}
 function submitLead(e){e.preventDefault();state.leadStage='sent';toast('Solicitação enviada para a equipe');render()}
 function toggleLive(){state.live=!state.live;state.route='community';if(state.live){state.liveSeconds=0;state.liveTimer=setInterval(()=>{state.liveSeconds++;const badge=document.querySelector('.live-badge');if(badge)badge.textContent=`● AO VIVO · ${timeFmt(state.liveSeconds)}`},1000)}else{clearInterval(state.liveTimer);state.liveTimer=null}toast(state.live?'Transmissão iniciada para o grupo':'Transmissão encerrada');render()}
@@ -334,42 +230,9 @@ render();
 
 
 function openTravelMovie(){
-  showModal(`<div class="fake-movie-player">
-    <div class="fake-movie-screen">
-      <div class="movie-scene"><span>PORTUGAL 2026</span><strong>Uma história Indo por Aí</strong><small id="movieSceneLabel">Porto · Dia 1</small></div>
-      <button class="fake-play-button" id="fakePlayButton">▶</button>
-      <div class="fake-progress"><span id="fakeMovieProgress"></span></div>
-    </div>
-    <div class="fake-movie-details">
-      <h2>Seu filme da viagem</h2>
-      <p id="fakeMovieText">Toque em Play para assistir à simulação.</p>
-      <div class="movie-chapters"><span>00:00 Porto</span><span>00:42 Douro</span><span>01:28 Lisboa</span><span>02:18 Créditos</span></div>
-    </div>
-  </div>`);
-  setTimeout(()=>{
-    const btn=document.querySelector('#fakePlayButton');
-    const bar=document.querySelector('#fakeMovieProgress');
-    const text=document.querySelector('#fakeMovieText');
-    const scene=document.querySelector('#movieSceneLabel');
-    if(!btn)return;
-    btn.onclick=()=>{
-      btn.textContent='❚❚';
-      bar.style.width='100%';
-      text.textContent='Reproduzindo a simulação do filme Portugal 2026.';
-      const scenes=['Porto · Dia 1','Vale do Douro · Dia 3','Lisboa · Dia 6','Obrigado por viajar com o Indo por Aí'];
-      let i=0;
-      const timer=setInterval(()=>{i++; if(scene)scene.textContent=scenes[Math.min(i,scenes.length-1)]; if(i>=scenes.length-1)clearInterval(timer);},800);
-      setTimeout(()=>{btn.textContent='▶';bar.style.width='8%';text.textContent='Demonstração concluída.';},3400);
-    };
-  },0);
+ showModal(`<div class="fake-movie-player"><div class="fake-movie-screen"><div class="movie-scene"><span>PORTUGAL 2026</span><strong>Uma história Indo por Aí</strong></div><button class="fake-play-button" id="fakePlayButton">▶</button><div class="fake-progress"><span id="fakeMovieProgress"></span></div></div><div class="fake-movie-details"><h2>Seu filme da viagem</h2><p id="fakeMovieText">Abertura cinematográfica · mapa animado · melhores momentos · créditos finais.</p><div class="movie-chapters"><span>00:00 Porto</span><span>00:42 Douro</span><span>01:28 Lisboa</span><span>02:18 Créditos</span></div></div></div>`);
+ setTimeout(()=>{const btn=document.querySelector('#fakePlayButton');const bar=document.querySelector('#fakeMovieProgress');const text=document.querySelector('#fakeMovieText');if(btn)btn.onclick=()=>{btn.textContent='❚❚';if(bar)bar.style.width='78%';if(text)text.textContent='Reproduzindo uma demonstração fictícia do filme Portugal 2026.';setTimeout(()=>{if(btn)btn.textContent='▶';},3500);};},0);
 }
 function showMemoryDay(title){
-  showModal(`<div class="memory-day-modal">
-    <span class="eyebrow">Álbum de lembranças</span><h2>${title}</h2>
-    <div class="memory-modal-grid">
-      <div>📸<small>Foto favorita</small></div><div>🎥<small>Vídeo do dia</small></div>
-      <div>📍<small>Mapa visitado</small></div><div>❤️<small>Momento salvo</small></div>
-    </div>
-    <p>Demonstração visual do conteúdo que será organizado automaticamente para cada dia.</p>
-  </div>`);
+ showModal(`<div class="memory-day-modal"><span class="eyebrow">Álbum de lembranças</span><h2>${title}</h2><div class="memory-modal-grid"><div>📸<small>Foto favorita</small></div><div>🎥<small>Vídeo do dia</small></div><div>📍<small>Mapa visitado</small></div><div>❤️<small>Momento salvo</small></div></div><p>Esta é uma demonstração visual. Na versão real, as fotos, vídeos, locais, avaliações e mensagens daquele dia aparecerão aqui automaticamente.</p></div>`);
 }

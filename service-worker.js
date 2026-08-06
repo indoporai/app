@@ -1,10 +1,9 @@
-
-const CACHE = "indo-por-ai-correcao-depois-mapa-v11";
+const CACHE = "indo-por-ai-depois-fix-v11";
 const CORE = [
   "./",
   "index.html",
-  "styles.css?v=logo-final-4",
-  "app.js?v=logo-final-4",
+  "styles.css?v=depois-fix-11",
+  "app.js?v=depois-fix-11",
   "manifest.webmanifest",
   "assets/apple-touch-icon.png",
   "assets/icon-192.png",
@@ -13,7 +12,9 @@ const CORE = [
 
 self.addEventListener("install", event => {
   event.waitUntil(
-    caches.open(CACHE).then(cache => cache.addAll(CORE)).then(() => self.skipWaiting())
+    caches.open(CACHE)
+      .then(cache => cache.addAll(CORE))
+      .then(() => self.skipWaiting())
   );
 });
 
@@ -26,16 +27,20 @@ self.addEventListener("activate", event => {
 });
 
 self.addEventListener("fetch", event => {
-  const url = new URL(event.request.url);
-  const isCore = url.pathname.endsWith("index.html") ||
-                 url.pathname.endsWith("app.js") ||
-                 url.pathname.endsWith("styles.css") ||
-                 url.pathname === "/" ||
-                 url.pathname.endsWith("/");
+  if (event.request.method !== "GET") return;
 
-  if (isCore) {
+  const url = new URL(event.request.url);
+  const coreFile =
+    url.pathname === "/" ||
+    url.pathname.endsWith("/") ||
+    url.pathname.endsWith("index.html") ||
+    url.pathname.endsWith("app.js") ||
+    url.pathname.endsWith("styles.css") ||
+    url.pathname.endsWith("service-worker.js");
+
+  if (coreFile) {
     event.respondWith(
-      fetch(event.request)
+      fetch(event.request, { cache: "no-store" })
         .then(response => {
           const copy = response.clone();
           caches.open(CACHE).then(cache => cache.put(event.request, copy));
