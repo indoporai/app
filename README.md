@@ -9,4 +9,3 @@ Mantém o Modelo Ideal aprovado e adiciona:
 - rodapé com @indo.por.ai.com.a.gente.
 
 Suba todos os arquivos para a raiz do GitHub, incluindo `_headers`.
-Forçar nova implantação do pacote com vídeo e álbum

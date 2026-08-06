@@ -1,5 +1,5 @@
 
-const CACHE = "indo-por-ai-video-album-v10";
+const CACHE = "indo-por-ai-correcao-depois-mapa-v11";
 const CORE = [
   "./",
   "index.html",
