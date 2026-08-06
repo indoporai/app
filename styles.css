@@ -97,3 +97,20 @@ body{min-height:100vh}.app-shell{width:min(100%,520px);min-height:100vh;margin:a
 .fake-movie-player{background:#111;color:#fff;border-radius:20px;overflow:hidden}.fake-movie-screen{height:330px;position:relative;background:linear-gradient(180deg,#79bdd0,#f2b86b 55%,#236c82 56%)}.movie-scene{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-shadow:0 2px 8px rgba(0,0,0,.65)}.movie-scene span{font-size:14px;letter-spacing:.18em}.movie-scene strong{font-size:28px;margin-top:8px}.fake-play-button{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:72px;height:72px;border:0;border-radius:50%;background:#fff;color:#f47a2a;font-size:28px}.fake-progress{position:absolute;left:14px;right:14px;bottom:13px;height:6px;background:rgba(255,255,255,.3);border-radius:999px;overflow:hidden}.fake-progress span{display:block;width:8%;height:100%;background:#fff;transition:width 3s linear}.fake-movie-details{padding:18px}.fake-movie-details p{color:rgba(255,255,255,.72)}.movie-chapters{display:flex;gap:7px;flex-wrap:wrap}.movie-chapters span{background:#262626;border-radius:999px;padding:7px 9px;font-size:11px}
 .memory-modal-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:9px;margin:17px 0}.memory-modal-grid div{background:#f4f8f7;border-radius:17px;padding:20px;text-align:center;font-size:30px}.memory-modal-grid small{display:block;font-size:11px;margin-top:7px;color:#6f7e80}
 @media(max-width:390px){.best-moment-card,.book-card{grid-template-columns:1fr}.book-cover{min-height:155px}.memory-hero-actions .btn{width:100%}}
+
+/* Correção definitiva do seletor Antes / Durante / Depois */
+.mode-card::after{
+  pointer-events:none !important;
+}
+.mode-card .eyebrow,
+.mode-card h2,
+.mode-card .mode-switch{
+  position:relative;
+  z-index:3;
+}
+.mode-switch button{
+  position:relative;
+  z-index:4;
+  touch-action:manipulation;
+  -webkit-tap-highlight-color:transparent;
+}

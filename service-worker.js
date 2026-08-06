@@ -1,9 +1,9 @@
-const CACHE = "indo-por-ai-depois-fix-v11";
+const CACHE = "indo-por-ai-depois-fix-v12";
 const CORE = [
   "./",
   "index.html",
-  "styles.css?v=depois-fix-11",
-  "app.js?v=depois-fix-11",
+  "styles.css?v=depois-fix-12",
+  "app.js?v=depois-fix-12",
   "manifest.webmanifest",
   "assets/apple-touch-icon.png",
   "assets/icon-192.png",
@@ -28,9 +28,8 @@ self.addEventListener("activate", event => {
 
 self.addEventListener("fetch", event => {
   if (event.request.method !== "GET") return;
-
   const url = new URL(event.request.url);
-  const coreFile =
+  const core =
     url.pathname === "/" ||
     url.pathname.endsWith("/") ||
     url.pathname.endsWith("index.html") ||
@@ -38,7 +37,7 @@ self.addEventListener("fetch", event => {
     url.pathname.endsWith("styles.css") ||
     url.pathname.endsWith("service-worker.js");
 
-  if (coreFile) {
+  if (core) {
     event.respondWith(
       fetch(event.request, { cache: "no-store" })
         .then(response => {
