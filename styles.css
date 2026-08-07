@@ -137,3 +137,34 @@ body{min-height:100vh}.app-shell{width:min(100%,520px);min-height:100vh;margin:a
 .v2-concierge-grid,.v2-admin-actions{display:grid;grid-template-columns:repeat(2,1fr);gap:9px;margin:16px 0}.v2-concierge-grid button,.v2-admin-actions button{border:1px solid #e2e9e7;background:#f7faf9;border-radius:16px;padding:15px;text-align:left}.v2-concierge-input{width:100%;box-sizing:border-box;border:1px solid #dce5e2;border-radius:14px;padding:13px;font-size:16px;margin:8px 0 12px}
 .v2-diary-stats{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin:15px 0}.v2-diary-stats span{background:#f4f8f7;border-radius:14px;padding:12px}.v2-diary-highlight{display:flex;gap:12px;align-items:center;background:#fff5df;border-radius:17px;padding:15px;font-size:32px}.v2-diary-highlight b,.v2-diary-highlight small{display:block}.v2-admin-metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:14px 0}.v2-admin-metrics div{background:#f4f8f7;border-radius:15px;padding:13px;text-align:center}.v2-admin-metrics strong,.v2-admin-metrics small{display:block}.v2-admin-metrics strong{font-size:24px}.v2-admin-metrics small{color:#748285}
 @media(max-width:430px){.v2-hero-top{flex-direction:column}.v2-weather{align-self:flex-start}.v2-next-card{grid-template-columns:64px 1fr}.v2-next-card .btn{grid-column:1/-1;width:100%}.v2-discovery-scroll{grid-template-columns:1fr}.v2-alert-card,.v2-diary-card,.v2-next-trip-card{grid-template-columns:auto 1fr}.v2-alert-card .btn,.v2-diary-card .btn,.v2-next-trip-card .btn{grid-column:1/-1;width:100%}}
+
+/* Indo por Aí V2 Beta 1 */
+.v2-splash{position:fixed;inset:0;z-index:9999;background:linear-gradient(180deg,#86cbd5,#f8d59c);display:flex;align-items:center;justify-content:center;overflow:hidden;transition:opacity .55s ease,visibility .55s ease}
+.v2-splash.hide{opacity:0;visibility:hidden;pointer-events:none}
+.splash-cloud{position:absolute;font-size:72px;opacity:.72;animation:splashCloud 5s linear infinite}.cloud-a{top:18%;left:-10%}.cloud-b{bottom:20%;right:-12%;animation-delay:-2s}
+.splash-plane{position:absolute;font-size:56px;animation:splashPlane 1.7s cubic-bezier(.4,0,.2,1) forwards}
+.splash-brand{display:flex;flex-direction:column;align-items:center;gap:6px;color:#fff;text-shadow:0 2px 12px rgba(0,0,0,.2);opacity:0;animation:splashBrand .8s ease .75s forwards}
+.splash-brand strong{font-size:34px}.splash-brand small{font-size:13px}
+@keyframes splashPlane{0%{transform:translate(-180px,100px) rotate(-10deg);opacity:0}25%{opacity:1}100%{transform:translate(180px,-90px) rotate(-4deg);opacity:.2}}
+@keyframes splashCloud{from{transform:translateX(0)}to{transform:translateX(130vw)}}@keyframes splashBrand{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+
+.v2-boarding-pass{width:100%;border:0;background:#fff;border-radius:24px;padding:0;overflow:hidden;text-align:left;color:inherit;box-shadow:var(--shadow)}
+.boarding-main{display:grid;grid-template-columns:1fr 90px 1fr;align-items:center;gap:8px;padding:20px;background:linear-gradient(135deg,#0b5059,#0f7f86);color:#fff}
+.boarding-main>div:last-child{text-align:right}.boarding-main strong{font-size:30px;display:block}.boarding-main small{color:rgba(255,255,255,.72)}
+.boarding-route{text-align:center}.boarding-route span{font-size:27px;display:block}.boarding-route b{font-size:11px;color:rgba(255,255,255,.72)}
+.boarding-divider{height:1px;border-top:2px dashed #dce7e4;position:relative}.boarding-divider:before,.boarding-divider:after{content:"";position:absolute;top:-10px;width:20px;height:20px;border-radius:50%;background:var(--bg)}.boarding-divider:before{left:-10px}.boarding-divider:after{right:-10px}
+.boarding-meta{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:16px}.boarding-meta small,.boarding-meta b{display:block}.boarding-meta small{color:#748285;font-size:10px}.boarding-meta b{margin-top:3px}
+.boarding-modal-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:9px;margin:16px 0}.boarding-modal-grid div{background:#f4f8f7;border-radius:15px;padding:13px}.boarding-modal-grid small,.boarding-modal-grid strong{display:block}.boarding-modal-grid small{color:#748285}.boarding-actions{display:flex;gap:8px;flex-wrap:wrap}
+
+.concierge-result-card{text-align:center}.concierge-result-icon{width:78px;height:78px;border-radius:24px;background:linear-gradient(135deg,#fff0d5,#e5f7f2);display:grid;place-items:center;font-size:38px;margin:0 auto 12px}
+.concierge-result-meta{display:flex;justify-content:center;gap:8px;flex-wrap:wrap;margin:12px 0}.concierge-result-meta span{background:#f4f8f7;border-radius:999px;padding:7px 9px;font-size:12px;font-weight:800}
+
+.diary-page-hero{border-radius:28px;padding:27px;background:linear-gradient(145deg,#0f7f86,#f0a148);color:#fff}.diary-page-hero p{color:rgba(255,255,255,.82)}
+.diary-page-metrics{display:flex;gap:8px;flex-wrap:wrap;margin-top:15px}.diary-page-metrics span{background:rgba(255,255,255,.17);padding:8px 10px;border-radius:999px;font-size:12px;font-weight:800}
+.diary-feature-photo{min-height:260px;border-radius:24px;background:linear-gradient(180deg,#f6a15e,#69396b);display:flex;align-items:flex-end;padding:22px;color:#fff;position:relative;overflow:hidden}
+.diary-feature-photo>span{position:absolute;right:25px;top:22px;font-size:72px}.diary-feature-photo small,.diary-feature-photo strong{display:block}.diary-feature-photo strong{font-size:25px;margin:4px 0}.diary-feature-photo p{color:rgba(255,255,255,.8);max-width:360px}
+.diary-timeline{display:flex;flex-direction:column;gap:0}.diary-timeline>div{display:grid;grid-template-columns:52px 42px 1fr;gap:10px;align-items:center;padding:12px 0;border-bottom:1px solid #e8eeec}
+.diary-timeline time{font-weight:900}.diary-timeline>div>span{width:42px;height:42px;border-radius:14px;background:#eef7f4;display:grid;place-items:center;font-size:21px}.diary-timeline b,.diary-timeline small{display:block}.diary-timeline small{color:#748285;margin-top:3px}
+.diary-curiosity{display:flex;gap:12px;align-items:flex-start;background:#fff8df;border-radius:20px;padding:17px}.diary-curiosity>span{font-size:27px}.diary-curiosity p{margin:0}
+.diary-quote{margin:0;background:#fff;border-left:5px solid #f47a2a;border-radius:0 20px 20px 0;padding:20px;font-size:18px;line-height:1.5;box-shadow:var(--shadow)}
+@media(max-width:430px){.boarding-main{grid-template-columns:1fr 62px 1fr}.boarding-meta{grid-template-columns:repeat(2,1fr)}}

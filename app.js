@@ -12,7 +12,7 @@ const state={route:'today',mode:'during',profile:savedProfile,leadStage:'new',tr
  {type:'other',name:'Juliana',text:'Perfeito! Já estamos a caminho ☀️',time:'08:47'},
  {type:'other',name:'Carlos',text:'Alguém sabe se vai chover à tarde?',time:'08:50'}
 ]};
-const titles={today:'Hoje',trip:'Minha Viagem',explore:'Explorar',community:'Grupo da viagem',memories:'Memórias',prospect:'Planejar viagem'};
+const titles={today:'Hoje',trip:'Minha Viagem',explore:'Explorar',community:'Grupo da viagem',memories:'Memórias',diary:'Diário da Viagem',prospect:'Planejar viagem'};
 
 document.addEventListener('click', event => {
  const modeButton = event.target.closest('[data-mode]');
@@ -62,6 +62,9 @@ function bind(){
  document.querySelectorAll('[data-journey-step]').forEach(btn=>btn.onclick=()=>showJourneyStep(btn.dataset.journeyStep));
  document.querySelectorAll('[data-diary]').forEach(btn=>btn.onclick=()=>showTravelDiary());
  document.querySelectorAll('[data-admin-preview]').forEach(btn=>btn.onclick=()=>showAdminPreview());
+ document.querySelectorAll('[data-boarding-pass]').forEach(btn=>btn.onclick=()=>showBoardingPass());
+ document.querySelectorAll('[data-open-diary-page]').forEach(btn=>btn.onclick=()=>{state.route='diary';render();});
+ document.querySelectorAll('[data-concierge-choice]').forEach(btn=>btn.onclick=()=>showConciergeResult(btn.dataset.conciergeChoice));
  const instagramBtn=document.querySelector('#instagramBtn');
  if(instagramBtn)instagramBtn.onclick=()=>window.open('https://www.instagram.com/indo.por.ai.com.a.gente/','_blank');
  document.querySelectorAll('[data-discovery]').forEach(card=>card.onclick=()=>{
@@ -128,7 +131,7 @@ ${modeCard()}
   <button class="v2-discovery-card" data-discovery='{"icon":"📸","name":"Miradouro da Vitória","rating":"⭐ 4,7","reviews":"2.109","description":"Um dos melhores miradouros gratuitos do Porto.","distance":"400 m","detour":"12 min","price":"Grátis"}'><span>📸</span><b>Miradouro</b><small>400 m · 4,7</small></button>
  </div>
 </section>
-<section class="section"><div class="v2-diary-card"><div><span class="eyebrow">Diário da viagem</span><h3>Seu Dia 3 já está sendo escrito.</h3><p>8,6 km, 5 experiências e 36 novas lembranças.</p></div><button class="btn btn-primary" data-diary="true">Ver diário</button></div></section>
+<section class="section"><div class="v2-diary-card"><div><span class="eyebrow">Diário da viagem</span><h3>Seu Dia 3 já está sendo escrito.</h3><p>8,6 km, 5 experiências e 36 novas lembranças.</p></div><button class="btn btn-primary" data-open-diary-page="true">Ver diário completo</button></div></section>
 <section class="section"><div class="v2-tool-grid"><button data-go="explore"><span>🗺️</span><b>Mapa</b><small>Rota do dia</small></button><button id="realLiveBtn"><span>🔴</span><b>Live</b><small>Transmitir agora</small></button><button data-go="community"><span>👥</span><b>Grupo</b><small>12 mensagens</small></button><button data-admin-preview="true"><span>⚙️</span><b>Administrador</b><small>Prévia</small></button></div></section>`}
 function beforeView(){return `<section class="v2-hero v2-before-hero">
  <div class="v2-hero-top"><div><span class="eyebrow">Antes da viagem</span><h1>Portugal já está esperando por você. 🇵🇹</h1><p>Faltam 14 dias. Sua preparação está 72% concluída.</p></div><span class="v2-weather">🌤️ 22°C</span></div>
@@ -136,6 +139,19 @@ function beforeView(){return `<section class="v2-hero v2-before-hero">
  <button class="btn btn-primary btn-block" data-go="trip">Continuar planejamento</button>
 </section>
 ${modeCard()}
+<section class="section"><div class="section-head"><div><span class="eyebrow">Cartão da viagem</span><h2>Seu embarque em um toque</h2></div><span class="chip green">Confirmado</span></div>
+ <button class="v2-boarding-pass" data-boarding-pass="true">
+  <div class="boarding-main">
+   <div><span class="eyebrow">PORTUGAL 2026</span><strong>GRU</strong><small>São Paulo</small></div>
+   <div class="boarding-route"><span>✈️</span><b>10h15</b></div>
+   <div><span class="eyebrow">DESTINO</span><strong>OPO</strong><small>Porto</small></div>
+  </div>
+  <div class="boarding-divider"></div>
+  <div class="boarding-meta">
+   <div><small>Data</small><b>05 SET</b></div><div><small>Embarque</small><b>21:40</b></div><div><small>Portão</small><b>A12</b></div><div><small>Assento</small><b>14A</b></div>
+  </div>
+ </button>
+</section>
 <section class="section"><div class="section-head"><div><span class="eyebrow">Sua jornada até o embarque</span><h2>Preparação da viagem</h2></div><span class="chip green">72%</span></div>
  <div class="v2-journey">
   <button class="v2-journey-step done" data-journey-step="Compra concluída"><span>✓</span><div><b>Compra</b><small>Viagem confirmada</small></div></button>
@@ -243,6 +259,17 @@ function exploreView(){return `<section class="section" style="margin-top:0"><di
  <section class="section"><div class="section-head"><div><span class="eyebrow">Rota completa do dia</span><h2>Todos os pontos interligados</h2></div><span class="chip green">6 paradas</span></div><div class="route-summary"><div class="route-line"></div><div class="route-stop"><span>1</span><div><b>Hotel</b><small>08:30 · saída</small></div></div><div class="route-stop"><span>2</span><div><b>Torre dos Clérigos</b><small>09:00 · 1,2 km</small></div></div><div class="route-stop"><span>3</span><div><b>Livraria Lello</b><small>10:30 · 350 m</small></div></div><div class="route-stop"><span>4</span><div><b>Taberna dos Mercadores</b><small>13:00 · 900 m</small></div></div><div class="route-stop"><span>5</span><div><b>Cruzeiro no Douro</b><small>16:00 · 550 m</small></div></div><div class="route-stop"><span>6</span><div><b>Retorno ao hotel</b><small>19:00 · 1,8 km</small></div></div></div></section>
  <section class="section"><div class="section-head"><h2>Mapa do grupo</h2><span class="chip green">3 online</span></div><div class="people-map-list"><button data-person="Ana"><span class="avatar">A</span><div><b>Ana</b><small>280 m de você · agora</small></div><span>Ver rota</span></button><button data-person="João"><span class="avatar">J</span><div><b>João</b><small>620 m de você · há 1 min</small></div><span>Ver rota</span></button></div><button class="btn btn-primary btn-block" id="shareLocationBtn">Compartilhar minha localização</button><p class="privacy-note">A localização fica desativada por padrão e pode ser encerrada a qualquer momento.</p></section>`}
 function communityView(){return `<section class="section" style="margin-top:0"><div class="section-head"><div><span class="eyebrow">Portugal 2026 · 28 pessoas</span><h2>Grupo da viagem</h2></div><button id="liveBtn">🔴 Iniciar live</button></div><div class="card"><div class="people"><div class="person"><i>RF</i><small>Renato</small></div><div class="person"><i>MS</i><small>Marina</small></div><div class="person"><i>CS</i><small>Carlos</small></div><div class="person"><i>JS</i><small>Julia</small></div><div class="person"><i>+8</i><small>Mais</small></div></div></div></section><section class="section"><div class="message guide"><b>📢 Aviso do guia</b><br>Amanhã sairemos às 8h30. O ponto de encontro será na recepção do hotel.<small>09:30</small></div><div class="chat">${state.messages.map(m=>`<div class="message ${m.type==='me'?'me':m.type==='guide'?'guide':''}"><b>${m.name}</b><br>${m.text}<small>${m.time}</small></div>`).join('')}</div><div class="composer"><input id="messageInput" placeholder="Digite uma mensagem..."/><button class="btn btn-purple" id="sendMessage">➤</button></div></section>`}
+function diaryView(){return `<section class="diary-page-hero"><span class="eyebrow">Diário da viagem</span><h1>08 de setembro · Porto</h1><p>Um dia cheio de descobertas, sabores e histórias em família.</p><div class="diary-page-metrics"><span>🚶 8,6 km</span><span>✅ 5 experiências</span><span>📸 36 lembranças</span></div></section>
+<section class="section"><div class="diary-feature-photo"><span>🌅</span><div><small>MOMENTO DO DIA</small><strong>Pôr do sol na Ribeira</strong><p>O céu ficou dourado enquanto o grupo encerrava o passeio às margens do Douro.</p></div></div></section>
+<section class="section"><div class="section-head"><h2>Linha do tempo</h2><span class="chip green">Dia completo</span></div><div class="diary-timeline">
+ <div><time>08:30</time><span>☕</span><section><b>Café da manhã</b><small>Hotel · 4,7</small></section></div>
+ <div><time>10:00</time><span>🏰</span><section><b>Torre dos Clérigos</b><small>32 fotos · 1 áudio do guia</small></section></div>
+ <div><time>13:00</time><span>🍽️</span><section><b>Almoço português</b><small>Taberna dos Mercadores · 4,8</small></section></div>
+ <div><time>16:00</time><span>⛵</span><section><b>Cruzeiro no Douro</b><small>Vídeo favorito do dia</small></section></div>
+</div></section>
+<section class="section"><div class="section-head"><h2>Curiosidade do destino</h2></div><div class="diary-curiosity"><span>💡</span><p>A Ribeira é uma das áreas mais antigas do Porto e integra a zona histórica classificada como Patrimônio Mundial.</p></div></section>
+<section class="section"><div class="section-head"><h2>Frase do guia</h2></div><blockquote class="diary-quote">“Hoje vocês não conheceram apenas o Porto — começaram a criar a história que vão contar quando voltarem.”</blockquote></section>
+<section class="section"><button class="btn btn-primary btn-block" data-go="memories">Ver fotos e vídeos do dia</button></section>`}
 function memoriesView(){return `<section class="album-hero"><span class="eyebrow">Álbum da viagem</span><h1>Portugal 2026</h1><p>Organizado automaticamente por dias, lugares e momentos.</p><div class="album-stats"><span>📸 624 fotos</span><span>🎥 27 vídeos</span><span>📍 34 lugares</span></div></section>
 <section class="section"><div class="section-head"><h2>Dias da viagem</h2><button id="addPhoto">+ Adicionar foto</button></div><div class="album-timeline">
  <button class="album-day" data-memory-day="Dia 1 · Chegada ao Porto"><div class="album-day-cover cover-airport">✈️</div><div><span>Dia 1</span><h3>Chegada ao Porto</h3><p>Aeroporto, hotel, Ribeira e primeiro jantar.</p><small>18 fotos · 2 vídeos</small></div><b>›</b></button>
@@ -279,7 +306,21 @@ function showMemoryDay(title){
 
 
 function openConcierge(){
- showModal(`<div class="v2-concierge"><span class="eyebrow">Seu Concierge</span><h2>Como posso ajudar agora?</h2><div class="v2-concierge-grid"><button onclick="toast('Buscando opções para almoço');modal.close()">🍽️ Onde almoço?</button><button onclick="toast('Abrindo próximo passeio');modal.close()">📅 Qual é o próximo passeio?</button><button onclick="toast('Buscando transporte');modal.close()">🚕 Preciso de transporte</button><button onclick="toast('Equipe Indo por Aí avisada');modal.close()">🆘 Tenho um problema</button></div><label>Escreva sua pergunta</label><input class="v2-concierge-input" placeholder="Ex.: onde encontro uma farmácia?"><button class="btn btn-primary btn-block" onclick="toast('Pergunta enviada ao concierge');modal.close()">Enviar pergunta</button></div>`);
+ showModal(`<div class="v2-concierge"><span class="eyebrow">Seu Concierge</span><h2>Como posso ajudar agora?</h2><p>Escolha uma necessidade para receber uma sugestão contextualizada.</p><div class="v2-concierge-grid"><button data-concierge-choice="lunch">🍽️ Onde almoço?</button><button data-concierge-choice="next">📅 Próximo passeio</button><button data-concierge-choice="transport">🚕 Preciso de transporte</button><button data-concierge-choice="pharmacy">💊 Farmácia próxima</button></div><label>Ou escreva sua pergunta</label><input class="v2-concierge-input" placeholder="Ex.: onde encontro um banheiro?"><button class="btn btn-primary btn-block" onclick="toast('Pergunta enviada ao concierge');modal.close()">Enviar pergunta</button></div>`);
+ setTimeout(()=>document.querySelectorAll('[data-concierge-choice]').forEach(btn=>btn.onclick=()=>showConciergeResult(btn.dataset.conciergeChoice)),0);
+}
+function showConciergeResult(choice){
+ const options={
+  lunch:{icon:'🍽️',title:'Taberna dos Mercadores',tag:'Escolha Indo por Aí',rating:'⭐ 4,8',distance:'250 m · 4 min',text:'Cozinha portuguesa muito bem avaliada, perfeita para o horário do almoço.',action:'Adicionar ao roteiro'},
+  next:{icon:'📚',title:'Livraria Lello',tag:'Próximo passeio',rating:'10:30',distance:'8 min caminhando',text:'Sua entrada é prioritária e o voucher já está disponível no app.',action:'Abrir voucher'},
+  transport:{icon:'🚕',title:'Transfer disponível',tag:'Mobilidade',rating:'Chegada em 6 min',distance:'€ 9–12',text:'Carro para até 4 pessoas, saída do ponto atual até a Ribeira.',action:'Solicitar agora'},
+  pharmacy:{icon:'💊',title:'Farmácia dos Clérigos',tag:'Perto de você',rating:'Aberta até 22h',distance:'180 m · 3 min',text:'Farmácia bem avaliada e próxima da rota atual.',action:'Ver caminho'}
+ };
+ const x=options[choice]||options.lunch;
+ showModal(`<div class="concierge-result-card"><div class="concierge-result-icon">${x.icon}</div><span class="eyebrow">${x.tag}</span><h2>${x.title}</h2><div class="concierge-result-meta"><span>${x.rating}</span><span>${x.distance}</span></div><p>${x.text}</p><button class="btn btn-primary btn-block" onclick="toast('${x.action}');modal.close()">${x.action}</button></div>`);
+}
+function showBoardingPass(){
+ showModal(`<div class="boarding-modal"><span class="eyebrow">Cartão da viagem</span><h2>São Paulo → Porto</h2><div class="boarding-modal-grid"><div><small>Voo</small><strong>TP 082</strong></div><div><small>Data</small><strong>05 SET</strong></div><div><small>Embarque</small><strong>21:40</strong></div><div><small>Portão</small><strong>A12</strong></div><div><small>Assento</small><strong>14A</strong></div><div><small>Status</small><strong>Confirmado</strong></div></div><div class="boarding-actions"><button class="btn btn-primary">Ver passagem</button><button class="btn btn-light">Abrir documentos</button></div></div>`);
 }
 function showJourneyStep(title){
  showModal(`<span class="eyebrow">Preparação da viagem</span><h2>${title}</h2><p>Todos os detalhes, documentos e ações desta etapa ficarão organizados aqui.</p><button class="btn btn-primary btn-block" onclick="toast('Etapa atualizada');modal.close()">Marcar como concluído</button>`);
