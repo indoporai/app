@@ -445,7 +445,9 @@ function sendMessage(){const input=document.querySelector('#messageInput');if(!i
 function handlePhotos(e){[...e.target.files].slice(0,8).forEach(file=>{const r=new FileReader();r.onload=()=>{state.photos.push(r.result);localStorage.setItem('ipa_beta06_photos',JSON.stringify(state.photos));state.route='memories';render()};r.readAsDataURL(file)})}
 function showModal(html){modalContent.innerHTML=html;modal.showModal();setTimeout(()=>{modalContent.querySelectorAll('[data-map]').forEach(b=>b.onclick=()=>window.open('https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(b.dataset.map),'_blank'));modalContent.querySelectorAll('[data-profile]').forEach(b=>b.onclick=()=>{modal.close();setProfile(b.dataset.profile)})},0)}
 function showInitialScenario(){
- document.querySelector('#app').innerHTML=`
+ document.body.classList.add('hidden-nav');
+ if(typeof topTitle!=='undefined' && topTitle) topTitle.textContent='Indo por Aí';
+ document.querySelector('#view').innerHTML=`
   <section class="scenario-entry">
    <div class="scenario-entry-brand">
     <span class="eyebrow">Indo por Aí</span>
@@ -467,6 +469,7 @@ function showInitialScenario(){
        state.profile='client';
        state.mode='before';
        state.route='today';
+       document.body.classList.remove('hidden-nav');
        render();
        return;
      }

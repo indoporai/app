@@ -70,7 +70,29 @@ const IPA_DEFAULT_DATA = {
   }
 };
 function clone(x){return JSON.parse(JSON.stringify(x))}
-function readData(){try{const s=localStorage.getItem("ipa-v2-demo-db");return s?JSON.parse(s):clone(IPA_DEFAULT_DATA)}catch(e){return clone(IPA_DEFAULT_DATA)}}
+function readData(){
+ try{
+   const s=localStorage.getItem("ipa-v2-demo-db");
+   if(!s)return clone(IPA_DEFAULT_DATA);
+   const saved=JSON.parse(s);
+   const defaults=clone(IPA_DEFAULT_DATA);
+   return {
+     ...defaults,
+     ...saved,
+     client:{...defaults.client,...(saved.client||{})},
+     plans:{...defaults.plans,...(saved.plans||{})},
+     exchange:{...defaults.exchange,...(saved.exchange||{})},
+     prep:{...defaults.prep,...(saved.prep||{})},
+     benefits:Array.isArray(saved.benefits)?saved.benefits:defaults.benefits,
+     payments:Array.isArray(saved.payments)?saved.payments:defaults.payments,
+     visitReviews:{...defaults.visitReviews,...(saved.visitReviews||{})},
+     ratings:{...defaults.ratings,...(saved.ratings||{})},
+     clients:Array.isArray(saved.clients)&&saved.clients.length?saved.clients:defaults.clients,
+     trips:Array.isArray(saved.trips)&&saved.trips.length?saved.trips:defaults.trips,
+     itineraryTemplates:Array.isArray(saved.itineraryTemplates)&&saved.itineraryTemplates.length?saved.itineraryTemplates:defaults.itineraryTemplates
+   };
+ }catch(e){return clone(IPA_DEFAULT_DATA)}
+}
 function writeData(d){localStorage.setItem("ipa-v2-demo-db",JSON.stringify(d))}
 window.IPAData={
  getAll(){return readData()},
