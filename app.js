@@ -37,7 +37,7 @@ document.addEventListener('click', event => {
    event.preventDefault();
    const action=accountAction.dataset.accountAction;
    if(action==='payments'){ modal.close(); state.route='payments'; render(); return; }
-   if(action==='admin'){ window.location.href='admin.html'; return; }
+   if(action==='admin'){ window.location.href=new URL('admin.html', window.location.href).href; return; }
    if(action==='profile'){ modal.close(); openProfileChooser(); return; }
  }
  const modeButton = event.target.closest('[data-mode]');
@@ -435,7 +435,7 @@ function tripView(){
  const labels={1:'Porto · Chegada',2:'Porto · Clássicos',3:'Vale do Douro',4:'Coimbra e Lisboa'};
  const rows=itineraries[day].map((item,index)=>`<button class="itinerary-item" data-modal="<h2>${item[2]}</h2><p><b>${item[0]}</b> · ${item[3]}</p><p>Todos os detalhes, contatos, vouchers e observações desta atividade ficam concentrados aqui.</p><button class='btn btn-primary btn-block' data-map='${item[2]} Portugal'>Abrir no Google Maps</button>"><span class="itinerary-time">${item[0]}</span><span class="itinerary-line"><i></i></span><span class="itinerary-icon">${item[1]}</span><span class="itinerary-copy"><b>${item[2]}</b><small>${item[3]}</small></span><span>›</span></button>`).join('');
  return `<section class="hero" style="background-image:linear-gradient(150deg,rgba(4,50,67,.9),rgba(8,115,127,.54)),url('https://images.unsplash.com/photo-1555881400-69b7c7f00f17?auto=format&fit=crop&w=1200&q=85')"><span class="eyebrow">Minha viagem</span><h1>Portugal 🇵🇹</h1><p>05 a 20 de agosto · Dia ${day} de 10</p><div class="hero-actions"><button class="btn btn-light" data-go="explore">Abrir mapa</button><button class="btn btn-primary" data-modal="<h2>Central de documentos</h2><p>Passagens, vouchers, seguro, ingressos e comprovantes ficam organizados aqui.</p>">Documentos</button></div></section>
- <section class="section"><div class="trip-quick-grid"><button data-go="payments"><span>💳</span><div><b>Pagamentos</b><small>Parcelas e comprovantes</small></div><em>›</em></button><button onclick="window.location.href='admin.html'"><span>⚙️</span><div><b>Modo ADM</b><small>Indo por Aí Business</small></div><em>›</em></button></div></section>
+ <section class="section"><div class="trip-quick-grid"><button data-go="payments"><span>💳</span><div><b>Pagamentos</b><small>Parcelas e comprovantes</small></div><em>›</em></button><button onclick="window.location.href=new URL('admin.html', window.location.href).href"><span>⚙️</span><div><b>Modo ADM</b><small>Indo por Aí Business</small></div><em>›</em></button></div></section>
  <section class="section itinerary-days"><div class="day-strip">${[1,2,3,4].map(d=>`<button class="day-pill ${d===day?'active':''}" data-day="${d}"><small>Dia</small><strong>${d}</strong></button>`).join('')}</div></section>
  <section class="section"><div class="section-head"><div><span class="eyebrow">Roteiro do dia</span><h2>${labels[day]}</h2></div><span class="chip">☀️ 24°C</span></div><div class="itinerary-list">${rows}</div></section>
  <section class="section"><div class="section-head"><div><span class="eyebrow">Descobertas pelo caminho</span><h2>Boas paradas perto do trajeto</h2></div><span class="chip orange">Inteligente</span></div><div class="smart-discovery-list">
@@ -499,7 +499,7 @@ function showInitialScenario(){
  document.querySelectorAll('[data-initial-scenario]').forEach(btn=>{
    btn.onclick=()=>{
      const s=btn.dataset.initialScenario;
-     if(s==='admin'){ window.location.href='admin.html'; return; }
+     if(s==='admin'){ window.location.href=new URL('admin.html', window.location.href).href; return; }
      state.scenarioChosen=true;
      if(s==='client'){
        state.profile='client';

@@ -2,14 +2,22 @@ const $=s=>document.querySelector(s);
 const brl=v=>new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(Number(v||0));
 let currentView='dashboard', selectedTripId='trip-portugal-2026';
 const moduleLabels={itinerary:'Roteiro',documents:'Documentos',luggage:'Mala inteligente',checkin:'Check-in',exchange:'Exchange',payments:'Pagamentos',community:'Comunidade',live:'Live',album:'Álbum',movie:'Filme da viagem',passport:'Passaporte'};
-function db(){return IPAData.getAll()}
+function db(){
+ const d=IPAData.getAll();
+ d.clients=Array.isArray(d.clients)?d.clients:[];
+ d.trips=Array.isArray(d.trips)?d.trips:[];
+ d.itineraryTemplates=Array.isArray(d.itineraryTemplates)?d.itineraryTemplates:[];
+ d.payments=Array.isArray(d.payments)?d.payments:[];
+ d.benefits=Array.isArray(d.benefits)?d.benefits:[];
+ return d
+}
 function modal(html){$('#adminModalBody').innerHTML=html;$('#adminModal').classList.add('open')}
 function closeModal(){ $('#adminModal').classList.remove('open') }
-$('#closeAdminModal').onclick=closeModal;
+if($('#closeAdminModal')) $('#closeAdminModal').onclick=closeModal;
 
 function metric(icon,label,value,sub=''){return `<article class="metric"><span>${icon}</span><div><small>${label}</small><strong>${value}</strong><em>${sub}</em></div></article>`}
 function dashboard(){
- const d=db(), active=(d.trips||[]).filter(t=>t.status!=='Concluído').length, pending=(d.payments||[]).filter(p=>p.status!=='Pago').reduce((s,p)=>s+p.amount,0);
+ const d=db(), active=d.trips.filter(t=>t.status!=='Concluído').length, pending=d.payments.filter(p=>p.status!=='Pago').reduce((s,p)=>s+Number(p.amount||0),0);
  return `<section class="welcome"><div><span class="eyebrow">VISÃO GERAL</span><h2>Bom dia! 👋</h2><p>Veja o que está acontecendo nas experiências dos seus clientes.</p></div><button class="primary" data-new-trip>+ Nova viagem</button></section>
  <div class="metrics">${metric('👤','Clientes ativos',(d.clients||[]).length,'base atual')}${metric('✈','Viagens ativas',active,'em operação')}${metric('💳','Em aberto',brl(pending),'a receber')}${metric('🔴','Lives programadas',(d.trips||[]).filter(t=>t.modules?.live).length,'viagens habilitadas')}</div>
  <section class="panel"><div class="panel-head"><div><span class="eyebrow">OPERAÇÃO</span><h2>Viagens</h2></div><button class="ghost" data-admin-view-jump="trips">Ver todas →</button></div>${tripTable(d.trips||[])}</section>
