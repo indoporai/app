@@ -168,3 +168,9 @@ body{min-height:100vh}.app-shell{width:min(100%,520px);min-height:100vh;margin:a
 .diary-curiosity{display:flex;gap:12px;align-items:flex-start;background:#fff8df;border-radius:20px;padding:17px}.diary-curiosity>span{font-size:27px}.diary-curiosity p{margin:0}
 .diary-quote{margin:0;background:#fff;border-left:5px solid #f47a2a;border-radius:0 20px 20px 0;padding:20px;font-size:18px;line-height:1.5;box-shadow:var(--shadow)}
 @media(max-width:430px){.boarding-main{grid-template-columns:1fr 62px 1fr}.boarding-meta{grid-template-columns:repeat(2,1fr)}}
+
+.v2-plan-card{display:grid;grid-template-columns:1fr auto;gap:14px;align-items:center;background:linear-gradient(135deg,#0f7f86,#35aaa7);color:#fff;border-radius:22px;padding:18px}.v2-plan-card h3{font-size:24px;margin:3px 0}.v2-plan-card p{margin:0;color:rgba(255,255,255,.78)}
+.v2-benefit-list{display:flex;flex-direction:column;gap:9px}.v2-benefit-card{width:100%;display:grid;grid-template-columns:1fr auto;align-items:center;text-align:left;border:1px solid #e4ebe8;background:#fff;border-radius:18px;padding:15px;color:inherit}.v2-benefit-card h3{margin:3px 0}.v2-benefit-card p{margin:0;color:#748285}
+.prep-checklist{display:flex;flex-direction:column;gap:9px;margin-top:14px}.prep-checklist label{display:flex;gap:10px;align-items:center;background:#f5f8f7;border-radius:14px;padding:12px}.prep-checklist input{width:auto}
+.exchange-client-card{background:linear-gradient(135deg,#0f7f86,#35aaa7);color:#fff;border-radius:20px;padding:18px;margin:14px 0;display:flex;flex-direction:column}.exchange-client-card strong{font-size:32px;margin:3px 0}.exchange-client-card span{color:rgba(255,255,255,.8)}.exchange-client-card b{margin-top:10px}.privacy-note{font-size:12px;color:#748285}
+@media(max-width:430px){.v2-plan-card{grid-template-columns:1fr}.v2-plan-card .btn{width:100%}}

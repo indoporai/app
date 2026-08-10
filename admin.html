@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Indo por Aí — Admin</title><link rel="stylesheet" href="admin.css">
+</head>
+<body>
+<main class="admin-shell">
+<header><div><small>MODO ADMINISTRADOR</small><h1>Indo por Aí Business</h1></div><a href="index.html">Abrir app do cliente →</a></header>
+
+<section class="panel">
+<div class="head"><div><small>Cliente de teste</small><h2>Renato</h2></div><span class="status">Portugal 2026</span></div>
+<label>Plano contratado</label>
+<select id="plan"><option>Explore</option><option>Signature</option><option>Elite</option><option>Groups</option></select>
+</section>
+
+<section class="panel">
+<div class="head"><div><small>Monetização</small><h2>Benefícios exclusivos</h2></div><span class="status">Personalizável</span></div>
+<div id="benefits"></div>
+</section>
+
+<section class="panel">
+<div class="head"><div><small>Indo por Aí Exchange</small><h2>Configuração do cliente</h2></div><span class="status">Privado</span></div>
+<div class="grid">
+<label>Valor em euro<input id="requestedEuro" type="number" step="10"></label>
+<label>Cotação de compra<input id="buyRate" type="number" step="0.01"></label>
+<label>Cotação para o cliente<input id="sellRate" type="number" step="0.01"></label>
+<label>Status<select id="exchangeStatus"><option>Reservado</option><option>Pago</option><option>Disponível</option><option>Entregue</option></select></label>
+</div>
+<div class="margin-card"><small>Margem estimada</small><strong id="marginValue">R$ 0,00</strong><span>Visível somente no administrador</span></div>
+<button id="saveExchange">Salvar Exchange</button>
+</section>
+
+<section class="panel">
+<h2>Teste prático</h2>
+<p>Altere plano, benefícios ou Exchange. Depois abra o app do cliente e entre em <b>Antes</b>.</p>
+<button class="secondary" id="resetDemo">Restaurar demonstração</button>
+</section>
+</main>
+<script src="data-service.js"></script><script src="admin.js"></script>
+</body></html>

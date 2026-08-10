@@ -65,6 +65,8 @@ function bind(){
  document.querySelectorAll('[data-boarding-pass]').forEach(btn=>btn.onclick=()=>showBoardingPass());
  document.querySelectorAll('[data-open-diary-page]').forEach(btn=>btn.onclick=()=>{state.route='diary';render();});
  document.querySelectorAll('[data-concierge-choice]').forEach(btn=>btn.onclick=()=>showConciergeResult(btn.dataset.conciergeChoice));
+ document.querySelectorAll('[data-prep-section]').forEach(btn=>btn.onclick=()=>{const s=btn.dataset.prepSection;const t={purchase:'Tudo o que foi comprado',documents:'Documentos necessários',luggage:'Mala inteligente',exchange:'Indo por Aí Exchange'};prepModal(s,t[s])});
+ document.querySelectorAll('[data-benefit-detail]').forEach(btn=>btn.onclick=()=>{const d=demoData();const b=d?.benefits.find(x=>x.id===btn.dataset.benefitDetail);if(!b)return;showModal(`<span class="eyebrow">${b.sponsorLabel}</span><h2>${b.title}</h2><p>Parceiro: <b>${b.partner}</b></p><button class="btn btn-primary btn-block" onclick="toast('${b.cta}');modal.close()">${b.cta}</button>`)});
  const instagramBtn=document.querySelector('#instagramBtn');
  if(instagramBtn)instagramBtn.onclick=()=>window.open('https://www.instagram.com/indo.por.ai.com.a.gente/','_blank');
  document.querySelectorAll('[data-discovery]').forEach(card=>card.onclick=()=>{
@@ -133,12 +135,23 @@ ${modeCard()}
 </section>
 <section class="section"><div class="v2-diary-card"><div><span class="eyebrow">Diário da viagem</span><h3>Seu Dia 3 já está sendo escrito.</h3><p>8,6 km, 5 experiências e 36 novas lembranças.</p></div><button class="btn btn-primary" data-open-diary-page="true">Ver diário completo</button></div></section>
 <section class="section"><div class="v2-tool-grid"><button data-go="explore"><span>🗺️</span><b>Mapa</b><small>Rota do dia</small></button><button id="realLiveBtn"><span>🔴</span><b>Live</b><small>Transmitir agora</small></button><button data-go="community"><span>👥</span><b>Grupo</b><small>12 mensagens</small></button><button data-admin-preview="true"><span>⚙️</span><b>Administrador</b><small>Prévia</small></button></div></section>`}
+
+function demoData(){return window.IPAData?IPAData.getAll():null}
+function planBadge(){const d=demoData();if(!d)return'';return `<section class="section"><div class="v2-plan-card"><div><span class="eyebrow">Seu plano</span><h3>${d.client.plan}</h3><p>${d.client.trip}</p></div><button class="btn btn-light" onclick="location.href='admin.html'">Demo Admin</button></div></section>`}
+function benefitsBlock(){const d=demoData();if(!d)return'';const a=d.benefits.filter(x=>x.enabled);return `<section class="section"><div class="section-head"><div><span class="eyebrow">Personalizado para você</span><h2>Benefícios exclusivos</h2></div><span class="chip">${a.length} ativos</span></div><div class="v2-benefit-list">${a.map(b=>`<button class="v2-benefit-card" data-benefit-detail="${b.id}"><div><span class="eyebrow">${b.sponsorLabel}</span><h3>${b.title}</h3><p>${b.partner}</p></div><span>›</span></button>`).join('')}</div></section>`}
+function prepModal(section,title){
+ const d=demoData();if(!d)return;
+ if(section==='exchange'){const e=d.exchange;showModal(`<span class="eyebrow">Indo por Aí Exchange</span><h2>Seu câmbio personalizado</h2><div class="exchange-client-card"><small>Saldo reservado</small><strong>€ ${e.requestedEuro}</strong><span>Cotação aplicada: €1 = R$ ${Number(e.sellRate).toFixed(2).replace('.',',')}</span><b>${e.status}</b></div><p class="privacy-note">Condições configuradas pelo Indo por Aí para esta viagem.</p>`);return}
+ const items=d.prep[section]||[];showModal(`<span class="eyebrow">Preparação da viagem</span><h2>${title}</h2><div class="prep-checklist">${items.map((x,i)=>`<label><input type="checkbox" data-prep-toggle="${section}:${i}" ${x.done?'checked':''}><span>${x.label}</span></label>`).join('')}</div>`);
+ setTimeout(()=>document.querySelectorAll('[data-prep-toggle]').forEach(cb=>cb.onchange=()=>{const [s,i]=cb.dataset.prepToggle.split(':');IPAData.togglePrep(s,Number(i))}),0)
+}
+
 function beforeView(){return `<section class="v2-hero v2-before-hero">
  <div class="v2-hero-top"><div><span class="eyebrow">Antes da viagem</span><h1>Portugal já está esperando por você. 🇵🇹</h1><p>Faltam 14 dias. Sua preparação está 72% concluída.</p></div><span class="v2-weather">🌤️ 22°C</span></div>
  <div class="v2-countdown"><div><strong>14</strong><small>dias</small></div><div><strong>08</strong><small>horas</small></div><div><strong>34</strong><small>minutos</small></div></div>
  <button class="btn btn-primary btn-block" data-go="trip">Continuar planejamento</button>
 </section>
-${modeCard()}
+${modeCard()}${planBadge()}
 <section class="section"><div class="section-head"><div><span class="eyebrow">Cartão da viagem</span><h2>Seu embarque em um toque</h2></div><span class="chip green">Confirmado</span></div>
  <button class="v2-boarding-pass" data-boarding-pass="true">
   <div class="boarding-main">
@@ -154,11 +167,11 @@ ${modeCard()}
 </section>
 <section class="section"><div class="section-head"><div><span class="eyebrow">Sua jornada até o embarque</span><h2>Preparação da viagem</h2></div><span class="chip green">72%</span></div>
  <div class="v2-journey">
-  <button class="v2-journey-step done" data-journey-step="Compra concluída"><span>✓</span><div><b>Compra</b><small>Viagem confirmada</small></div></button>
-  <button class="v2-journey-step done" data-journey-step="Documentos conferidos"><span>✓</span><div><b>Documentos</b><small>Passaporte e seguro</small></div></button>
+  <button class="v2-journey-step done" data-prep-section="purchase"><span>✓</span><div><b>Compra</b><small>Viagem confirmada</small></div></button>
+  <button class="v2-journey-step done" data-prep-section="documents"><span>✓</span><div><b>Documentos</b><small>Passaporte e seguro</small></div></button>
   <button class="v2-journey-step active" data-journey-step="Check-in abre em 3 dias"><span>3</span><div><b>Check-in</b><small>Abre em 3 dias</small></div></button>
-  <button class="v2-journey-step" data-journey-step="Mala 75% pronta"><span>4</span><div><b>Mala</b><small>75% concluída</small></div></button>
-  <button class="v2-journey-step" data-journey-step="Câmbio pendente"><span>5</span><div><b>Câmbio</b><small>Ver recomendação</small></div></button>
+  <button class="v2-journey-step" data-prep-section="luggage"><span>4</span><div><b>Mala</b><small>75% concluída</small></div></button>
+  <button class="v2-journey-step" data-prep-section="exchange"><span>5</span><div><b>Câmbio</b><small>Ver recomendação</small></div></button>
   <button class="v2-journey-step" data-journey-step="Dia do embarque"><span>✈️</span><div><b>Viagem</b><small>05 de setembro</small></div></button>
  </div>
 </section>
@@ -166,6 +179,7 @@ ${modeCard()}
  <div class="v2-prep-grid"><div><span>📄</span><b>Documentos</b><small>Prontos</small></div><div><span>🧳</span><b>Mala</b><small>75%</small></div><div><span>💶</span><b>Câmbio</b><small>Pendente</small></div><div><span>✈️</span><b>Check-in</b><small>Em 3 dias</small></div></div>
 </section>
 <section class="section"><div class="v2-alert-card"><span>💡</span><div><span class="eyebrow">Dica inteligente</span><h3>Leve um casaco leve para as noites no Porto.</h3><p>A previsão indica temperaturas próximas de 15°C.</p></div></div></section>
+${benefitsBlock()}
 <section class="section"><div class="section-head"><h2>Momento Indo por Aí</h2><span class="chip orange">Exclusivo</span></div><button class="card discovery-card" id="preTripSurprise"><div class="discovery-spark">✨</div><div><span class="eyebrow">Descoberta para sua viagem</span><h3>Quinta da Pacheca</h3><p>Uma experiência especial no Vale do Douro, escolhida para combinar com seu perfil.</p><div class="discovery-meta"><span>🍷 Gastronomia</span><span>⭐ 4,9</span><span>Dia 4</span></div></div><span class="discovery-arrow">›</span></button></section>
 <section class="section"><div class="instagram-footer"><div class="instagram-mark">◎</div><div><span class="eyebrow">Comunidade Indo por Aí</span><h3>Viajar é colecionar histórias.</h3><p><b>@indo.por.ai.com.a.gente</b></p><small>Uma comunidade com mais de 21 mil apaixonados por viagens.</small></div><button class="btn btn-primary" id="instagramBtn">Ver Instagram</button></div></section>`}
 function afterView(){return `<section class="memory-hero">
