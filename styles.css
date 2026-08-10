@@ -203,3 +203,21 @@ body{min-height:100vh}.app-shell{width:min(100%,520px);min-height:100vh;margin:a
 .trip-quick-grid button{display:grid;grid-template-columns:42px 1fr auto;gap:10px;align-items:center;border:1px solid #e3ebe8;background:#fff;border-radius:18px;padding:14px;text-align:left;color:inherit;box-shadow:var(--shadow)}
 .trip-quick-grid button>span{font-size:25px}.trip-quick-grid b,.trip-quick-grid small{display:block}.trip-quick-grid small{color:#748285;margin-top:3px}.trip-quick-grid em{font-style:normal;font-size:20px}
 @media(max-width:430px){.trip-quick-grid{grid-template-columns:1fr}}
+
+/* Beta 3.2 — tela inicial de escolha de cenário */
+.scenario-entry{min-height:70vh;display:flex;flex-direction:column;justify-content:center;padding:24px 4px}
+.scenario-entry-brand{text-align:center;max-width:520px;margin:0 auto 22px}
+.scenario-entry-brand h1{margin:6px 0 8px;font-size:32px}.scenario-entry-brand p{margin:0;color:#748285}
+.scenario-entry-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.scenario-entry-grid button{border:1px solid #e3ebe8;background:#fff;border-radius:22px;padding:18px;text-align:left;color:inherit;display:grid;grid-template-columns:52px 1fr auto;gap:12px;align-items:center;box-shadow:var(--shadow);transition:transform .16s ease,border-color .16s ease}
+.scenario-entry-grid button:hover{transform:translateY(-2px);border-color:#9acfc8}.scenario-icon{width:52px;height:52px;border-radius:17px;background:#eef7f4;display:grid;place-items:center;font-size:27px}
+.scenario-entry-grid b,.scenario-entry-grid small{display:block}.scenario-entry-grid small{color:#748285;margin-top:4px}.scenario-entry-grid em{font-style:normal;font-size:24px}
+@media(max-width:760px){.scenario-entry-grid{grid-template-columns:1fr}.scenario-entry{padding-top:12px}.scenario-entry-brand h1{font-size:28px}}
+
+/* Beta 3.4 — avaliação rápida dentro do roteiro */
+.itinerary-review{display:grid;grid-template-columns:auto 1fr auto;gap:9px;align-items:center;background:#fbfcfc;border:1px solid #e5ecea;border-radius:16px;padding:12px;margin:10px 0}
+.visit-check{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:800;white-space:nowrap}.visit-check input{width:auto}
+.mini-stars{display:flex;gap:1px;justify-content:flex-start}.mini-stars button{border:0;background:transparent;padding:1px;font-size:22px;color:#d5ddda;line-height:1}.mini-stars button.selected{color:#f1a32c}
+.place-note{grid-column:1/3;width:100%;box-sizing:border-box;border:1px solid #dce5e2;border-radius:12px;padding:10px 11px;font:inherit;font-size:13px;background:#fff}
+.save-place-review{border:0;background:#0f7f86;color:#fff;border-radius:12px;padding:10px 12px;font-weight:900;align-self:stretch}
+@media(max-width:520px){.itinerary-review{grid-template-columns:1fr}.place-note{grid-column:1}.save-place-review{width:100%}.visit-check{white-space:normal}}
