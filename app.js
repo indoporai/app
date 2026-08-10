@@ -95,6 +95,7 @@ function bind(){
  document.querySelectorAll('[data-rating-place]').forEach(btn=>btn.onclick=()=>openPlaceCommunity(btn.dataset.ratingPlace));
  document.querySelectorAll('[data-plan-details]').forEach(btn=>btn.onclick=()=>showPlanDetails());
  document.querySelectorAll('[data-payment]').forEach(btn=>btn.onclick=()=>openPayment(btn.dataset.payment));
+ document.querySelectorAll('[data-open-plan]').forEach(btn=>btn.onclick=()=>openPlanDetails(btn.dataset.openPlan));
  const instagramBtn=document.querySelector('#instagramBtn');
  if(instagramBtn)instagramBtn.onclick=()=>window.open('https://www.instagram.com/indo.por.ai.com.a.gente/','_blank');
  document.querySelectorAll('[data-discovery]').forEach(card=>card.onclick=()=>{
@@ -255,12 +256,47 @@ function ratePlace(id){
  },0);
 }
 function plansSalesBlock(){
- return `<section class="sales-plans"><span class="eyebrow">Escolha como quer viajar</span><h2>Uma experiência para cada jeito de ir por aí.</h2><div class="sales-plan-grid">
-  <article><span>🌍</span><h3>Explore</h3><p>Roteiros configurados + acesso ao app.</p><small>Inclui álbum e filme</small></article>
-  <article class="featured"><em>MAIS ESCOLHIDO</em><span>✨</span><h3>Signature</h3><p>Roteiros + suporte pré-embarque + hotéis e passagens.</p><small>Inclui álbum e filme</small></article>
-  <article><span>👑</span><h3>Elite</h3><p>Acesso full à plataforma e concierge.</p><small>Inclui álbum e filme</small></article>
-  <article><span>🚌</span><h3>Groups</h3><p>Excursões e grandes grupos com ferramentas exclusivas.</p><small>Inclui álbum e filme</small></article>
- </div></section>`;
+ return `<section class="sales-plans">
+  <span class="eyebrow">Escolha como quer viajar</span>
+  <h2>Uma experiência para cada jeito de ir por aí.</h2>
+  <div class="sales-plan-grid">
+   <button class="sales-plan-card" data-open-plan="Explore">
+    <span>🌍</span><h3>Explore</h3><p>Roteiros configurados + acesso ao app.</p><small>Inclui álbum e filme</small><em>Ver tudo que inclui →</em>
+   </button>
+   <button class="sales-plan-card featured" data-open-plan="Signature">
+    <i>MAIS ESCOLHIDO</i><span>✨</span><h3>Signature</h3><p>Roteiros + suporte pré-embarque + hotéis e passagens.</p><small>Inclui álbum e filme</small><em>Ver tudo que inclui →</em>
+   </button>
+   <button class="sales-plan-card" data-open-plan="Elite">
+    <span>👑</span><h3>Elite</h3><p>Acesso full à plataforma e concierge.</p><small>Inclui álbum e filme</small><em>Ver tudo que inclui →</em>
+   </button>
+   <button class="sales-plan-card" data-open-plan="Groups">
+    <span>🚌</span><h3>Groups</h3><p>Excursões e grandes grupos com ferramentas exclusivas.</p><small>Inclui álbum e filme</small><em>Ver tudo que inclui →</em>
+   </button>
+  </div>
+ </section>`;
+}
+
+function openPlanDetails(plan){
+ const d=ipaDB();
+ const features=d?.plans?.[plan]||[];
+ const descriptions={
+   Explore:'Para quem gosta de viajar com autonomia, mas quer um roteiro organizado e uma experiência digital completa.',
+   Signature:'Para quem quer ajuda antes do embarque, incluindo organização, hotéis e passagens.',
+   Elite:'A experiência completa do Indo por Aí, com concierge e acesso aos recursos premium durante toda a viagem.',
+   Groups:'Pensado para excursões, famílias grandes, empresas e grupos que precisam de organização e comunicação centralizadas.'
+ };
+ const icons={Explore:'🌍',Signature:'✨',Elite:'👑',Groups:'🚌'};
+ showModal(`<div class="plan-detail-modal">
+   <div class="plan-detail-icon">${icons[plan]||'✈️'}</div>
+   <span class="eyebrow">Indo por Aí ${plan}</span>
+   <h2>${plan}</h2>
+   <p>${descriptions[plan]||''}</p>
+   <div class="plan-detail-list">${features.map((f,i)=>`<div><span>✓</span><b>${f}</b></div>`).join('')}</div>
+   <div class="plan-detail-footer">
+     <small>Álbum e filme da viagem estão incluídos em todos os planos.</small>
+     <button class="btn btn-primary btn-block" onclick="toast('Quero saber mais sobre o plano ${plan}');modal.close()">Quero este plano</button>
+   </div>
+  </div>`);
 }
 
 

@@ -1,9 +1,9 @@
-const CACHE = "indo-por-ai-v2-beta-4-1";
+const CACHE = "indo-por-ai-v2-beta-4-2";
 const CORE = [
   "./",
   "index.html",
-  "styles.css?v=v2-beta-4-1",
-  "app.js?v=v2-beta-4-1",
+  "styles.css?v=v2-beta-4-2",
+  "app.js?v=v2-beta-4-2",
   "data-service.js?v=v2-beta-4-1",
   "admin.html",
   "admin.js",
