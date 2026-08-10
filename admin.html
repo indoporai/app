@@ -1,5 +1,5 @@
 <!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Indo por Aí Business</title><link rel="stylesheet" href="admin.css?v=v2-beta-4-3"></head><body>
+<title>Indo por Aí Business</title><link rel="stylesheet" href="admin.css?v=v2-beta-4-4"></head><body>
 <div class="business-layout">
  <aside class="sidebar">
   <div class="brand"><div class="brand-mark">✈</div><div><b>Indo por Aí</b><small>BUSINESS</small></div></div>
@@ -18,11 +18,28 @@
   <header class="business-top"><div><small>INDO POR AÍ BUSINESS</small><h1 id="adminTitle">Dashboard</h1></div><div class="admin-avatar">RF</div></header>
   <div id="adminContent">
       <section class="panel admin-loading">
-        <div class="panel-head"><div><span class="eyebrow">INDO POR AÍ BUSINESS</span><h2>Carregando painel...</h2></div></div>
-        <p>Se esta mensagem permanecer, atualize a página uma vez.</p>
+        <div class="panel-head">
+          <div><span class="eyebrow">INDO POR AÍ BUSINESS</span><h2>Dashboard</h2></div>
+          <span class="status">Demo</span>
+        </div>
+        <div class="finance-metrics">
+          <div><small>Clientes ativos</small><strong>1</strong></div>
+          <div><small>Viagens ativas</small><strong>1</strong></div>
+          <div><small>Modo</small><strong>Administrador</strong></div>
+        </div>
+        <p>Carregando os dados da plataforma...</p>
       </section>
     </div>
  </main>
 </div>
 <div id="adminModal" class="admin-modal"><div class="admin-modal-card"><button class="close" id="closeAdminModal">×</button><div id="adminModalBody"></div></div></div>
-<script src="data-service.js?v=v2-beta-4-3"></script><script src="admin.js?v=v2-beta-4-3"></script></body></html>
+<script src="data-service.js?v=v2-beta-4-4"></script><script src="admin.js?v=v2-beta-4-4"></script>
+<script>
+window.addEventListener('error', function(){
+  var el=document.getElementById('adminContent');
+  if(el && !el.innerText.trim()){
+    el.innerHTML='<section class="panel"><h2>Indo por Aí Business</h2><p>O painel foi carregado, mas houve um erro ao buscar os dados da demonstração.</p><p>Atualize a página ou use o botão “Abrir app do cliente”.</p></section>';
+  }
+});
+</script>
+</body></html>

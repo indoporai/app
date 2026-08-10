@@ -59,11 +59,13 @@ function partnersView(){
 function liveViewAdmin(){return `<div class="view-actions"><div><span class="eyebrow">LIVE</span><h2>Central de transmissões</h2><p>O fluxo real será conectado ao Cloudflare/Daily na próxima integração.</p></div></div><section class="panel"><div class="empty-live"><span>🔴</span><h2>Live pronta para integração</h2><p>As viagens com o módulo Live habilitado aparecerão aqui para iniciar a transmissão.</p></div></section>`}
 
 function render(){
+ const content=$('#adminContent');
+ if(!content) return;
  document.querySelectorAll('.nav').forEach(b=>b.classList.toggle('active',b.dataset.adminView===currentView));
  const titles={dashboard:'Dashboard',clients:'Clientes',trips:'Viagens',templates:'Modelos de roteiro',finance:'Financeiro',live:'Live',partners:'Parceiros'};
  $('#adminTitle').textContent=titles[currentView]||'Indo por Aí Business';
  const views={dashboard,clients:clientsView,trips:tripsView,templates:templatesView,finance:financeView,live:liveViewAdmin,partners:partnersView};
- $('#adminContent').innerHTML=views[currentView]();
+ content.innerHTML=views[currentView]();
  bind();
 }
 function bind(){

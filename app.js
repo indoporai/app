@@ -54,7 +54,17 @@ setTimeout(()=>document.querySelector('#splash').classList.add('hide'),1800);
 if('serviceWorker' in navigator) navigator.serviceWorker.register('./service-worker.js');
 function money(n){return new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(n)}
 function timeFmt(s){const m=String(Math.floor(s/60)).padStart(2,'0'),sec=String(s%60).padStart(2,'0');return `${m}:${sec}`}
-function setProfile(profile){state.profile=profile;localStorage.setItem('ipa_beta06_profile',profile);state.route=profile==='prospect'?'prospect':'today';render()}
+function setProfile(profile){
+ state.profile=profile;
+ localStorage.setItem('ipa_beta06_profile',profile);
+ if(profile==='client'){
+   state.mode='before';
+   state.route='today';
+ }else{
+   state.route='prospect';
+ }
+ render();
+}
 function render(){
  topTitle.textContent=titles[state.route]||'Indo por Aí';
  view.innerHTML=routes[state.route]();
@@ -493,22 +503,14 @@ function showInitialScenario(){
    <div class="scenario-entry-grid">
     <button data-initial-scenario="prospect"><span class="scenario-icon">🌍</span><div><b>Ainda não sou cliente</b><small>Conheça planos, benefícios e a proposta do Indo por Aí.</small></div><em>›</em></button>
     <button data-initial-scenario="client"><span class="scenario-icon">✈️</span><div><b>Já sou cliente</b><small>Acesse Antes, Durante, Depois e toda a experiência da viagem.</small></div><em>›</em></button>
-    <button data-initial-scenario="admin"><span class="scenario-icon">⚙️</span><div><b>Modo ADM</b><small>Abra o Indo por Aí Business para gerenciar clientes, pagamentos e benefícios.</small></div><em>›</em></button>
+    <a class="scenario-admin-link" href="./admin.html"><span class="scenario-icon">⚙️</span><div><b>Modo ADM</b><small>Abra o Indo por Aí Business para gerenciar clientes, pagamentos e benefícios.</small></div><em>›</em></a>
    </div>
   </section>`;
  document.querySelectorAll('[data-initial-scenario]').forEach(btn=>{
    btn.onclick=()=>{
      const s=btn.dataset.initialScenario;
-     if(s==='admin'){ window.location.href=new URL('admin.html', window.location.href).href; return; }
      state.scenarioChosen=true;
-     if(s==='client'){
-       state.profile='client';
-       state.mode='before';
-       state.route='today';
-       document.body.classList.remove('hidden-nav');
-       render();
-       return;
-     }
+     if(s==='client') document.body.classList.remove('hidden-nav');
      setProfile(s);
    };
  });

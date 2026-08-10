@@ -257,3 +257,25 @@ body{min-height:100vh}.app-shell{width:min(100%,520px);min-height:100vh;margin:a
 .sales-plan-card.featured>span{
   margin-top:0;
 }
+
+/* Beta 4.4 — entrada ADM nativa e segura */
+.scenario-entry-grid .scenario-admin-link{
+  border:1px solid #e3ebe8;
+  background:#fff;
+  border-radius:22px;
+  padding:18px;
+  text-align:left;
+  color:inherit;
+  display:grid;
+  grid-template-columns:52px 1fr auto;
+  gap:12px;
+  align-items:center;
+  box-shadow:var(--shadow);
+  text-decoration:none;
+  transition:transform .16s ease,border-color .16s ease;
+}
+.scenario-entry-grid .scenario-admin-link:hover{transform:translateY(-2px);border-color:#9acfc8}
+.scenario-entry-grid .scenario-admin-link b,
+.scenario-entry-grid .scenario-admin-link small{display:block}
+.scenario-entry-grid .scenario-admin-link small{color:#748285;margin-top:4px}
+.scenario-entry-grid .scenario-admin-link em{font-style:normal;font-size:24px}
