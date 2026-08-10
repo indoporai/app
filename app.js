@@ -12,7 +12,7 @@ const state={route:'today',mode:'during',profile:savedProfile,leadStage:'new',tr
  {type:'other',name:'Juliana',text:'Perfeito! Já estamos a caminho ☀️',time:'08:47'},
  {type:'other',name:'Carlos',text:'Alguém sabe se vai chover à tarde?',time:'08:50'}
 ]};
-const titles={today:'Hoje',trip:'Minha Viagem',explore:'Explorar',community:'Grupo da viagem',memories:'Memórias',diary:'Diário da Viagem',payments:'Pagamentos',prospect:'Planejar viagem'};
+const titles={today:'Hoje',trip:'Minha Viagem',explore:'Explorar',community:'Grupo da viagem',memories:'Memórias',diary:'Diário da Viagem',payments:'Pagamentos',prospect:'Planejar viagem',admin:'Indo por Aí Business'};
 
 document.addEventListener('click', event => {
  const itineraryStar = event.target.closest('[data-itinerary-star]');
@@ -37,7 +37,7 @@ document.addEventListener('click', event => {
    event.preventDefault();
    const action=accountAction.dataset.accountAction;
    if(action==='payments'){ modal.close(); state.route='payments'; render(); return; }
-   if(action==='admin'){ window.location.href=new URL('admin.html', window.location.href).href; return; }
+   if(action==='admin'){ modal.close(); state.profile='admin'; state.route='admin'; document.body.classList.add('hidden-nav'); render(); return; }
    if(action==='profile'){ modal.close(); openProfileChooser(); return; }
  }
  const modeButton = event.target.closest('[data-mode]');
@@ -106,6 +106,20 @@ function bind(){
  document.querySelectorAll('[data-plan-details]').forEach(btn=>btn.onclick=()=>showPlanDetails());
  document.querySelectorAll('[data-payment]').forEach(btn=>btn.onclick=()=>openPayment(btn.dataset.payment));
  document.querySelectorAll('[data-open-plan]').forEach(btn=>btn.onclick=()=>openPlanDetails(btn.dataset.openPlan));
+ document.querySelectorAll('[data-admin-section]').forEach(b=>b.onclick=()=>{adminSection=b.dataset.adminSection;state.route='admin';render()});
+ document.querySelectorAll('[data-admin-trip]').forEach(b=>b.onclick=()=>{view.innerHTML=adminTripEditor(b.dataset.adminTrip);bind();window.scrollTo({top:0})});
+ document.querySelectorAll('[data-admin-plan]').forEach(b=>b.onclick=()=>{IPAData.updateTrip(adminTripId,{plan:b.dataset.adminPlan});view.innerHTML=adminTripEditor(adminTripId);bind()});
+ document.querySelectorAll('[data-admin-module]').forEach(x=>x.onchange=()=>{IPAData.toggleTripModule(adminTripId,x.dataset.adminModule,x.checked);view.innerHTML=adminTripEditor(adminTripId);bind()});
+ document.querySelectorAll('[data-admin-publish]').forEach(b=>b.onclick=()=>{const t=adminData().trips.find(x=>x.id===b.dataset.adminPublish);IPAData.publishTrip(t.id,!t.published);view.innerHTML=adminTripEditor(t.id);bind()});
+ document.querySelectorAll('[data-admin-preview]').forEach(b=>b.onclick=()=>{state.profile='client';state.mode='before';state.route='today';document.body.classList.remove('hidden-nav');render()});
+ document.querySelectorAll('[data-admin-benefit]').forEach(x=>x.onchange=()=>{IPAData.setBenefit(x.dataset.adminBenefit,x.checked);render()});
+ document.querySelectorAll('[data-admin-remind]').forEach(b=>b.onclick=()=>toast('Lembrete enviado ao cliente'));
+ document.querySelectorAll('[data-admin-exit]').forEach(b=>b.onclick=()=>showInitialScenario());
+ document.querySelectorAll('[data-admin-new-client]').forEach(b=>b.onclick=()=>showModal(`<span class="eyebrow">NOVO CLIENTE</span><h2>Cadastrar cliente</h2><label>Nome</label><input id="admClientName" class="v2-concierge-input" placeholder="Nome completo"><label>E-mail</label><input id="admClientEmail" class="v2-concierge-input" placeholder="email@cliente.com"><button id="admSaveClient" class="btn btn-primary btn-block">Salvar</button>`));
+ const admSaveClient=document.querySelector('#admSaveClient');if(admSaveClient)admSaveClient.onclick=()=>{IPAData.createClient({name:document.querySelector('#admClientName').value||'Novo cliente',email:document.querySelector('#admClientEmail').value});modal.close();adminSection='clients';render()};
+ document.querySelectorAll('[data-admin-new-trip]').forEach(b=>b.onclick=()=>{const d=adminData();showModal(`<span class="eyebrow">NOVA VIAGEM</span><h2>Criar experiência</h2><label>Cliente</label><select id="admTripClient" class="v2-concierge-input">${d.clients.map(c=>`<option value="${c.id}">${c.name}</option>`).join('')}</select><label>Nome</label><input id="admTripName" class="v2-concierge-input" value="Portugal 2026"><label>Destino</label><input id="admTripDest" class="v2-concierge-input" value="Porto, Portugal"><button id="admSaveTrip" class="btn btn-primary btn-block">Criar viagem</button>`);setTimeout(()=>{const save=document.querySelector('#admSaveTrip');if(save)save.onclick=()=>{IPAData.createTrip({clientId:document.querySelector('#admTripClient').value,name:document.querySelector('#admTripName').value,destination:document.querySelector('#admTripDest').value,plan:'Signature',startDate:'2026-09-05',endDate:'2026-09-12'});modal.close();adminSection='trips';render()}},0)});
+ document.querySelectorAll('[data-admin-new-charge]').forEach(b=>b.onclick=()=>showModal(`<span class="eyebrow">FINANCEIRO</span><h2>Nova cobrança</h2><label>Descrição</label><input id="admPayTitle" class="v2-concierge-input" value="Parcela da viagem"><label>Valor</label><input id="admPayAmount" type="number" class="v2-concierge-input" value="1500"><button id="admSavePay" class="btn btn-primary btn-block">Enviar cobrança</button>`));
+ const admSavePay=document.querySelector('#admSavePay');if(admSavePay)admSavePay.onclick=()=>{IPAData.createPayment({trip:'Portugal 2026',title:document.querySelector('#admPayTitle').value,description:'Cobrança pelo ADM',amount:Number(document.querySelector('#admPayAmount').value),dueDate:'2026-08-25',methods:['PIX','Cartão']});modal.close();adminSection='finance';render()};
  const instagramBtn=document.querySelector('#instagramBtn');
  if(instagramBtn)instagramBtn.onclick=()=>window.open('https://www.instagram.com/indo.por.ai.com.a.gente/','_blank');
  document.querySelectorAll('[data-discovery]').forEach(card=>card.onclick=()=>{
@@ -149,8 +163,26 @@ const routes={
  community:()=>state.live?liveView():communityView(),
  memories:()=>memoriesView(),
  diary:()=>diaryView(),
- payments:()=>paymentsView()
+ payments:()=>paymentsView(),
+ admin:()=>adminIntegratedView()
 };
+
+
+let adminSection='dashboard';
+let adminTripId='trip-portugal-2026';
+function adminData(){const d=ipaDB()||{};d.clients=Array.isArray(d.clients)?d.clients:[];d.trips=Array.isArray(d.trips)?d.trips:[];d.payments=Array.isArray(d.payments)?d.payments:[];d.benefits=Array.isArray(d.benefits)?d.benefits:[];d.itineraryTemplates=Array.isArray(d.itineraryTemplates)?d.itineraryTemplates:[];return d}
+function adminMoney(v){return new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(Number(v||0))}
+function adminMetric(icon,label,value,sub=''){return `<div class="ipa-admin-metric"><span>${icon}</span><div><small>${label}</small><strong>${value}</strong><em>${sub}</em></div></div>`}
+function adminTripList(){const d=adminData();return `<div class="ipa-admin-trip-list">${d.trips.map(t=>{const c=d.clients.find(x=>x.id===t.clientId);return `<button data-admin-trip="${t.id}"><span>🇵🇹</span><div><b>${t.name}</b><small>${c?.name||'Cliente'} · ${t.destination}</small></div><em>${t.plan}</em><i>${t.published?'Publicado':t.status}</i><strong>›</strong></button>`}).join('')||'<p>Nenhuma viagem cadastrada.</p>'}</div>`}
+function adminDashboard(){const d=adminData(),open=d.payments.filter(p=>p.status!=='Pago').reduce((s,p)=>s+Number(p.amount||0),0);return `<div class="ipa-admin-head"><div><span class="eyebrow">INDO POR AÍ BUSINESS</span><h1>Dashboard</h1><p>Gerencie clientes, viagens e receita em um só lugar.</p></div><button class="btn btn-primary" data-admin-new-trip>+ Nova viagem</button></div><div class="ipa-admin-metrics">${adminMetric('👤','Clientes',d.clients.length,'ativos')}${adminMetric('✈️','Viagens',d.trips.length,'cadastradas')}${adminMetric('💳','Em aberto',adminMoney(open),'a receber')}${adminMetric('🔴','Live',d.trips.filter(t=>t.modules?.live).length,'habilitadas')}</div><section class="ipa-admin-panel"><div class="section-head"><div><span class="eyebrow">OPERAÇÃO</span><h2>Viagens</h2></div><button class="btn btn-light" data-admin-section="trips">Ver todas</button></div>${adminTripList()}</section><section class="ipa-admin-panel"><span class="eyebrow">PRÓXIMAS AÇÕES</span><h2>O que precisa da sua atenção</h2><div class="ipa-admin-attention"><div>💳 <span><b>Cobranças em aberto</b><small>Envie lembretes pelo Financeiro.</small></span></div><div>👁️ <span><b>Confira como cliente</b><small>Revise a experiência antes de publicar.</small></span></div><div>🔴 <span><b>Live</b><small>Ative apenas quando quiser transmissão.</small></span></div></div></section>`}
+function adminClients(){const d=adminData();return `<div class="ipa-admin-head"><div><span class="eyebrow">CRM</span><h1>Clientes</h1><p>Um cliente pode ter várias viagens.</p></div><button class="btn btn-primary" data-admin-new-client>+ Novo cliente</button></div><div class="ipa-admin-client-grid">${d.clients.map(c=>`<div class="ipa-admin-client"><div class="ipa-admin-avatar">${(c.name||'C').split(' ').map(x=>x[0]).slice(0,2).join('')}</div><div><b>${c.name}</b><small>${c.email||''}</small><em>${d.trips.filter(t=>t.clientId===c.id).length} viagem(ns)</em></div></div>`).join('')}</div>`}
+function adminTrips(){return `<div class="ipa-admin-head"><div><span class="eyebrow">EXPERIÊNCIAS</span><h1>Viagens</h1><p>Escolha uma viagem para personalizar o app.</p></div><button class="btn btn-primary" data-admin-new-trip>+ Nova viagem</button></div><section class="ipa-admin-panel">${adminTripList()}</section>`}
+function adminFinance(){const d=adminData(),total=d.payments.reduce((s,p)=>s+Number(p.amount||0),0),paid=d.payments.filter(p=>p.status==='Pago').reduce((s,p)=>s+Number(p.amount||0),0);return `<div class="ipa-admin-head"><div><span class="eyebrow">FINANCEIRO</span><h1>Pagamentos</h1><p>Crie cobranças e acompanhe os recebimentos.</p></div><button class="btn btn-primary" data-admin-new-charge>+ Nova cobrança</button></div><div class="ipa-admin-metrics">${adminMetric('💼','Contratado',adminMoney(total))}${adminMetric('✓','Recebido',adminMoney(paid))}${adminMetric('⏱️','Em aberto',adminMoney(total-paid))}</div><section class="ipa-admin-panel"><div class="ipa-admin-payment-list">${d.payments.map(p=>`<div><span><b>${p.title}</b><small>${p.trip} · ${p.description}</small></span><strong>${adminMoney(p.amount)}</strong><em class="${p.status==='Pago'?'ok':'wait'}">${p.status}</em><button data-admin-remind="${p.id}">Lembrar</button></div>`).join('')}</div></section>`}
+function adminPartners(){const d=adminData();return `<div class="ipa-admin-head"><div><span class="eyebrow">MONETIZAÇÃO</span><h1>Parceiros</h1><p>Escolha os benefícios ativos.</p></div></div><section class="ipa-admin-panel"><div class="ipa-admin-partners">${d.benefits.map(b=>`<label><div><b>${b.title}</b><small>${b.sponsorLabel} · ${b.partner}</small></div><input type="checkbox" data-admin-benefit="${b.id}" ${b.enabled?'checked':''}></label>`).join('')}</div></section>`}
+function adminLive(){return `<div class="ipa-admin-head"><div><span class="eyebrow">LIVE</span><h1>Central de transmissões</h1><p>Controle as transmissões por viagem.</p></div></div><section class="ipa-admin-panel ipa-admin-live"><span>🔴</span><h2>Live preparada</h2><p>Próxima integração: Daily + Cloudflare.</p></section>`}
+function adminTemplates(){const d=adminData();return `<div class="ipa-admin-head"><div><span class="eyebrow">BIBLIOTECA</span><h1>Modelos de roteiro</h1><p>Crie uma vez e reutilize.</p></div></div><div class="ipa-admin-template-grid">${d.itineraryTemplates.map(t=>`<div><span>🗺️</span><small>${t.destination}</small><b>${t.name}</b><p>${t.description}</p><em>${t.days} dias</em></div>`).join('')}</div>`}
+function adminTripEditor(id){const d=adminData(),t=d.trips.find(x=>x.id===id);if(!t)return adminTrips();adminTripId=id;const c=d.clients.find(x=>x.id===t.clientId);const labels={itinerary:'Roteiro',documents:'Documentos',luggage:'Mala inteligente',checkin:'Check-in',exchange:'Exchange',payments:'Pagamentos',community:'Comunidade',live:'Live',album:'Álbum',movie:'Filme',passport:'Passaporte'};return `<div class="ipa-admin-editor-head"><button data-admin-section="trips">← Viagens</button><div><span class="eyebrow">${c?.name||'CLIENTE'}</span><h1>${t.name}</h1><p>${t.destination}</p></div><button class="btn btn-light" data-admin-preview="${t.id}">👁 Ver como cliente</button></div><section class="ipa-admin-panel"><div class="section-head"><div><span class="eyebrow">PLANO</span><h2>Plano contratado</h2></div><b class="ipa-plan">${t.plan}</b></div><div class="ipa-admin-plan-grid">${['Explore','Signature','Elite','Groups'].map(p=>`<button data-admin-plan="${p}" class="${t.plan===p?'active':''}"><b>${p}</b><small>${p==='Explore'?'Roteiro + app':p==='Signature'?'Pré-embarque + compras':p==='Elite'?'Experiência completa':'Grandes grupos'}</small></button>`).join('')}</div></section><section class="ipa-admin-panel"><span class="eyebrow">EXPERIÊNCIA DO CLIENTE</span><h2>O que aparece no app</h2><div class="ipa-admin-module-grid">${Object.entries(labels).map(([k,v])=>`<label class="${t.modules?.[k]?'on':''}"><div><b>${v}</b><small>${t.modules?.[k]?'Visível':'Oculto'}</small></div><input type="checkbox" data-admin-module="${k}" ${t.modules?.[k]?'checked':''}></label>`).join('')}</div></section><section class="ipa-admin-panel"><span class="eyebrow">ROTEIRO</span><h2>Dias da viagem</h2><div class="ipa-admin-days">${(t.itinerary||[]).map(day=>`<div><strong>${day.day}</strong><span><b>${day.title}</b>${day.places.map(p=>`<small>• ${p}</small>`).join('')}</span></div>`).join('')}</div></section><button class="btn btn-primary btn-block" data-admin-publish="${t.id}">${t.published?'✓ Viagem publicada':'🚀 Publicar viagem'}</button>`}
+function adminIntegratedView(){const views={dashboard:adminDashboard,clients:adminClients,trips:adminTrips,templates:adminTemplates,finance:adminFinance,live:adminLive,partners:adminPartners};return `<div class="ipa-admin-integrated"><div class="ipa-admin-bar"><div><b>Indo por Aí</b><small>BUSINESS</small></div><button data-admin-exit>← Voltar</button></div><div class="ipa-admin-nav">${[['dashboard','⌂','Dashboard'],['clients','👤','Clientes'],['trips','✈️','Viagens'],['templates','🗺️','Roteiros'],['finance','💳','Financeiro'],['live','🔴','Live'],['partners','☆','Parceiros']].map(([k,i,l])=>`<button data-admin-section="${k}" class="${adminSection===k?'active':''}">${i}<span>${l}</span></button>`).join('')}</div><div class="ipa-admin-content">${(views[adminSection]||adminDashboard)()}</div></div>`}
 
 function prospectView(){return `<section class="prospect-premium">
  <span class="eyebrow">Ainda não sou cliente</span><h1>Sua viagem começa antes do embarque.</h1><p>Roteiros, organização, acompanhamento e memórias em uma única experiência.</p><button class="btn btn-primary">Quero viajar com o Indo por Aí</button>
@@ -503,13 +535,20 @@ function showInitialScenario(){
    <div class="scenario-entry-grid">
     <button data-initial-scenario="prospect"><span class="scenario-icon">🌍</span><div><b>Ainda não sou cliente</b><small>Conheça planos, benefícios e a proposta do Indo por Aí.</small></div><em>›</em></button>
     <button data-initial-scenario="client"><span class="scenario-icon">✈️</span><div><b>Já sou cliente</b><small>Acesse Antes, Durante, Depois e toda a experiência da viagem.</small></div><em>›</em></button>
-    <a class="scenario-admin-link" href="./admin.html"><span class="scenario-icon">⚙️</span><div><b>Modo ADM</b><small>Abra o Indo por Aí Business para gerenciar clientes, pagamentos e benefícios.</small></div><em>›</em></a>
+    <button data-initial-scenario="admin"><span class="scenario-icon">⚙️</span><div><b>Modo ADM</b><small>Abra o Indo por Aí Business para gerenciar clientes, pagamentos e benefícios.</small></div><em>›</em></button>
    </div>
   </section>`;
  document.querySelectorAll('[data-initial-scenario]').forEach(btn=>{
    btn.onclick=()=>{
      const s=btn.dataset.initialScenario;
      state.scenarioChosen=true;
+     if(s==='admin'){
+       state.profile='admin';
+       state.route='admin';
+       document.body.classList.add('hidden-nav');
+       render();
+       return;
+     }
      if(s==='client') document.body.classList.remove('hidden-nav');
      setProfile(s);
    };
