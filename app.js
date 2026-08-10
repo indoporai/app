@@ -12,7 +12,7 @@ const state={route:'today',mode:'during',profile:savedProfile,leadStage:'new',tr
  {type:'other',name:'Juliana',text:'Perfeito! Já estamos a caminho ☀️',time:'08:47'},
  {type:'other',name:'Carlos',text:'Alguém sabe se vai chover à tarde?',time:'08:50'}
 ]};
-const titles={today:'Hoje',trip:'Minha Viagem',explore:'Explorar',community:'Grupo da viagem',memories:'Memórias',diary:'Diário da Viagem',prospect:'Planejar viagem'};
+const titles={today:'Hoje',trip:'Minha Viagem',explore:'Explorar',community:'Grupo da viagem',memories:'Memórias',diary:'Diário da Viagem',payments:'Pagamentos',prospect:'Planejar viagem'};
 
 document.addEventListener('click', event => {
  const modeButton = event.target.closest('[data-mode]');
@@ -69,6 +69,7 @@ function bind(){
  document.querySelectorAll('[data-benefit-id]').forEach(btn=>btn.onclick=()=>{const d=ipaDB();const b=d?.benefits.find(x=>x.id===btn.dataset.benefitId);if(!b)return;showModal(`<span class="eyebrow">${b.sponsorLabel}</span><h2>${b.title}</h2><p>Em parceria com <b>${b.partner}</b>.</p><button class="btn btn-primary btn-block" onclick="toast('${b.cta}');modal.close()">${b.cta}</button>`)});
  document.querySelectorAll('[data-rating-place]').forEach(btn=>btn.onclick=()=>openPlaceCommunity(btn.dataset.ratingPlace));
  document.querySelectorAll('[data-plan-details]').forEach(btn=>btn.onclick=()=>showPlanDetails());
+ document.querySelectorAll('[data-payment]').forEach(btn=>btn.onclick=()=>openPayment(btn.dataset.payment));
  const instagramBtn=document.querySelector('#instagramBtn');
  if(instagramBtn)instagramBtn.onclick=()=>window.open('https://www.instagram.com/indo.por.ai.com.a.gente/','_blank');
  document.querySelectorAll('[data-discovery]').forEach(card=>card.onclick=()=>{
@@ -197,6 +198,39 @@ function plansSalesBlock(){
  </div></section>`;
 }
 
+
+function brl(v){return new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(Number(v||0))}
+function paymentSummary(){
+ const d=ipaDB();if(!d)return'';
+ const total=d.payments.reduce((s,p)=>s+p.amount,0);
+ const paid=d.payments.filter(p=>p.status==='Pago').reduce((s,p)=>s+p.amount,0);
+ const pending=total-paid;
+ return {total,paid,pending};
+}
+function openPayment(id){
+ const d=ipaDB();const p=d?.payments.find(x=>x.id===id);if(!p)return;
+ if(p.status==='Pago'){
+   showModal(`<span class="eyebrow">Pagamento</span><h2>${p.title}</h2><div class="payment-paid-card"><span>✓</span><strong>Pagamento confirmado</strong><small>${brl(p.amount)} · ${p.paidAt||''}</small></div><p>${p.description}</p><button class="btn btn-light btn-block" onclick="toast('Comprovante disponível');modal.close()">Ver comprovante</button>`);
+   return;
+ }
+ showModal(`<div class="payment-modal"><span class="eyebrow">Pagamento disponível</span><h2>${p.title}</h2><p>${p.description}</p><div class="payment-amount">${brl(p.amount)}</div><small>Vencimento: ${new Date(p.dueDate+'T12:00:00').toLocaleDateString('pt-BR')}</small><div class="payment-methods"><button data-pay-method="pix:${p.id}"><span>◈</span><b>Pagar com Pix</b><small>Abra o app do seu banco</small></button><button data-pay-method="card:${p.id}"><span>💳</span><b>Pagar com cartão</b><small>Checkout seguro</small></button></div><p class="payment-safe">🔒 Os dados do cartão não ficam armazenados no Indo por Aí.</p></div>`);
+ setTimeout(()=>document.querySelectorAll('[data-pay-method]').forEach(btn=>btn.onclick=()=>simulatePayment(btn.dataset.payMethod)),0);
+}
+function simulatePayment(payload){
+ const [method,id]=payload.split(':');const d=ipaDB();const p=d?.payments.find(x=>x.id===id);if(!p)return;
+ if(method==='pix'){
+   showModal(`<span class="eyebrow">Pix</span><h2>${brl(p.amount)}</h2><div class="pix-demo"><div class="pix-qr">▦</div><b>Pix Copia e Cola</b><code>00020126...INDOPORAI...${p.id}</code></div><p>Na versão real, este botão abrirá o fluxo do gateway/banco. Para o teste, simule a confirmação:</p><button class="btn btn-primary btn-block" data-confirm-payment="${p.id}">Simular Pix pago</button>`);
+ }else{
+   showModal(`<span class="eyebrow">Checkout seguro</span><h2>${brl(p.amount)}</h2><div class="fake-checkout"><label>Nome no cartão<input value="Renato Ferreira"></label><label>Número do cartão<input value="•••• •••• •••• 4242"></label><div><label>Validade<input value="12/29"></label><label>CVV<input value="•••"></label></div></div><button class="btn btn-primary btn-block" data-confirm-payment="${p.id}">Simular pagamento aprovado</button><p class="payment-safe">Em produção, esta etapa será hospedada pelo gateway.</p>`);
+ }
+ setTimeout(()=>document.querySelectorAll('[data-confirm-payment]').forEach(btn=>btn.onclick=()=>{IPAData.markPaymentPaid(btn.dataset.confirmPayment);toast('Pagamento confirmado');modal.close();render()}),0);
+}
+function paymentsView(){
+ const d=ipaDB();const s=paymentSummary();
+ return `<section class="payments-hero"><span class="eyebrow">Minha Viagem</span><h1>Pagamentos</h1><p>Acompanhe parcelas, extras e comprovantes da sua viagem.</p><div class="payment-summary-grid"><div><small>Contratado</small><strong>${brl(s.total)}</strong></div><div><small>Pago</small><strong>${brl(s.paid)}</strong></div><div><small>Em aberto</small><strong>${brl(s.pending)}</strong></div></div></section>
+ <section class="section"><div class="section-head"><h2>Suas cobranças</h2><span class="chip">${d.payments.length} lançamentos</span></div><div class="payment-list">${d.payments.map(p=>`<button class="payment-row" data-payment="${p.id}"><div class="payment-status ${p.status==='Pago'?'paid':'pending'}">${p.status==='Pago'?'✓':'!'}</div><div><span class="eyebrow">${p.trip}</span><h3>${p.title}</h3><p>${p.description}</p><small>Vencimento ${new Date(p.dueDate+'T12:00:00').toLocaleDateString('pt-BR')}</small></div><div class="payment-row-value"><strong>${brl(p.amount)}</strong><span class="${p.status==='Pago'?'paid-text':'pending-text'}">${p.status}</span></div></button>`).join('')}</div></section>`;
+}
+
 function beforeView(){const d=ipaDB();return `<section class="v2-hero v2-before-hero">
  <div class="v2-hero-top"><div><span class="eyebrow">Antes da viagem</span><h1>Portugal já está esperando por você. 🇵🇹</h1><p>Faltam 14 dias. Sua preparação está avançando.</p></div><span class="v2-weather">🌤️ 22°C</span></div>
  <div class="v2-countdown"><div><strong>14</strong><small>dias</small></div><div><strong>08</strong><small>horas</small></div><div><strong>34</strong><small>minutos</small></div></div>
@@ -204,6 +238,7 @@ function beforeView(){const d=ipaDB();return `<section class="v2-hero v2-before-
 </section>
 ${modeCard()}
 <section class="section"><div class="v2-plan-card"><div><span class="eyebrow">Seu plano</span><h3>${d?.client.plan||'Signature'}</h3><p>${d?.client.trip||'Portugal 2026'}</p></div><button class="btn btn-light" data-plan-details="true">Ver benefícios do plano</button></div></section>
+<section class="section"><button class="payment-alert-card" data-go="payments"><div class="payment-alert-icon">💳</div><div><span class="eyebrow">Pagamento disponível</span><h3>Você tem uma parcela pendente</h3><p>R$ 1.500 · vencimento 15/08</p></div><span>›</span></button></section>
 <section class="section"><div class="section-head"><div><span class="eyebrow">Cartão da viagem</span><h2>Seu embarque em um toque</h2></div><span class="chip green">Confirmado</span></div>
  <button class="v2-boarding-pass" data-boarding-pass="true"><div class="boarding-main"><div><span class="eyebrow">PORTUGAL 2026</span><strong>GRU</strong><small>São Paulo</small></div><div class="boarding-route"><span>✈️</span><b>10h15</b></div><div><span class="eyebrow">DESTINO</span><strong>OPO</strong><small>Porto</small></div></div><div class="boarding-divider"></div><div class="boarding-meta"><div><small>Data</small><b>05 SET</b></div><div><small>Embarque</small><b>21:40</b></div><div><small>Portão</small><b>A12</b></div><div><small>Assento</small><b>14A</b></div></div></button>
 </section>

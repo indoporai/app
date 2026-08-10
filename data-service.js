@@ -32,6 +32,11 @@ const IPA_DEFAULT_DATA = {
       {label:"Protetor solar",done:true}
     ]
   },
+  payments:[
+    {id:"pay-001",trip:"Portugal 2026",title:"Parcela da viagem",description:"2ª parcela do pacote Signature",amount:1500,dueDate:"2026-08-15",status:"Pendente",methods:["PIX","Cartão"],createdAt:"2026-08-10",paidAt:null},
+    {id:"pay-002",trip:"Portugal 2026",title:"Passeio Vale do Douro",description:"Experiência adicional",amount:450,dueDate:"2026-08-20",status:"Pago",methods:["PIX","Cartão"],createdAt:"2026-08-09",paidAt:"2026-08-09"},
+    {id:"pay-003",trip:"Portugal 2026",title:"Saldo final da viagem",description:"Última parcela antes do embarque",amount:3350,dueDate:"2026-08-30",status:"Pendente",methods:["PIX","Cartão"],createdAt:"2026-08-10",paidAt:null}
+  ],
   ratings:{
     clerigos:{place:"Torre dos Clérigos",score:4.9,count:127,recommend:96,guide:"Suba no fim da tarde para aproveitar a luz e a vista.",tips:["Chegue cedo para evitar fila.","A vista no pôr do sol vale muito a pena."]},
     lello:{place:"Livraria Lello",score:4.8,count:203,recommend:93,guide:"Use o ingresso com horário marcado e chegue 10 minutos antes.",tips:["Evite o meio do dia.","Reserve pelo menos 45 minutos."]},
@@ -49,5 +54,8 @@ window.IPAData={
  setBenefit(id,en){const d=readData();const b=d.benefits.find(x=>x.id===id);if(b)b.enabled=en;writeData(d)},
  updateExchange(p){const d=readData();d.exchange={...d.exchange,...p};writeData(d)},
  togglePrep(section,index){const d=readData();if(d.prep[section]?.[index])d.prep[section][index].done=!d.prep[section][index].done;writeData(d)},
- addRating(id,stars,tip){const d=readData();const r=d.ratings[id];if(!r)return;const total=r.score*r.count+stars;r.count+=1;r.score=Math.round((total/r.count)*10)/10;if(tip)r.tips.unshift(tip);writeData(d)}
+ addRating(id,stars,tip){const d=readData();const r=d.ratings[id];if(!r)return;const total=r.score*r.count+stars;r.count+=1;r.score=Math.round((total/r.count)*10)/10;if(tip)r.tips.unshift(tip);writeData(d)},
+ createPayment(payment){const d=readData();payment.id=payment.id||("pay-"+Date.now());payment.status=payment.status||"Pendente";payment.createdAt=new Date().toISOString().slice(0,10);payment.paidAt=null;d.payments.unshift(payment);writeData(d);return payment},
+ updatePayment(id,patch){const d=readData();const p=d.payments.find(x=>x.id===id);if(p)Object.assign(p,patch);writeData(d);return p},
+ markPaymentPaid(id){const d=readData();const p=d.payments.find(x=>x.id===id);if(p){p.status="Pago";p.paidAt=new Date().toISOString().slice(0,10)}writeData(d);return p}
 };
