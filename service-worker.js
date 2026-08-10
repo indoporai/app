@@ -1,9 +1,13 @@
-const CACHE = "indo-por-ai-practical-demo-1";
+const CACHE = "indo-por-ai-v2-beta-2";
 const CORE = [
   "./",
   "index.html",
-  "styles.css?v=practical-1",
-  "app.js?v=practical-1",
+  "styles.css?v=v2-beta-2",
+  "app.js?v=v2-beta-2",
+  "data-service.js",
+  "admin.html",
+  "admin.js",
+  "admin.css",
   "manifest.webmanifest",
   "assets/apple-touch-icon.png",
   "assets/icon-192.png",
