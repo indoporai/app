@@ -193,3 +193,13 @@ body{min-height:100vh}.app-shell{width:min(100%,520px);min-height:100vh;margin:a
 .fake-checkout{display:flex;flex-direction:column;gap:10px;margin:14px 0}.fake-checkout>div{display:grid;grid-template-columns:1fr 1fr;gap:9px}.fake-checkout label{display:block;font-size:12px;font-weight:800}.fake-checkout input{width:100%;box-sizing:border-box;margin-top:5px;border:1px solid #dce7e4;border-radius:12px;padding:11px;font:inherit}
 .payment-paid-card{text-align:center;background:#eaf8f1;border-radius:18px;padding:18px;margin:14px 0;color:#16825b}.payment-paid-card span{display:grid;place-items:center;width:54px;height:54px;border-radius:50%;background:#fff;margin:0 auto 8px;font-size:28px}.payment-paid-card strong,.payment-paid-card small{display:block}.payment-paid-card small{margin-top:5px}
 @media(max-width:430px){.payment-summary-grid{grid-template-columns:1fr}.payment-row{grid-template-columns:42px 1fr}.payment-row-value{grid-column:2;text-align:left}.payment-methods{grid-template-columns:1fr}.fake-checkout>div{grid-template-columns:1fr}}
+
+/* Beta 3.1 — acesso visível ao ADM e Pagamentos */
+.account-hub-list{display:flex;flex-direction:column;gap:9px;margin-top:14px}
+.account-hub-list button{width:100%;display:grid;grid-template-columns:44px 1fr auto;gap:11px;align-items:center;border:1px solid #e3ebe8;background:#fff;border-radius:16px;padding:13px;text-align:left;color:inherit}
+.account-hub-list button>span{width:44px;height:44px;border-radius:14px;background:#eef7f4;display:grid;place-items:center;font-size:22px}
+.account-hub-list b,.account-hub-list small{display:block}.account-hub-list small{color:#748285;margin-top:3px}.account-hub-list em{font-style:normal;font-size:22px}
+.trip-quick-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.trip-quick-grid button{display:grid;grid-template-columns:42px 1fr auto;gap:10px;align-items:center;border:1px solid #e3ebe8;background:#fff;border-radius:18px;padding:14px;text-align:left;color:inherit;box-shadow:var(--shadow)}
+.trip-quick-grid button>span{font-size:25px}.trip-quick-grid b,.trip-quick-grid small{display:block}.trip-quick-grid small{color:#748285;margin-top:3px}.trip-quick-grid em{font-style:normal;font-size:20px}
+@media(max-width:430px){.trip-quick-grid{grid-template-columns:1fr}}
