@@ -115,11 +115,79 @@ function bind(){
  document.querySelectorAll('[data-admin-benefit]').forEach(x=>x.onchange=()=>{IPAData.setBenefit(x.dataset.adminBenefit,x.checked);render()});
  document.querySelectorAll('[data-admin-remind]').forEach(b=>b.onclick=()=>toast('Lembrete enviado ao cliente'));
  document.querySelectorAll('[data-admin-exit]').forEach(b=>b.onclick=()=>showInitialScenario());
- document.querySelectorAll('[data-admin-new-client]').forEach(b=>b.onclick=()=>showModal(`<span class="eyebrow">NOVO CLIENTE</span><h2>Cadastrar cliente</h2><label>Nome</label><input id="admClientName" class="v2-concierge-input" placeholder="Nome completo"><label>E-mail</label><input id="admClientEmail" class="v2-concierge-input" placeholder="email@cliente.com"><button id="admSaveClient" class="btn btn-primary btn-block">Salvar</button>`));
- const admSaveClient=document.querySelector('#admSaveClient');if(admSaveClient)admSaveClient.onclick=()=>{IPAData.createClient({name:document.querySelector('#admClientName').value||'Novo cliente',email:document.querySelector('#admClientEmail').value});modal.close();adminSection='clients';render()};
+ document.querySelectorAll('[data-admin-invite]').forEach(b=>b.onclick=async()=>{
+   const id=b.dataset.adminInvite,email=b.dataset.adminEmail;
+   if(!email){toast('Cadastre o e-mail do cliente');return}
+   b.disabled=true;b.textContent='Enviando...';
+   try{
+     await window.IPAFirebase.sendClientInvite(email,id);
+     IPAData.updateClient(id,{inviteStatus:'sent',inviteSentAt:new Date().toISOString()});
+     await window.IPAFirebase.syncNow();
+     toast('Convite enviado por e-mail ✓');render();
+   }catch(err){console.error(err);toast('Erro ao enviar convite');b.disabled=false;b.textContent='✉ Enviar acesso'}
+ });
+ document.querySelectorAll('[data-admin-new-client]').forEach(b=>b.onclick=()=>{
+   showModal(`<span class="eyebrow">NOVO CLIENTE</span><h2>Cadastrar cliente</h2>
+     <label>Nome</label><input id="admClientName" class="v2-concierge-input" placeholder="Nome completo">
+     <label>E-mail</label><input id="admClientEmail" class="v2-concierge-input" placeholder="email@cliente.com">
+     <label>Telefone</label><input id="admClientPhone" class="v2-concierge-input" placeholder="(11) 99999-9999">
+     <button id="admSaveClient" class="btn btn-primary btn-block">Salvar cliente</button>
+     <small id="admClientSaveStatus" class="firebase-security-note"></small>`);
+   setTimeout(()=>{
+     const save=document.querySelector('#admSaveClient');
+     if(!save)return;
+     save.onclick=async()=>{
+       const name=document.querySelector('#admClientName')?.value.trim();
+       const email=document.querySelector('#admClientEmail')?.value.trim();
+       const phone=document.querySelector('#admClientPhone')?.value.trim();
+       const status=document.querySelector('#admClientSaveStatus');
+       if(!name){toast('Informe o nome do cliente');return}
+       save.disabled=true;
+       save.textContent='Salvando...';
+       if(status)status.textContent='Gravando no Firebase...';
+       try{
+         const client=IPAData.createClient({name,email,phone});
+         if(window.IPAFirebase?.user){
+           await window.IPAFirebase.syncNow();
+         }
+         if(status)status.textContent='✓ Cliente salvo no Firebase';
+         toast('Cliente salvo no Firebase ✓');
+         setTimeout(()=>{
+           modal.close();
+           adminSection='clients';
+           render();
+         },500);
+       }catch(err){
+         console.error('Erro ao salvar cliente',err);
+         if(status)status.textContent='Erro: '+(err?.message||'não foi possível salvar');
+         toast('Não foi possível salvar o cliente');
+         save.disabled=false;
+         save.textContent='Tentar novamente';
+       }
+     };
+   },0);
+ });
  document.querySelectorAll('[data-admin-new-trip]').forEach(b=>b.onclick=()=>{const d=adminData();showModal(`<span class="eyebrow">NOVA VIAGEM</span><h2>Criar experiência</h2><label>Cliente</label><select id="admTripClient" class="v2-concierge-input">${d.clients.map(c=>`<option value="${c.id}">${c.name}</option>`).join('')}</select><label>Nome</label><input id="admTripName" class="v2-concierge-input" value="Portugal 2026"><label>Destino</label><input id="admTripDest" class="v2-concierge-input" value="Porto, Portugal"><button id="admSaveTrip" class="btn btn-primary btn-block">Criar viagem</button>`);setTimeout(()=>{const save=document.querySelector('#admSaveTrip');if(save)save.onclick=()=>{IPAData.createTrip({clientId:document.querySelector('#admTripClient').value,name:document.querySelector('#admTripName').value,destination:document.querySelector('#admTripDest').value,plan:'Signature',startDate:'2026-09-05',endDate:'2026-09-12'});modal.close();adminSection='trips';render()}},0)});
- document.querySelectorAll('[data-admin-new-charge]').forEach(b=>b.onclick=()=>showModal(`<span class="eyebrow">FINANCEIRO</span><h2>Nova cobrança</h2><label>Descrição</label><input id="admPayTitle" class="v2-concierge-input" value="Parcela da viagem"><label>Valor</label><input id="admPayAmount" type="number" class="v2-concierge-input" value="1500"><button id="admSavePay" class="btn btn-primary btn-block">Enviar cobrança</button>`));
- const admSavePay=document.querySelector('#admSavePay');if(admSavePay)admSavePay.onclick=()=>{IPAData.createPayment({trip:'Portugal 2026',title:document.querySelector('#admPayTitle').value,description:'Cobrança pelo ADM',amount:Number(document.querySelector('#admPayAmount').value),dueDate:'2026-08-25',methods:['PIX','Cartão']});modal.close();adminSection='finance';render()};
+ document.querySelectorAll('[data-admin-new-charge]').forEach(b=>b.onclick=()=>{
+   showModal(`<span class="eyebrow">FINANCEIRO</span><h2>Nova cobrança</h2>
+     <label>Descrição</label><input id="admPayTitle" class="v2-concierge-input" value="Parcela da viagem">
+     <label>Valor</label><input id="admPayAmount" type="number" class="v2-concierge-input" value="1500">
+     <button id="admSavePay" class="btn btn-primary btn-block">Enviar cobrança</button>`);
+   setTimeout(()=>{
+     const save=document.querySelector('#admSavePay');
+     if(save)save.onclick=async()=>{
+       save.disabled=true;save.textContent='Salvando...';
+       try{
+         IPAData.createPayment({trip:'Portugal 2026',title:document.querySelector('#admPayTitle').value,description:'Cobrança pelo ADM',amount:Number(document.querySelector('#admPayAmount').value),dueDate:'2026-08-25',methods:['PIX','Cartão']});
+         if(window.IPAFirebase?.user)await window.IPAFirebase.syncNow();
+         toast('Cobrança salva no Firebase ✓');
+         modal.close();adminSection='finance';render();
+       }catch(err){
+         toast('Erro ao salvar cobrança');save.disabled=false;save.textContent='Tentar novamente';
+       }
+     };
+   },0);
+ });
  const firebaseLogin=document.querySelector('#firebaseAdminLogin');
  if(firebaseLogin) firebaseLogin.onclick=async()=>{
    const email=document.querySelector('#firebaseAdminEmail')?.value.trim();
@@ -186,7 +254,7 @@ function adminMoney(v){return new Intl.NumberFormat('pt-BR',{style:'currency',cu
 function adminMetric(icon,label,value,sub=''){return `<div class="ipa-admin-metric"><span>${icon}</span><div><small>${label}</small><strong>${value}</strong><em>${sub}</em></div></div>`}
 function adminTripList(){const d=adminData();return `<div class="ipa-admin-trip-list">${d.trips.map(t=>{const c=d.clients.find(x=>x.id===t.clientId);return `<button data-admin-trip="${t.id}"><span>🇵🇹</span><div><b>${t.name}</b><small>${c?.name||'Cliente'} · ${t.destination}</small></div><em>${t.plan}</em><i>${t.published?'Publicado':t.status}</i><strong>›</strong></button>`}).join('')||'<p>Nenhuma viagem cadastrada.</p>'}</div>`}
 function adminDashboard(){const d=adminData(),open=d.payments.filter(p=>p.status!=='Pago').reduce((s,p)=>s+Number(p.amount||0),0);return `<div class="ipa-admin-head"><div><span class="eyebrow">INDO POR AÍ BUSINESS</span><h1>Dashboard</h1><p>Gerencie clientes, viagens e receita em um só lugar.</p></div><button class="btn btn-primary" data-admin-new-trip>+ Nova viagem</button></div><div class="ipa-admin-metrics">${adminMetric('👤','Clientes',d.clients.length,'ativos')}${adminMetric('✈️','Viagens',d.trips.length,'cadastradas')}${adminMetric('💳','Em aberto',adminMoney(open),'a receber')}${adminMetric('🔴','Live',d.trips.filter(t=>t.modules?.live).length,'habilitadas')}</div><section class="ipa-admin-panel"><div class="section-head"><div><span class="eyebrow">OPERAÇÃO</span><h2>Viagens</h2></div><button class="btn btn-light" data-admin-section="trips">Ver todas</button></div>${adminTripList()}</section><section class="ipa-admin-panel"><span class="eyebrow">PRÓXIMAS AÇÕES</span><h2>O que precisa da sua atenção</h2><div class="ipa-admin-attention"><div>💳 <span><b>Cobranças em aberto</b><small>Envie lembretes pelo Financeiro.</small></span></div><div>👁️ <span><b>Confira como cliente</b><small>Revise a experiência antes de publicar.</small></span></div><div>🔴 <span><b>Live</b><small>Ative apenas quando quiser transmissão.</small></span></div></div></section>`}
-function adminClients(){const d=adminData();return `<div class="ipa-admin-head"><div><span class="eyebrow">CRM</span><h1>Clientes</h1><p>Um cliente pode ter várias viagens.</p></div><button class="btn btn-primary" data-admin-new-client>+ Novo cliente</button></div><div class="ipa-admin-client-grid">${d.clients.map(c=>`<div class="ipa-admin-client"><div class="ipa-admin-avatar">${(c.name||'C').split(' ').map(x=>x[0]).slice(0,2).join('')}</div><div><b>${c.name}</b><small>${c.email||''}</small><em>${d.trips.filter(t=>t.clientId===c.id).length} viagem(ns)</em></div></div>`).join('')}</div>`}
+function adminClients(){const d=adminData();return `<div class="ipa-admin-head"><div><span class="eyebrow">CRM</span><h1>Clientes</h1><p>Um cliente pode ter várias viagens.</p></div><button class="btn btn-primary" data-admin-new-client>+ Novo cliente</button></div><div class="ipa-admin-client-grid">${d.clients.map(c=>`<div class="ipa-admin-client"><div class="ipa-admin-avatar">${(c.name||'C').split(' ').map(x=>x[0]).slice(0,2).join('')}</div><div><b>${c.name}</b><small>${c.email||''}</small><em>${d.trips.filter(t=>t.clientId===c.id).length} viagem(ns)</em><button class="ipa-invite-btn" data-admin-invite="${c.id}" data-admin-email="${c.email||''}">✉ Enviar acesso</button></div></div>`).join('')}</div>`}
 function adminTrips(){return `<div class="ipa-admin-head"><div><span class="eyebrow">EXPERIÊNCIAS</span><h1>Viagens</h1><p>Escolha uma viagem para personalizar o app.</p></div><button class="btn btn-primary" data-admin-new-trip>+ Nova viagem</button></div><section class="ipa-admin-panel">${adminTripList()}</section>`}
 function adminFinance(){const d=adminData(),total=d.payments.reduce((s,p)=>s+Number(p.amount||0),0),paid=d.payments.filter(p=>p.status==='Pago').reduce((s,p)=>s+Number(p.amount||0),0);return `<div class="ipa-admin-head"><div><span class="eyebrow">FINANCEIRO</span><h1>Pagamentos</h1><p>Crie cobranças e acompanhe os recebimentos.</p></div><button class="btn btn-primary" data-admin-new-charge>+ Nova cobrança</button></div><div class="ipa-admin-metrics">${adminMetric('💼','Contratado',adminMoney(total))}${adminMetric('✓','Recebido',adminMoney(paid))}${adminMetric('⏱️','Em aberto',adminMoney(total-paid))}</div><section class="ipa-admin-panel"><div class="ipa-admin-payment-list">${d.payments.map(p=>`<div><span><b>${p.title}</b><small>${p.trip} · ${p.description}</small></span><strong>${adminMoney(p.amount)}</strong><em class="${p.status==='Pago'?'ok':'wait'}">${p.status}</em><button data-admin-remind="${p.id}">Lembrar</button></div>`).join('')}</div></section>`}
 function adminPartners(){const d=adminData();return `<div class="ipa-admin-head"><div><span class="eyebrow">MONETIZAÇÃO</span><h1>Parceiros</h1><p>Escolha os benefícios ativos.</p></div></div><section class="ipa-admin-panel"><div class="ipa-admin-partners">${d.benefits.map(b=>`<label><div><b>${b.title}</b><small>${b.sponsorLabel} · ${b.partner}</small></div><input type="checkbox" data-admin-benefit="${b.id}" ${b.enabled?'checked':''}></label>`).join('')}</div></section>`}

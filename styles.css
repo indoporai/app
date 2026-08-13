@@ -302,3 +302,5 @@ body{min-height:100vh}.app-shell{width:min(100%,520px);min-height:100vh;margin:a
 .firebase-badge.sync{background:#fff2d8;color:#9c6914}
 .firebase-badge.error{background:#ffe7e4;color:#a84334}
 @media(max-width:560px){.firebase-admin-actions{justify-content:flex-start}.ipa-admin-bar{align-items:flex-start;flex-direction:column}}
+
+.ipa-invite-btn{border:0;background:#e8f5f2;color:#0f7f86;border-radius:9px;padding:7px 9px;margin-top:7px;font-size:11px;font-weight:900}.ipa-invite-btn:disabled{opacity:.6}

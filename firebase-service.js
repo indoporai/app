@@ -5,7 +5,10 @@ import {
   signOut,
   onAuthStateChanged,
   setPersistence,
-  browserLocalPersistence
+  browserLocalPersistence,
+  sendSignInLinkToEmail,
+  isSignInWithEmailLink,
+  signInWithEmailLink
 } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-auth.js";
 import {
   getFirestore,
@@ -204,6 +207,20 @@ window.IPAFirebase = {
   },
   async logout(){
     await signOut(auth);
+  },
+  async sendClientInvite(email,clientId){
+    if(!currentUser || currentUser.uid!==ADMIN_UID) throw new Error("Entre como administrador.");
+    if(!email) throw new Error("Cliente sem e-mail cadastrado.");
+    const url=new URL(window.location.origin+window.location.pathname);
+    url.searchParams.set("clientInvite","1");
+    if(clientId) url.searchParams.set("clientId",clientId);
+    await sendSignInLinkToEmail(auth,email,{url:url.toString(),handleCodeInApp:true});
+    return true;
+  },
+  async completeEmailLink(email){
+    if(!isSignInWithEmailLink(auth,window.location.href)) return null;
+    if(!email) throw new Error("Confirme o e-mail que recebeu o convite.");
+    return (await signInWithEmailLink(auth,email,window.location.href)).user;
   },
   async refresh(){
     if(!currentUser) throw new Error("Faça login primeiro.");
