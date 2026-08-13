@@ -93,7 +93,10 @@ function readData(){
    };
  }catch(e){return clone(IPA_DEFAULT_DATA)}
 }
-function writeData(d){localStorage.setItem("ipa-v2-demo-db",JSON.stringify(d))}
+function writeData(d,source="local"){
+ localStorage.setItem("ipa-v2-demo-db",JSON.stringify(d));
+ window.dispatchEvent(new CustomEvent("ipa-data-updated",{detail:{data:d,source}}));
+}
 window.IPAData={
  getAll(){return readData()},
  reset(){writeData(clone(IPA_DEFAULT_DATA))},
@@ -115,5 +118,6 @@ window.IPAData={
    {day:2,title:"Centro histórico",places:["Principais atrações","Experiência local"]},
    {day:3,title:"Gastronomia e cultura",places:["Mercado local","Restaurante recomendado"]}
  ]}writeData(d);return t},
- markPaymentPaid(id){const d=readData();const p=d.payments.find(x=>x.id===id);if(p){p.status="Pago";p.paidAt=new Date().toISOString().slice(0,10)}writeData(d);return p}
+ markPaymentPaid(id){const d=readData();const p=d.payments.find(x=>x.id===id);if(p){p.status="Pago";p.paidAt=new Date().toISOString().slice(0,10)}writeData(d);return p},
+ replaceFromCloud(cloudData){const current=readData();const merged={...current,...cloudData};writeData(merged,"cloud");return merged}
 };
