@@ -124,7 +124,7 @@ function bind(){
      IPAData.updateClient(id,{inviteStatus:'sent',inviteSentAt:new Date().toISOString()});
      await window.IPAFirebase.syncNow();
      toast('Convite enviado por e-mail ✓');render();
-   }catch(err){console.error(err);toast('Erro ao enviar convite');b.disabled=false;b.textContent='✉ Enviar acesso'}
+   }catch(err){console.error(err);toast('Erro no convite: '+(err?.code||err?.message||'desconhecido'));b.disabled=false;b.textContent='✉ Enviar acesso'}
  });
  document.querySelectorAll('[data-admin-new-client]').forEach(b=>b.onclick=()=>{
    showModal(`<span class="eyebrow">NOVO CLIENTE</span><h2>Cadastrar cliente</h2>
@@ -695,6 +695,31 @@ window.addEventListener('ipa-firebase-service-loaded',()=>{if(state.profile==='a
 window.addEventListener('ipa-firebase-ready',()=>{if(state.profile==='admin'||state.route==='admin')render()});
 window.addEventListener('ipa-firebase-state',()=>{if(state.profile==='admin'||state.route==='admin')render()});
 window.addEventListener('ipa-firebase-synced',()=>{if(state.profile==='admin'||state.route==='admin')render()});
+
+async function handleClientEmailInvite(){
+ if(!window.IPAFirebase?.isEmailSignInLink?.()) return false;
+ let email=localStorage.getItem("ipa-email-for-signin")||"";
+ if(!email){
+   email=window.prompt("Confirme o e-mail que recebeu o convite:")||"";
+ }
+ if(!email) return false;
+ try{
+   await window.IPAFirebase.completeEmailLink(email);
+   state.scenarioChosen=true;
+   state.profile='client';
+   state.mode='before';
+   state.route='today';
+   document.body.classList.remove('hidden-nav');
+   toast('Acesso confirmado ✓');
+   render();
+   return true;
+ }catch(err){
+   console.error(err);
+   toast('Não foi possível concluir o acesso: '+(err?.code||err?.message||''));
+   return false;
+ }
+}
+window.addEventListener('ipa-firebase-service-loaded',()=>{handleClientEmailInvite()});
 
 showInitialScenario();
 

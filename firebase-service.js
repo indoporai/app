@@ -183,10 +183,10 @@ onAuthStateChanged(auth,async user=>{
   }
 
   if(user.uid!==ADMIN_UID){
-    lastError="Este usuário não possui permissão de administrador.";
-    status="unauthorized";
-    notify();
-    await signOut(auth);
+    status="client-connected";
+    lastError="";
+    initialized=true;
+    notify("ipa-firebase-ready");
     return;
   }
 
@@ -211,16 +211,23 @@ window.IPAFirebase = {
   async sendClientInvite(email,clientId){
     if(!currentUser || currentUser.uid!==ADMIN_UID) throw new Error("Entre como administrador.");
     if(!email) throw new Error("Cliente sem e-mail cadastrado.");
-    const url=new URL(window.location.origin+window.location.pathname);
+    const url=new URL("https://app-ci8.pages.dev/");
     url.searchParams.set("clientInvite","1");
     if(clientId) url.searchParams.set("clientId",clientId);
-    await sendSignInLinkToEmail(auth,email,{url:url.toString(),handleCodeInApp:true});
-    return true;
+    const normalizedEmail=email.trim().toLowerCase();
+    await sendSignInLinkToEmail(auth,normalizedEmail,{url:url.toString(),handleCodeInApp:true});
+    localStorage.setItem("ipa-email-for-signin",normalizedEmail);
+    localStorage.setItem("ipa-client-id-for-signin",clientId||"");
+    return {email:normalizedEmail,clientId:clientId||"",continueUrl:url.toString()};
   },
+  isEmailSignInLink(){ return isSignInWithEmailLink(auth,window.location.href); },
   async completeEmailLink(email){
     if(!isSignInWithEmailLink(auth,window.location.href)) return null;
+    email=(email||localStorage.getItem("ipa-email-for-signin")||"").trim().toLowerCase();
     if(!email) throw new Error("Confirme o e-mail que recebeu o convite.");
-    return (await signInWithEmailLink(auth,email,window.location.href)).user;
+    const user=(await signInWithEmailLink(auth,email,window.location.href)).user;
+    localStorage.removeItem("ipa-email-for-signin");
+    return user;
   },
   async refresh(){
     if(!currentUser) throw new Error("Faça login primeiro.");
