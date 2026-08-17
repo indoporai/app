@@ -1,0 +1,74 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return signedIn()
+        && request.auth.uid == "5dlGX6JlrUQHyjFWSHB9Dye0r1E3";
+    }
+
+    function clientBelongsToUser(clientId) {
+      return signedIn()
+        && get(/databases/$(database)/documents/clients/$(clientId)).data.authUid == request.auth.uid;
+    }
+
+    match /clients/{clientId} {
+      // ADM vê e altera todos.
+      allow read, write: if isAdmin();
+
+      // Primeiro acesso por link: o cliente pode ler o próprio cadastro
+      // somente quando o e-mail do documento é o mesmo e-mail autenticado.
+      allow read: if signedIn()
+        && resource.data.email == request.auth.token.email;
+
+      // Cliente pode gravar APENAS seu próprio UID no primeiro acesso.
+      allow update: if signedIn()
+        && resource.data.email == request.auth.token.email
+        && request.resource.data.email == resource.data.email
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['authUid', 'firstAccessAt'])
+        && request.resource.data.authUid == request.auth.uid;
+    }
+
+    match /trips/{tripId} {
+      allow read, write: if isAdmin();
+      allow read: if signedIn()
+        && resource.data.published == true
+        && clientBelongsToUser(resource.data.clientId);
+    }
+
+    match /payments/{paymentId} {
+      allow read, write: if isAdmin();
+      allow read: if signedIn()
+        && resource.data.clientId != null
+        && clientBelongsToUser(resource.data.clientId);
+    }
+
+    match /benefits/{benefitId} {
+      allow read, write: if isAdmin();
+      allow read: if signedIn();
+    }
+
+    match /itineraryTemplates/{templateId} {
+      allow read, write: if isAdmin();
+    }
+
+    match /users/{userId} {
+      allow read, write: if isAdmin();
+      allow read: if signedIn() && request.auth.uid == userId;
+    }
+
+    match /settings/{document=**} {
+      allow read, write: if isAdmin();
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

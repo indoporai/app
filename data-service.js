@@ -36,7 +36,7 @@ const IPA_DEFAULT_DATA = {
     {id:"cli-renato",name:"Renato",email:"renato@demo.com",phone:"(11) 99999-9999",status:"Ativo"}
   ],
   trips:[
-    {id:"trip-portugal-2026",clientId:"cli-renato",name:"Portugal 2026",destination:"Porto, Portugal",startDate:"2026-09-05",endDate:"2026-09-12",travelers:2,plan:"Signature",status:"Em preparação",published:true,
+    {id:"trip-portugal-2026",clientId:"cli-renato",name:"Portugal 2026",destination:"Porto",country:"Portugal",startDate:"2026-09-05",endDate:"2026-09-12",travelers:2,plan:"Signature",status:"Em preparação",published:true,
      modules:{itinerary:true,documents:true,luggage:true,checkin:true,exchange:true,payments:true,community:true,live:false,album:true,movie:true,passport:true},
      templateId:"tpl-porto-7",
      itinerary:[
@@ -109,7 +109,8 @@ window.IPAData={
  createPayment(payment){const d=readData();payment.id=payment.id||("pay-"+Date.now());payment.status=payment.status||"Pendente";payment.createdAt=new Date().toISOString().slice(0,10);payment.paidAt=null;d.payments.unshift(payment);writeData(d);return payment},
  updatePayment(id,patch){const d=readData();const p=d.payments.find(x=>x.id===id);if(p)Object.assign(p,patch);writeData(d);return p},
  createClient(client){const d=readData();client.id=client.id||("cli-"+Date.now());client.status=client.status||"Ativo";d.clients=d.clients||[];d.clients.push(client);writeData(d);return client},
- createTrip(trip){const d=readData();trip.id=trip.id||("trip-"+Date.now());trip.status=trip.status||"Em preparação";trip.published=false;trip.modules=trip.modules||{itinerary:true,documents:true,luggage:true,checkin:true,exchange:false,payments:true,community:false,live:false,album:true,movie:true,passport:true};trip.itinerary=trip.itinerary||[];d.trips=d.trips||[];d.trips.push(trip);writeData(d);return trip},
+ updateClientById(id,patch){const d=readData();const c=(d.clients||[]).find(x=>x.id===id);if(c)Object.assign(c,patch);writeData(d);return c},
+ createTrip(trip){const d=readData();trip.id=trip.id||("trip-"+Date.now());trip.status=trip.status||"Em preparação";trip.published=false;trip.country=trip.country||"";trip.modules=trip.modules||{itinerary:true,documents:true,luggage:true,checkin:true,exchange:false,payments:true,community:false,live:false,album:true,movie:true,passport:true};trip.itinerary=trip.itinerary||[];d.trips=d.trips||[];d.trips.push(trip);writeData(d);return trip},
  updateTrip(id,patch){const d=readData();const t=(d.trips||[]).find(x=>x.id===id);if(t)Object.assign(t,patch);writeData(d);return t},
  toggleTripModule(tripId,module,enabled){const d=readData();const t=(d.trips||[]).find(x=>x.id===tripId);if(t){t.modules=t.modules||{};t.modules[module]=enabled}writeData(d);return t},
  publishTrip(id,published=true){return this.updateTrip(id,{published,status:published?"Publicado":"Em preparação"})},
@@ -118,6 +119,9 @@ window.IPAData={
    {day:2,title:"Centro histórico",places:["Principais atrações","Experiência local"]},
    {day:3,title:"Gastronomia e cultura",places:["Mercado local","Restaurante recomendado"]}
  ]}writeData(d);return t},
+ addItineraryDay(tripId,dayData){const d=readData();const t=(d.trips||[]).find(x=>x.id===tripId);if(!t)return null;t.itinerary=t.itinerary||[];const next=Math.max(0,...t.itinerary.map(x=>Number(x.day)||0))+1;t.itinerary.push({day:dayData.day||next,title:dayData.title||("Dia "+next),date:dayData.date||"",places:[]});writeData(d);return t},
+ addItineraryPlace(tripId,dayNumber,place){const d=readData();const t=(d.trips||[]).find(x=>x.id===tripId);if(!t)return null;t.itinerary=t.itinerary||[];let day=t.itinerary.find(x=>Number(x.day)===Number(dayNumber));if(!day){day={day:Number(dayNumber),title:"Dia "+dayNumber,date:"",places:[]};t.itinerary.push(day)}day.places=day.places||[];day.places.push({id:place.id||("place-"+Date.now()),name:place.name||"Novo local",address:place.address||"",time:place.time||"",note:place.note||"",placeId:place.placeId||""});writeData(d);return t},
+ createItineraryTemplate(template){const d=readData();template.id=template.id||("tpl-"+Date.now());template.days=Number(template.days)||1;template.itinerary=template.itinerary||[];d.itineraryTemplates=d.itineraryTemplates||[];d.itineraryTemplates.push(template);writeData(d);return template},
  markPaymentPaid(id){const d=readData();const p=d.payments.find(x=>x.id===id);if(p){p.status="Pago";p.paidAt=new Date().toISOString().slice(0,10)}writeData(d);return p},
  replaceFromCloud(cloudData){const current=readData();const merged={...current,...cloudData};writeData(merged,"cloud");return merged}
 };
