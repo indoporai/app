@@ -420,3 +420,7 @@ body{min-height:100vh}.app-shell{width:min(100%,520px);min-height:100vh;margin:a
   .admin-add-place-btn{margin-left:54px !important;max-width:calc(100% - 54px) !important}
   .admin-place-list{padding-left:0 !important}
 }
+
+/* Beta 6.4 — convite por viagem */
+.admin-publish-actions{display:grid;grid-template-columns:1fr;gap:8px;margin-top:12px}
+.admin-publish-actions .btn{margin:0}

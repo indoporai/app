@@ -212,9 +212,30 @@ async function loadClientExperience(){
     client.authUid=currentUser.uid;
   }
 
-  const tripQuery=query(collection(firestore,"trips"),where("clientId","==",client.id));
-  const tripSnap=await getDocs(tripQuery);
-  const trips=tripSnap.docs.map(d=>({id:d.id,...d.data()})).filter(t=>t.published!==false);
+  const requestedTripId=params.get("tripId")||localStorage.getItem("ipa-trip-id-for-signin")||"";
+  let trips=[];
+
+  // Se o convite veio de uma viagem específica, carrega exatamente ela.
+  if(requestedTripId){
+    try{
+      const tripDoc=await getDoc(doc(firestore,"trips",requestedTripId));
+      if(tripDoc.exists()){
+        const requestedTrip={id:tripDoc.id,...tripDoc.data()};
+        if(requestedTrip.clientId===client.id && requestedTrip.published===true){
+          trips=[requestedTrip];
+        }
+      }
+    }catch(e){
+      console.warn("Não foi possível carregar a viagem do convite",e);
+    }
+  }
+
+  // Fallback para convites antigos: busca viagens publicadas do cliente.
+  if(!trips.length){
+    const tripQuery=query(collection(firestore,"trips"),where("clientId","==",client.id));
+    const tripSnap=await getDocs(tripQuery);
+    trips=tripSnap.docs.map(d=>({id:d.id,...d.data()})).filter(t=>t.published===true);
+  }
 
   let payments=[];
   try{
@@ -232,8 +253,14 @@ async function loadClientExperience(){
     console.warn("Benefícios indisponíveis para cliente",e);
   }
 
-  trips.sort((a,b)=>String(b.startDate||"").localeCompare(String(a.startDate||"")));
-  const chosenTrip=trips.find(t=>t.published===true)||trips[0]||null;
+  const today=new Date().toISOString().slice(0,10);
+  trips.sort((a,b)=>{
+    const aa=String(a.startDate||"9999-12-31"),bb=String(b.startDate||"9999-12-31");
+    const aFuture=aa>=today,bFuture=bb>=today;
+    if(aFuture!==bFuture) return aFuture?-1:1;
+    return aFuture ? aa.localeCompare(bb) : bb.localeCompare(aa);
+  });
+  const chosenTrip=trips[0]||null;
   const cloudData={
     clients:[client],
     client:{
@@ -250,12 +277,15 @@ async function loadClientExperience(){
 
   if(window.IPAData?.replaceFromCloud) window.IPAData.replaceFromCloud(cloudData);
   localStorage.setItem("ipa-active-client-id",client.id);
-  if(chosenTrip) localStorage.setItem("ipa-active-trip-id",chosenTrip.id);
+  if(chosenTrip){
+    localStorage.setItem("ipa-active-trip-id",chosenTrip.id);
+    localStorage.setItem("ipa-trip-id-for-signin",chosenTrip.id);
+  }
 
   // Remove o código de autenticação/convite da barra de endereço sem recarregar.
   try{
     const clean=new URL(window.location.href);
-    ["mode","oobCode","apiKey","lang","clientInvite","clientId"].forEach(k=>clean.searchParams.delete(k));
+    ["mode","oobCode","apiKey","lang","clientInvite","clientId","tripId"].forEach(k=>clean.searchParams.delete(k));
     history.replaceState({},document.title,clean.pathname+(clean.searchParams.toString()?("?"+clean.searchParams.toString()):""));
   }catch(e){}
 
@@ -329,17 +359,19 @@ window.IPAFirebase = {
   async logout(){
     await signOut(auth);
   },
-  async sendClientInvite(email,clientId){
+  async sendClientInvite(email,clientId,tripId=""){
     if(!currentUser || currentUser.uid!==ADMIN_UID) throw new Error("Entre como administrador.");
     if(!email) throw new Error("Cliente sem e-mail cadastrado.");
     const url=new URL("https://app-ci8.pages.dev/");
     url.searchParams.set("clientInvite","1");
     if(clientId) url.searchParams.set("clientId",clientId);
+    if(tripId) url.searchParams.set("tripId",tripId);
     const normalizedEmail=email.trim().toLowerCase();
     await sendSignInLinkToEmail(auth,normalizedEmail,{url:url.toString(),handleCodeInApp:true});
     localStorage.setItem("ipa-email-for-signin",normalizedEmail);
     localStorage.setItem("ipa-client-id-for-signin",clientId||"");
-    return {email:normalizedEmail,clientId:clientId||"",continueUrl:url.toString()};
+    if(tripId) localStorage.setItem("ipa-trip-id-for-signin",tripId);
+    return {email:normalizedEmail,clientId:clientId||"",tripId:tripId||"",continueUrl:url.toString()};
   },
   isEmailSignInLink(){ return isSignInWithEmailLink(auth,window.location.href); },
   async completeEmailLink(email){
