@@ -793,7 +793,13 @@ window.addEventListener('ipa-client-experience-ready',()=>{
  }
 });
 window.addEventListener('ipa-firebase-service-loaded',()=>{if(state.profile==='admin'||state.route==='admin')render()});
-window.addEventListener('ipa-firebase-ready',()=>{if(state.profile==='admin'||state.route==='admin')render()});
+window.addEventListener('ipa-firebase-ready',()=>{
+ const fb=window.IPAFirebase;
+ if(fb?.user && fb.user.uid!=='5dlGX6JlrUQHyjFWSHB9Dye0r1E3' && (fb.status==='client-connected'||fb.status==='client-no-trip')){
+   state.scenarioChosen=true;state.profile='client';state.mode='before';state.route='today';document.body.classList.remove('hidden-nav');render();return;
+ }
+ if(state.profile==='admin'||state.route==='admin')render();
+});
 window.addEventListener('ipa-firebase-state',()=>{if(state.profile==='admin'||state.route==='admin')render()});
 window.addEventListener('ipa-firebase-synced',()=>{if(state.profile==='admin'||state.route==='admin')render()});
 
@@ -827,6 +833,9 @@ async function handleClientEmailInvite(){
 window.addEventListener('ipa-firebase-service-loaded',()=>{handleClientEmailInvite()});
 
 if(!(window.IPAFirebase?.isEmailSignInLink?.())){
+  // O Firebase é módulo e pode ainda não ter carregado neste ponto.
+  // A tela inicial só é mostrada agora; se já houver sessão de cliente,
+  // o onAuthStateChanged a substituirá pela experiência personalizada.
   showInitialScenario();
 }
 

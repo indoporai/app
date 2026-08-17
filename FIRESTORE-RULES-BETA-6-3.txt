@@ -1,0 +1,76 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return signedIn()
+        && request.auth.uid == "5dlGX6JlrUQHyjFWSHB9Dye0r1E3";
+    }
+
+    function isOwnClient(clientId) {
+      return signedIn()
+        && get(/databases/$(database)/documents/clients/$(clientId)).data.authUid == request.auth.uid;
+    }
+
+    match /clients/{clientId} {
+      allow read, write: if isAdmin();
+
+      // Primeiro acesso: e-mail do Auth deve ser o mesmo do cadastro.
+      // Próximos acessos: o UID já vinculado também é aceito.
+      allow read: if signedIn()
+        && (
+          resource.data.email == request.auth.token.email
+          || resource.data.authUid == request.auth.uid
+        );
+
+      // No primeiro acesso o cliente só pode gravar o próprio UID.
+      allow update: if signedIn()
+        && resource.data.email == request.auth.token.email
+        && request.resource.data.email == resource.data.email
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['authUid', 'firstAccessAt'])
+        && request.resource.data.authUid == request.auth.uid;
+    }
+
+    match /trips/{tripId} {
+      allow read, write: if isAdmin();
+      allow read: if signedIn()
+        && resource.data.published == true
+        && isOwnClient(resource.data.clientId);
+    }
+
+    match /payments/{paymentId} {
+      allow read, write: if isAdmin();
+      allow read: if signedIn()
+        && resource.data.clientId != null
+        && isOwnClient(resource.data.clientId);
+    }
+
+    match /benefits/{benefitId} {
+      allow read, write: if isAdmin();
+      allow read: if signedIn();
+    }
+
+    match /itineraryTemplates/{templateId} {
+      allow read, write: if isAdmin();
+    }
+
+    match /users/{userId} {
+      allow read, write: if isAdmin();
+      allow read: if signedIn() && request.auth.uid == userId;
+    }
+
+    match /settings/{document=**} {
+      allow read, write: if isAdmin();
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

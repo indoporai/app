@@ -160,21 +160,46 @@ async function loadClientExperience(){
   notify();
 
   const normalizedEmail=(currentUser.email||"").trim().toLowerCase();
+  const params=new URLSearchParams(window.location.search);
+  const invitedClientId=params.get("clientId")||localStorage.getItem("ipa-active-client-id")||"";
 
-  let clientSnap=await getDocs(query(collection(firestore,"clients"),where("authUid","==",currentUser.uid),limit(1)));
-  if(clientSnap.empty){
-    clientSnap=await getDocs(query(collection(firestore,"clients"),where("email","==",normalizedEmail),limit(1)));
+  let clientDoc=null;
+
+  // Primeiro acesso: usa o ID que foi embutido no convite.
+  // Isso evita depender de consulta por authUid antes de o vínculo existir.
+  if(invitedClientId){
+    try{
+      const snap=await getDoc(doc(firestore,"clients",invitedClientId));
+      if(snap.exists()) clientDoc=snap;
+    }catch(e){
+      console.warn("Não foi possível abrir o clientId do convite",e);
+    }
   }
 
-  if(clientSnap.empty){
+  // Fallback seguro: o e-mail autenticado precisa ser igual ao e-mail do cadastro.
+  if(!clientDoc){
+    const clientSnap=await getDocs(
+      query(collection(firestore,"clients"),where("email","==",normalizedEmail),limit(1))
+    );
+    if(!clientSnap.empty) clientDoc=clientSnap.docs[0];
+  }
+
+  if(!clientDoc){
     status="client-no-profile";
-    lastError="Seu acesso existe, mas ainda não há um cliente vinculado a este e-mail.";
+    lastError="Seu acesso existe, mas não encontramos um cadastro de cliente para este e-mail.";
     notify("ipa-client-experience-ready");
     return null;
   }
 
-  const clientDoc=clientSnap.docs[0];
   const client={id:clientDoc.id,...clientDoc.data()};
+
+  // Validação extra no front-end. As regras do Firestore repetem essa proteção.
+  if(String(client.email||"").trim().toLowerCase()!==normalizedEmail){
+    status="client-no-profile";
+    lastError="Este convite não pertence ao e-mail autenticado.";
+    notify("ipa-client-experience-ready");
+    return null;
+  }
 
   // Persist the UID back into the client document. Security Rules in this
   // package allow the authenticated owner to claim only their own profile.
@@ -226,6 +251,13 @@ async function loadClientExperience(){
   if(window.IPAData?.replaceFromCloud) window.IPAData.replaceFromCloud(cloudData);
   localStorage.setItem("ipa-active-client-id",client.id);
   if(chosenTrip) localStorage.setItem("ipa-active-trip-id",chosenTrip.id);
+
+  // Remove o código de autenticação/convite da barra de endereço sem recarregar.
+  try{
+    const clean=new URL(window.location.href);
+    ["mode","oobCode","apiKey","lang","clientInvite","clientId"].forEach(k=>clean.searchParams.delete(k));
+    history.replaceState({},document.title,clean.pathname+(clean.searchParams.toString()?("?"+clean.searchParams.toString()):""));
+  }catch(e){}
 
   status=chosenTrip ? "client-connected" : "client-no-trip";
   lastError=chosenTrip ? "" : "Seu cadastro foi encontrado, mas ainda não existe uma viagem publicada para você.";
