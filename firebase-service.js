@@ -212,10 +212,16 @@ async function loadClientExperience(){
     client.authUid=currentUser.uid;
   }
 
-  const requestedTripId=params.get("tripId")||localStorage.getItem("ipa-trip-id-for-signin")||"";
+  const requestedTripId=
+    client.activeTripId
+    ||client.lastInvitedTripId
+    ||params.get("tripId")
+    ||localStorage.getItem("ipa-trip-id-for-signin")
+    ||"";
+
   let trips=[];
 
-  // Se o convite veio de uma viagem específica, carrega exatamente ela.
+  // Fluxo principal: o próprio documento do cliente informa qual viagem ele deve abrir.
   if(requestedTripId){
     try{
       const tripDoc=await getDoc(doc(firestore,"trips",requestedTripId));
@@ -223,14 +229,18 @@ async function loadClientExperience(){
         const requestedTrip={id:tripDoc.id,...tripDoc.data()};
         if(requestedTrip.clientId===client.id && requestedTrip.published===true){
           trips=[requestedTrip];
+        }else{
+          console.warn("Viagem vinculada não está publicada ou não pertence ao cliente",requestedTrip);
         }
+      }else{
+        console.warn("Viagem vinculada não existe:",requestedTripId);
       }
     }catch(e){
-      console.warn("Não foi possível carregar a viagem do convite",e);
+      console.warn("Não foi possível carregar a viagem vinculada",e);
     }
   }
 
-  // Fallback para convites antigos: busca viagens publicadas do cliente.
+  // Fallback para cadastros antigos.
   if(!trips.length){
     const tripQuery=query(collection(firestore,"trips"),where("clientId","==",client.id));
     const tripSnap=await getDocs(tripQuery);
@@ -290,7 +300,9 @@ async function loadClientExperience(){
   }catch(e){}
 
   status=chosenTrip ? "client-connected" : "client-no-trip";
-  lastError=chosenTrip ? "" : "Seu cadastro foi encontrado, mas ainda não existe uma viagem publicada para você.";
+  lastError=chosenTrip
+    ? ""
+    : `Seu cadastro foi encontrado, mas não conseguimos abrir a viagem vinculada. Cliente: ${client.id}. Viagem ativa: ${client.activeTripId||client.lastInvitedTripId||"não definida"}.`;
   initialized=true;
   notify("ipa-client-experience-ready");
   return cloudData;

@@ -424,3 +424,5 @@ body{min-height:100vh}.app-shell{width:min(100%,520px);min-height:100vh;margin:a
 /* Beta 6.4 — convite por viagem */
 .admin-publish-actions{display:grid;grid-template-columns:1fr;gap:8px;margin-top:12px}
 .admin-publish-actions .btn{margin:0}
+
+.client-active-trip{display:block;margin-top:5px;color:#0f7f86!important;font-weight:800}

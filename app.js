@@ -123,12 +123,29 @@ function bind(){
    const clientId=b.dataset.clientId;
    const email=b.dataset.clientEmail;
    if(!email){toast('Cliente sem e-mail cadastrado');return}
-   const original=b.textContent;b.disabled=true;b.textContent='Enviando...';
+   const original=b.textContent;b.disabled=true;b.textContent='Vinculando viagem...';
    try{
+     // A viagem selecionada passa a ser a viagem ativa daquele cliente.
+     // Assim o cliente não depende do tripId sobreviver no link de autenticação.
+     IPAData.updateClientById(clientId,{
+       activeTripId:tripId,
+       lastInvitedTripId:tripId,
+       inviteStatus:'preparing'
+     });
+     if(window.IPAFirebase?.user) await window.IPAFirebase.syncNow();
+
+     b.textContent='Enviando acesso...';
      await window.IPAFirebase.sendClientInvite(email,clientId,tripId);
-     IPAData.updateClientById(clientId,{inviteStatus:'sent',inviteSentAt:new Date().toISOString(),lastInvitedTripId:tripId});
-     if(window.IPAFirebase?.user)await window.IPAFirebase.syncNow();
-     toast('Acesso desta viagem enviado ✓');
+
+     IPAData.updateClientById(clientId,{
+       activeTripId:tripId,
+       lastInvitedTripId:tripId,
+       inviteStatus:'sent',
+       inviteSentAt:new Date().toISOString()
+     });
+     if(window.IPAFirebase?.user) await window.IPAFirebase.syncNow();
+
+     toast('Viagem vinculada e acesso enviado ✓');
      b.textContent='✓ Convite enviado';
      setTimeout(()=>{b.disabled=false;b.textContent=original},1800);
    }catch(err){
@@ -329,7 +346,7 @@ function adminMoney(v){return new Intl.NumberFormat('pt-BR',{style:'currency',cu
 function adminMetric(icon,label,value,sub=''){return `<div class="ipa-admin-metric"><span>${icon}</span><div><small>${label}</small><strong>${value}</strong><em>${sub}</em></div></div>`}
 function adminTripList(){const d=adminData();return `<div class="ipa-admin-trip-list">${d.trips.map(t=>{const c=d.clients.find(x=>x.id===t.clientId);return `<button data-admin-trip="${t.id}"><span>${countryFlag(tripCountry(t))}</span><div><b>${t.name}</b><small>${c?.name||'Cliente'} · ${t.destination}</small></div><em>${t.plan}</em><i>${t.published?'Publicado':t.status}</i><strong>›</strong></button>`}).join('')||'<p>Nenhuma viagem cadastrada.</p>'}</div>`}
 function adminDashboard(){const d=adminData(),open=d.payments.filter(p=>p.status!=='Pago').reduce((s,p)=>s+Number(p.amount||0),0);return `<div class="ipa-admin-head"><div><span class="eyebrow">INDO POR AÍ BUSINESS</span><h1>Dashboard</h1><p>Gerencie clientes, viagens e receita em um só lugar.</p></div><button class="btn btn-primary" data-admin-new-trip>+ Nova viagem</button></div><div class="ipa-admin-metrics">${adminMetric('👤','Clientes',d.clients.length,'ativos')}${adminMetric('✈️','Viagens',d.trips.length,'cadastradas')}${adminMetric('💳','Em aberto',adminMoney(open),'a receber')}${adminMetric('🔴','Live',d.trips.filter(t=>t.modules?.live).length,'habilitadas')}</div><section class="ipa-admin-panel"><div class="section-head"><div><span class="eyebrow">OPERAÇÃO</span><h2>Viagens</h2></div><button class="btn btn-light" data-admin-section="trips">Ver todas</button></div>${adminTripList()}</section><section class="ipa-admin-panel"><span class="eyebrow">PRÓXIMAS AÇÕES</span><h2>O que precisa da sua atenção</h2><div class="ipa-admin-attention"><div>💳 <span><b>Cobranças em aberto</b><small>Envie lembretes pelo Financeiro.</small></span></div><div>👁️ <span><b>Confira como cliente</b><small>Revise a experiência antes de publicar.</small></span></div><div>🔴 <span><b>Live</b><small>Ative apenas quando quiser transmissão.</small></span></div></div></section>`}
-function adminClients(){const d=adminData();return `<div class="ipa-admin-head"><div><span class="eyebrow">CRM</span><h1>Clientes</h1><p>Um cliente pode ter várias viagens.</p></div><button class="btn btn-primary" data-admin-new-client>+ Novo cliente</button></div><div class="ipa-admin-client-grid">${d.clients.map(c=>`<div class="ipa-admin-client"><div class="ipa-admin-avatar">${(c.name||'C').split(' ').map(x=>x[0]).slice(0,2).join('')}</div><div><b>${c.name}</b><small>${c.email||''}</small><em>${d.trips.filter(t=>t.clientId===c.id).length} viagem(ns)</em><button class="ipa-invite-btn" data-admin-invite="${c.id}" data-admin-email="${c.email||''}">✉ Enviar acesso geral</button></div></div>`).join('')}</div>`}
+function adminClients(){const d=adminData();return `<div class="ipa-admin-head"><div><span class="eyebrow">CRM</span><h1>Clientes</h1><p>Um cliente pode ter várias viagens.</p></div><button class="btn btn-primary" data-admin-new-client>+ Novo cliente</button></div><div class="ipa-admin-client-grid">${d.clients.map(c=>`<div class="ipa-admin-client"><div class="ipa-admin-avatar">${(c.name||'C').split(' ').map(x=>x[0]).slice(0,2).join('')}</div><div><b>${c.name}</b><small>${c.email||''}</small><em>${d.trips.filter(t=>t.clientId===c.id).length} viagem(ns)</em>${c.activeTripId?`<small class="client-active-trip">Viagem direcionada: ${d.trips.find(t=>t.id===c.activeTripId)?.name||c.activeTripId}</small>`:''}<button class="ipa-invite-btn" data-admin-invite="${c.id}" data-admin-email="${c.email||''}">✉ Enviar acesso geral</button></div></div>`).join('')}</div>`}
 function adminTrips(){return `<div class="ipa-admin-head"><div><span class="eyebrow">EXPERIÊNCIAS</span><h1>Viagens</h1><p>Escolha uma viagem para personalizar o app.</p></div><button class="btn btn-primary" data-admin-new-trip>+ Nova viagem</button></div><section class="ipa-admin-panel">${adminTripList()}</section>`}
 function adminFinance(){const d=adminData(),total=d.payments.reduce((s,p)=>s+Number(p.amount||0),0),paid=d.payments.filter(p=>p.status==='Pago').reduce((s,p)=>s+Number(p.amount||0),0);return `<div class="ipa-admin-head"><div><span class="eyebrow">FINANCEIRO</span><h1>Pagamentos</h1><p>Crie cobranças e acompanhe os recebimentos.</p></div><button class="btn btn-primary" data-admin-new-charge>+ Nova cobrança</button></div><div class="ipa-admin-metrics">${adminMetric('💼','Contratado',adminMoney(total))}${adminMetric('✓','Recebido',adminMoney(paid))}${adminMetric('⏱️','Em aberto',adminMoney(total-paid))}</div><section class="ipa-admin-panel"><div class="ipa-admin-payment-list">${d.payments.map(p=>`<div><span><b>${p.title}</b><small>${p.trip} · ${p.description}</small></span><strong>${adminMoney(p.amount)}</strong><em class="${p.status==='Pago'?'ok':'wait'}">${p.status}</em><button data-admin-remind="${p.id}">Lembrar</button></div>`).join('')}</div></section>`}
 function adminPartners(){const d=adminData();return `<div class="ipa-admin-head"><div><span class="eyebrow">MONETIZAÇÃO</span><h1>Parceiros</h1><p>Escolha os benefícios ativos.</p></div></div><section class="ipa-admin-panel"><div class="ipa-admin-partners">${d.benefits.map(b=>`<label><div><b>${b.title}</b><small>${b.sponsorLabel} · ${b.partner}</small></div><input type="checkbox" data-admin-benefit="${b.id}" ${b.enabled?'checked':''}></label>`).join('')}</div></section>`}
