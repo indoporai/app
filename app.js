@@ -60,6 +60,9 @@ function setProfile(profile){
  if(profile==='client'){
    state.mode='before';
    state.route='today';
+   if(window.IPAFirebase?.user && window.IPAFirebase.user.uid!=='5dlGX6JlrUQHyjFWSHB9Dye0r1E3'){
+     window.IPAFirebase.loadClientExperience().then(()=>render()).catch(console.error);
+   }
  }else{
    state.route='prospect';
  }
@@ -227,7 +230,7 @@ function bind(){
    toast('Destino atualizado ✓');view.innerHTML=adminTripEditor(b.dataset.adminSaveDestination);bind();
  });
  document.querySelectorAll('[data-admin-add-day]').forEach(b=>b.onclick=()=>{
-   showModal(`<span class="eyebrow">ROTEIRO</span><h2>Adicionar dia</h2><label>Título do dia</label><input id="routeDayTitle" class="v2-concierge-input" placeholder="Ex.: Centro histórico"><label>Data</label><input id="routeDayDate" type="date" class="v2-concierge-input"><button id="saveRouteDay" class="btn btn-primary btn-block">Salvar dia</button>`);
+   showModal(`<span class="eyebrow">ROTEIRO</span><h2>Adicionar dia</h2><p class="route-helper">Crie aqui o <b>dia da viagem</b>. Depois use <b>+ Adicionar local</b> para incluir atrações, restaurantes e passeios.</p><label>Tema / nome do dia</label><input id="routeDayTitle" class="v2-concierge-input" placeholder="Ex.: Centro histórico de Paris"><label>Data</label><input id="routeDayDate" type="date" class="v2-concierge-input"><button id="saveRouteDay" class="btn btn-primary btn-block">Salvar dia</button>`);
    setTimeout(()=>{const save=document.querySelector('#saveRouteDay');if(save)save.onclick=async()=>{
      IPAData.addItineraryDay(b.dataset.adminAddDay,{title:document.querySelector('#routeDayTitle').value,date:document.querySelector('#routeDayDate').value});
      if(window.IPAFirebase?.user)await window.IPAFirebase.syncNow();
@@ -327,7 +330,7 @@ function adminTripEditor(id){
  <div class="admin-trip-fields"><label>Destino<input id="editTripDestination" value="${tripDestination(t)}"></label><label>País<input id="editTripCountry" value="${country}"></label><button class="btn btn-light" data-admin-save-destination="${t.id}">Salvar destino</button></div>
  <div class="ipa-admin-plan-grid">${['Explore','Signature','Elite','Groups'].map(p=>`<button data-admin-plan="${p}" class="${t.plan===p?'active':''}"><b>${p}</b><small>${p==='Explore'?'Roteiro + app':p==='Signature'?'Pré-embarque + compras':p==='Elite'?'Experiência completa':'Grandes grupos'}</small></button>`).join('')}</div></section>
  <section class="ipa-admin-panel"><span class="eyebrow">EXPERIÊNCIA DO CLIENTE</span><h2>O que aparece no app</h2><div class="ipa-admin-module-grid">${Object.entries(labels).map(([k,v])=>`<label class="${t.modules?.[k]?'on':''}"><div><b>${v}</b><small>${t.modules?.[k]?'Visível':'Oculto'}</small></div><input type="checkbox" data-admin-module="${k}" ${t.modules?.[k]?'checked':''}></label>`).join('')}</div></section>
- <section class="ipa-admin-panel"><div class="section-head"><div><span class="eyebrow">ROTEIRO</span><h2>Dias e locais</h2></div><button class="btn btn-light" data-admin-add-day="${t.id}">+ Adicionar dia</button></div><div class="ipa-admin-days">${(t.itinerary||[]).sort((a,b)=>a.day-b.day).map(day=>`<div class="admin-day-expanded"><div class="admin-day-title"><strong>${day.day}</strong><span><b>${day.title}</b><small>${day.date||''}</small></span><button data-admin-add-place="${t.id}:${day.day}">+ Local</button></div><div class="admin-place-list">${normalizedPlaces(day).map((p,i)=>`<div><span>${i+1}</span><div><b>${p.time?`${p.time} · `:''}${p.name}</b><small>${p.address||p.note||''}</small></div></div>`).join('')||'<small>Nenhum local neste dia.</small>'}</div></div>`).join('')||'<p>Comece adicionando o primeiro dia.</p>'}</div></section>
+ <section class="ipa-admin-panel"><div class="section-head"><div><span class="eyebrow">ROTEIRO</span><h2>Dias e locais</h2></div><button class="btn btn-light" data-admin-add-day="${t.id}">+ Adicionar dia</button></div><div class="ipa-admin-days">${(t.itinerary||[]).sort((a,b)=>a.day-b.day).map(day=>`<div class="admin-day-expanded"><div class="admin-day-title"><strong>${day.day}</strong><span><b>${day.title}</b><small>${day.date||''}</small></span><button class="admin-add-place-btn" data-admin-add-place="${t.id}:${day.day}">+ Adicionar local</button></div><div class="admin-place-list">${normalizedPlaces(day).map((p,i)=>`<div><span>${i+1}</span><div><b>${p.time?`${p.time} · `:''}${p.name}</b><small>${p.address||p.note||''}</small></div></div>`).join('')||'<small>Nenhum local neste dia.</small>'}</div></div>`).join('')||'<p>Comece adicionando o primeiro dia.</p>'}</div></section>
  <button class="btn btn-primary btn-block" data-admin-publish="${t.id}">${t.published?'✓ Viagem publicada':'🚀 Publicar viagem'}</button>`;
 }
 function adminLoginView(){
@@ -428,8 +431,14 @@ function ipaDB(){return window.IPAData?IPAData.getAll():null}
 function activeTrip(){
  const d=ipaDB();
  const preview=new URLSearchParams(location.search).get('preview');
- const stored=localStorage.getItem('ipa-active-trip-id');
- return (d?.trips||[]).find(t=>t.id===preview)||(d?.trips||[]).find(t=>t.id===stored)||(d?.trips||[])[0]||null;
+ const storedTrip=localStorage.getItem('ipa-active-trip-id');
+ const activeClient=localStorage.getItem('ipa-active-client-id');
+ const trips=(d?.trips||[]).filter(t=>!activeClient||t.clientId===activeClient);
+ return trips.find(t=>t.id===preview)
+   ||trips.find(t=>t.id===storedTrip)
+   ||trips.find(t=>t.published===true)
+   ||trips[0]
+   ||null;
 }
 function countryFlag(country){
  const map={"Portugal":"🇵🇹","Brasil":"🇧🇷","Espanha":"🇪🇸","França":"🇫🇷","Itália":"🇮🇹","Reino Unido":"🇬🇧","Inglaterra":"🇬🇧","Estados Unidos":"🇺🇸","Argentina":"🇦🇷","Alemanha":"🇩🇪","Holanda":"🇳🇱","Países Baixos":"🇳🇱","Suíça":"🇨🇭","Áustria":"🇦🇹","Grécia":"🇬🇷","Irlanda":"🇮🇪","Bélgica":"🇧🇪","Croácia":"🇭🇷","Japão":"🇯🇵","Canadá":"🇨🇦","México":"🇲🇽","Chile":"🇨🇱","Uruguai":"🇺🇾"};

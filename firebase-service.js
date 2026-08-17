@@ -160,8 +160,11 @@ async function loadClientExperience(){
   notify();
 
   const normalizedEmail=(currentUser.email||"").trim().toLowerCase();
-  const clientQuery=query(collection(firestore,"clients"),where("email","==",normalizedEmail),limit(1));
-  const clientSnap=await getDocs(clientQuery);
+
+  let clientSnap=await getDocs(query(collection(firestore,"clients"),where("authUid","==",currentUser.uid),limit(1)));
+  if(clientSnap.empty){
+    clientSnap=await getDocs(query(collection(firestore,"clients"),where("email","==",normalizedEmail),limit(1)));
+  }
 
   if(clientSnap.empty){
     status="client-no-profile";
@@ -204,7 +207,8 @@ async function loadClientExperience(){
     console.warn("Benefícios indisponíveis para cliente",e);
   }
 
-  const chosenTrip=trips[0]||null;
+  trips.sort((a,b)=>String(b.startDate||"").localeCompare(String(a.startDate||"")));
+  const chosenTrip=trips.find(t=>t.published===true)||trips[0]||null;
   const cloudData={
     clients:[client],
     client:{
