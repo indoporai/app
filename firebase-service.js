@@ -227,8 +227,8 @@ async function loadClientExperience(){
   localStorage.setItem("ipa-active-client-id",client.id);
   if(chosenTrip) localStorage.setItem("ipa-active-trip-id",chosenTrip.id);
 
-  status="client-connected";
-  lastError="";
+  status=chosenTrip ? "client-connected" : "client-no-trip";
+  lastError=chosenTrip ? "" : "Seu cadastro foi encontrado, mas ainda não existe uma viagem publicada para você.";
   initialized=true;
   notify("ipa-client-experience-ready");
   return cloudData;

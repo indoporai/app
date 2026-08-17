@@ -328,3 +328,95 @@ body{min-height:100vh}.app-shell{width:min(100%,520px);min-height:100vh;margin:a
   .admin-add-place-btn{grid-column:2;width:auto}
   .admin-place-list{padding-left:0;margin-top:12px}
 }
+
+/* Beta 6.2 — correção definitiva de Dias e Locais no mobile */
+.admin-day-expanded{
+  display:block !important;
+  width:100% !important;
+  box-sizing:border-box !important;
+  padding:14px !important;
+  overflow:visible !important;
+}
+.admin-day-title{
+  display:flex !important;
+  flex-wrap:wrap !important;
+  align-items:flex-start !important;
+  gap:12px !important;
+  width:100% !important;
+}
+.admin-day-title>strong{
+  flex:0 0 48px !important;
+  width:48px !important;
+  height:48px !important;
+  border-radius:14px !important;
+  background:#073f49 !important;
+  color:#fff !important;
+  display:grid !important;
+  place-items:center !important;
+  font-size:20px !important;
+  line-height:1 !important;
+  grid-row:auto !important;
+}
+.admin-day-title>span{
+  flex:1 1 180px !important;
+  min-width:0 !important;
+  width:auto !important;
+  display:block !important;
+}
+.admin-day-title>span b{
+  display:block !important;
+  width:100% !important;
+  white-space:normal !important;
+  word-break:normal !important;
+  overflow-wrap:anywhere !important;
+  writing-mode:horizontal-tb !important;
+  text-orientation:mixed !important;
+  font-size:18px !important;
+  line-height:1.15 !important;
+}
+.admin-day-title>span small{
+  display:block !important;
+  margin-top:6px !important;
+  font-size:13px !important;
+  line-height:1.2 !important;
+}
+.admin-add-place-btn{
+  flex:0 0 auto !important;
+  margin:8px 0 0 60px !important;
+  width:auto !important;
+  max-width:calc(100% - 60px) !important;
+  white-space:nowrap !important;
+}
+.admin-place-list{
+  width:100% !important;
+  box-sizing:border-box !important;
+  padding-left:60px !important;
+  margin-top:12px !important;
+}
+.admin-place-list>small{
+  display:block !important;
+  color:#748285 !important;
+  padding:8px 0 !important;
+}
+.client-login-loading,.client-access-error{
+  min-height:65vh;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  text-align:center;
+  padding:24px;
+}
+.client-login-loading>span,.client-access-error>span{font-size:44px;margin-bottom:10px}
+.client-login-loading h2,.client-access-error h2{margin:0 0 8px}
+.client-login-loading p,.client-access-error p{color:#748285;max-width:340px}
+
+@media(max-width:560px){
+  .admin-day-expanded{padding:12px !important}
+  .admin-day-title{gap:10px !important}
+  .admin-day-title>strong{flex-basis:44px !important;width:44px !important;height:44px !important}
+  .admin-day-title>span{flex-basis:calc(100% - 54px) !important}
+  .admin-day-title>span b{font-size:17px !important}
+  .admin-add-place-btn{margin-left:54px !important;max-width:calc(100% - 54px) !important}
+  .admin-place-list{padding-left:0 !important}
+}

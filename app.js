@@ -776,8 +776,20 @@ function openAdmin(){const services=[['Passagem',4630,5290],['Hotel',3420,4180],
 function toast(msg){const el=document.createElement('div');el.className='toast';el.textContent=msg;document.body.appendChild(el);setTimeout(()=>el.remove(),2200)}
 
 window.addEventListener('ipa-client-experience-ready',()=>{
- if(window.IPAFirebase?.user && window.IPAFirebase.user.uid!=='5dlGX6JlrUQHyjFWSHB9Dye0r1E3'){
-   state.scenarioChosen=true;state.profile='client';state.mode='before';state.route='today';document.body.classList.remove('hidden-nav');render();
+ const fb=window.IPAFirebase;
+ if(fb?.user && fb.user.uid!=='5dlGX6JlrUQHyjFWSHB9Dye0r1E3'){
+   if(fb.status==='client-no-profile' || fb.status==='error'){
+     document.body.classList.remove('hidden-nav');
+     view.innerHTML=`<section class="client-access-error"><span>⚠️</span><h2>Não encontramos sua viagem</h2><p>${fb.error||'Seu acesso foi autenticado, mas ainda não há uma viagem publicada para este usuário.'}</p><button class="btn btn-light" onclick="location.reload()">Tentar novamente</button></section>`;
+     return;
+   }
+
+   state.scenarioChosen=true;
+   state.profile='client';
+   state.mode='before';
+   state.route='today';
+   document.body.classList.remove('hidden-nav');
+   render();
  }
 });
 window.addEventListener('ipa-firebase-service-loaded',()=>{if(state.profile==='admin'||state.route==='admin')render()});
@@ -787,30 +799,36 @@ window.addEventListener('ipa-firebase-synced',()=>{if(state.profile==='admin'||s
 
 async function handleClientEmailInvite(){
  if(!window.IPAFirebase?.isEmailSignInLink?.()) return false;
+
  let email=localStorage.getItem("ipa-email-for-signin")||"";
- if(!email){
-   email=window.prompt("Confirme o e-mail que recebeu o convite:")||"";
- }
+ if(!email) email=window.prompt("Confirme o e-mail que recebeu o convite:")||"";
  if(!email) return false;
+
  try{
-   await window.IPAFirebase.completeEmailLink(email);
    state.scenarioChosen=true;
    state.profile='client';
    state.mode='before';
    state.route='today';
-   document.body.classList.remove('hidden-nav');
-   toast('Acesso confirmado ✓');
-   render();
+   document.body.classList.add('hidden-nav');
+   view.innerHTML=`<section class="client-login-loading"><span>✈️</span><h2>Preparando sua viagem...</h2><p>Estamos carregando sua experiência personalizada.</p></section>`;
+
+   await window.IPAFirebase.completeEmailLink(email);
+
+   // onAuthStateChanged fará o vínculo e carregará a experiência.
    return true;
  }catch(err){
    console.error(err);
+   document.body.classList.remove('hidden-nav');
    toast('Não foi possível concluir o acesso: '+(err?.code||err?.message||''));
+   showInitialScenario();
    return false;
  }
 }
 window.addEventListener('ipa-firebase-service-loaded',()=>{handleClientEmailInvite()});
 
-showInitialScenario();
+if(!(window.IPAFirebase?.isEmailSignInLink?.())){
+  showInitialScenario();
+}
 
 
 function openTravelMovie(){
