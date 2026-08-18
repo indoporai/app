@@ -431,3 +431,14 @@ body{min-height:100vh}.app-shell{width:min(100%,520px);min-height:100vh;margin:a
 .payment-method-checks{display:flex;gap:10px;margin:8px 0 12px}.payment-method-checks label{display:flex!important;align-items:center;gap:6px;background:#f5faf8;border-radius:10px;padding:9px 11px;font-size:12px!important}
 .empty-payment-state{text-align:center;background:#f7faf9;border-radius:16px;padding:24px;color:#718083}.empty-payment-state span{display:block;font-size:32px;margin-bottom:7px}.empty-payment-state b,.empty-payment-state small{display:block}.empty-payment-state small{margin-top:4px}
 .admin-publish-actions{display:grid;gap:8px}
+
+/* Beta 6.9 — Mercado Pago Pix (teste) */
+.payment-test-badge{display:inline-flex;background:#fff0d9;color:#aa5b00;border-radius:999px;padding:5px 9px;font-size:10px;font-weight:900;letter-spacing:.08em;margin:7px 0}
+.pix-real-loading{min-height:300px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}.pix-real-loading>span{font-size:44px;color:#0f7f86}.pix-real-loading p{color:#748285}
+.pix-real-modal{text-align:center}.pix-original-charge{margin:8px 0}.pix-test-warning{background:#fff7e9;border:1px solid #f4d5a6;border-radius:13px;padding:10px;margin:10px 0;font-size:12px;color:#76552d}
+.pix-real-qr{display:block;width:min(260px,80%);aspect-ratio:1;object-fit:contain;margin:14px auto;border:10px solid white;border-radius:18px;box-shadow:0 8px 28px rgba(0,0,0,.08)}
+.pix-real-qr-placeholder{width:190px;height:190px;margin:14px auto;border-radius:18px;background:#f5faf8;display:grid;place-items:center;font-weight:900;color:#0f7f86}.pix-real-qr-placeholder small{font-weight:600;color:#748285}
+.pix-copy-label{display:block;text-align:left;font-size:11px;font-weight:900;margin:8px 0 5px}
+.pix-copy-row{display:grid;grid-template-columns:1fr auto;gap:7px}.pix-copy-row textarea{min-height:72px;resize:none;border:1px solid #dce7e4;border-radius:11px;padding:9px;font-size:10px;word-break:break-all}.pix-copy-row button{border:0;border-radius:11px;background:#e5f3ef;color:#0f7f86;font-weight:900;padding:0 12px}
+.pix-order-id{display:block;margin-top:8px;color:#869497;font-size:9px;word-break:break-all}
+.payment-error-box{background:#fff0ef;color:#a7372f;border-radius:12px;padding:10px;margin:12px 0;font-size:12px}

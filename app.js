@@ -732,20 +732,131 @@ function paymentSummary(){
 function openPayment(id){
  const d=ipaDB();const p=d?.payments.find(x=>x.id===id);if(!p)return;
  if(p.status==='Pago'){
-   showModal(`<span class="eyebrow">Pagamento</span><h2>${p.title}</h2><div class="payment-paid-card"><span>✓</span><strong>Pagamento confirmado</strong><small>${brl(p.amount)} · ${p.paidAt||''}</small></div><p>${p.description}</p><button class="btn btn-light btn-block" onclick="toast('Comprovante disponível');modal.close()">Ver comprovante</button>`);
+   showModal(`<span class="eyebrow">Pagamento</span><h2>${p.title}</h2><div class="payment-paid-card"><span>✓</span><strong>Pagamento confirmado${p.paymentEnvironment==='test'?' (teste)':''}</strong><small>${brl(p.amount)} · ${p.paidAt||''}</small></div><p>${p.description}</p><button class="btn btn-light btn-block" onclick="toast('Comprovante disponível');modal.close()">Ver comprovante</button>`);
    return;
  }
  showModal(`<div class="payment-modal"><span class="eyebrow">Pagamento disponível</span><h2>${p.title}</h2><p>${p.description}</p><div class="payment-amount">${brl(p.amount)}</div><small>Vencimento: ${new Date(p.dueDate+'T12:00:00').toLocaleDateString('pt-BR')}</small><div class="payment-methods"><button data-pay-method="pix:${p.id}"><span>◈</span><b>Pagar com Pix</b><small>Abra o app do seu banco</small></button><button data-pay-method="card:${p.id}"><span>💳</span><b>Pagar com cartão</b><small>Checkout seguro</small></button></div><p class="payment-safe">🔒 Os dados do cartão não ficam armazenados no Indo por Aí.</p></div>`);
  setTimeout(()=>document.querySelectorAll('[data-pay-method]').forEach(btn=>btn.onclick=()=>simulatePayment(btn.dataset.payMethod)),0);
 }
 function simulatePayment(payload){
- const [method,id]=payload.split(':');const d=ipaDB();const p=d?.payments.find(x=>x.id===id);if(!p)return;
+ const [method,id]=payload.split(':');
+ const d=ipaDB();
+ const p=d?.payments.find(x=>x.id===id);
+ if(!p)return;
+
  if(method==='pix'){
-   showModal(`<span class="eyebrow">Pix</span><h2>${brl(p.amount)}</h2><div class="pix-demo"><div class="pix-qr">▦</div><b>Pix Copia e Cola</b><code>00020126...INDOPORAI...${p.id}</code></div><p>Na versão real, este botão abrirá o fluxo do gateway/banco. Para o teste, simule a confirmação:</p><button class="btn btn-primary btn-block" data-confirm-payment="${p.id}">Simular Pix pago</button>`);
- }else{
-   showModal(`<span class="eyebrow">Checkout seguro</span><h2>${brl(p.amount)}</h2><div class="fake-checkout"><label>Nome no cartão<input value="Renato Ferreira"></label><label>Número do cartão<input value="•••• •••• •••• 4242"></label><div><label>Validade<input value="12/29"></label><label>CVV<input value="•••"></label></div></div><button class="btn btn-primary btn-block" data-confirm-payment="${p.id}">Simular pagamento aprovado</button><p class="payment-safe">Em produção, esta etapa será hospedada pelo gateway.</p>`);
+   createMercadoPagoPix(p);
+   return;
  }
- setTimeout(()=>document.querySelectorAll('[data-confirm-payment]').forEach(btn=>btn.onclick=()=>{IPAData.markPaymentPaid(btn.dataset.confirmPayment);toast('Pagamento confirmado');modal.close();render()}),0);
+
+ showModal(`<span class="eyebrow">Checkout seguro</span><h2>${brl(p.amount)}</h2>
+   <div class="payment-test-badge">AMBIENTE DE TESTE</div>
+   <div class="fake-checkout">
+    <label>Nome no cartão<input value="Teste Mercado Pago"></label>
+    <label>Número do cartão<input value="•••• •••• •••• 4242"></label>
+    <div><label>Validade<input value="12/29"></label><label>CVV<input value="•••"></label></div>
+   </div>
+   <p class="payment-safe">Cartão real será conectado em uma próxima etapa.</p>`);
+}
+
+async function createMercadoPagoPix(payment){
+ showModal(`<div class="pix-real-loading"><span>◈</span><h2>Gerando Pix de teste...</h2><p>Conectando com o Mercado Pago de forma segura.</p></div>`);
+ try{
+   const response=await fetch('/api/pix/create',{
+     method:'POST',
+     headers:{'Content-Type':'application/json'},
+     body:JSON.stringify({
+       paymentId:payment.id,
+       requestedAmount:Number(payment.amount||0)
+     })
+   });
+   const result=await response.json().catch(()=>({}));
+   if(!response.ok||!result.ok){
+     throw new Error(result?.error||result?.details?.message||`Erro ${response.status}`);
+   }
+
+   IPAData.updatePayment(payment.id,{
+     mpOrderId:result.orderId,
+     mpPaymentId:result.paymentId,
+     mpStatus:result.paymentStatus||result.orderStatus,
+     paymentEnvironment:'test'
+   });
+
+   showPixResult(payment,result);
+ }catch(err){
+   console.error('Mercado Pago PIX',err);
+   showModal(`<span class="eyebrow">PIX · Mercado Pago</span><h2>Não conseguimos gerar o Pix</h2>
+     <div class="payment-error-box">${String(err?.message||err)}</div>
+     <p>Confira se a Beta 6.9 foi publicada depois da criação do Secret <b>MERCADO_PAGO_ACCESS_TOKEN</b>.</p>
+     <button class="btn btn-light btn-block" onclick="modal.close()">Fechar</button>`);
+ }
+}
+
+function showPixResult(payment,result){
+ const qrImage=result.qrCodeBase64
+   ? `<img class="pix-real-qr" alt="QR Code Pix" src="data:image/png;base64,${result.qrCodeBase64}">`
+   : `<div class="pix-real-qr-placeholder">PIX<br><small>QR indisponível no teste</small></div>`;
+
+ showModal(`<div class="pix-real-modal">
+   <span class="eyebrow">PIX · MERCADO PAGO</span>
+   <div class="payment-test-badge">AMBIENTE DE TESTE</div>
+   <h2>Pix criado com sucesso</h2>
+   <p class="pix-original-charge">Cobrança no Indo por Aí: <b>${brl(payment.amount)}</b></p>
+   <div class="pix-test-warning">O Mercado Pago exige <b>R$ 50,00</b> na compra Pix de teste. Nenhum valor real será movimentado.</div>
+   ${qrImage}
+   ${result.qrCode?`<label class="pix-copy-label">Pix Copia e Cola</label><div class="pix-copy-row"><textarea id="pixCopyCode" readonly>${result.qrCode}</textarea><button data-copy-pix>Copiar</button></div>`:''}
+   ${result.ticketUrl?`<button class="btn btn-primary btn-block" data-open-pix-ticket="${result.ticketUrl}">Abrir Pix de teste</button>`:''}
+   <button class="btn btn-light btn-block" data-check-pix="${payment.id}:${result.orderId}">Verificar pagamento</button>
+   <small class="pix-order-id">Order: ${result.orderId}</small>
+ </div>`);
+
+ setTimeout(()=>{
+   document.querySelectorAll('[data-copy-pix]').forEach(b=>b.onclick=async()=>{
+     const code=document.querySelector('#pixCopyCode')?.value||'';
+     try{await navigator.clipboard.writeText(code);toast('Pix copiado ✓')}
+     catch{toast('Selecione e copie o código')}
+   });
+   document.querySelectorAll('[data-open-pix-ticket]').forEach(b=>b.onclick=()=>window.open(b.dataset.openPixTicket,'_blank'));
+   document.querySelectorAll('[data-check-pix]').forEach(b=>b.onclick=()=>{
+     const [paymentId,orderId]=b.dataset.checkPix.split(':');
+     checkMercadoPagoPix(paymentId,orderId,b);
+   });
+ },0);
+}
+
+async function checkMercadoPagoPix(paymentId,orderId,button){
+ const original=button.textContent;
+ button.disabled=true;button.textContent='Consultando...';
+ try{
+   const response=await fetch(`/api/pix/status?orderId=${encodeURIComponent(orderId)}`,{cache:'no-store'});
+   const result=await response.json().catch(()=>({}));
+   if(!response.ok||!result.ok)throw new Error(result?.error||`Erro ${response.status}`);
+
+   const status=String(result.paymentStatus||result.orderStatus||'').toLowerCase();
+   IPAData.updatePayment(paymentId,{
+     mpStatus:status,
+     mpStatusDetail:result.paymentStatusDetail||result.orderStatusDetail||''
+   });
+
+   if(['approved','processed','paid'].includes(status)){
+     // Somente demonstração local na Beta 6.9.
+     IPAData.updatePayment(paymentId,{
+       status:'Pago',
+       paidAt:new Date().toISOString().slice(0,10),
+       paymentEnvironment:'test'
+     });
+     toast('Pagamento de teste aprovado ✓');
+     modal.close();render();
+     return;
+   }
+
+   toast(`Status Mercado Pago: ${status||'aguardando'}`);
+ }catch(err){
+   console.error(err);
+   toast('Erro ao consultar: '+(err?.message||''));
+ }finally{
+   button.disabled=false;button.textContent=original;
+ }
 }
 function paymentsView(){
  const d=ipaDB(),t=activeTrip();
