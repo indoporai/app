@@ -442,3 +442,10 @@ body{min-height:100vh}.app-shell{width:min(100%,520px);min-height:100vh;margin:a
 .pix-copy-row{display:grid;grid-template-columns:1fr auto;gap:7px}.pix-copy-row textarea{min-height:72px;resize:none;border:1px solid #dce7e4;border-radius:11px;padding:9px;font-size:10px;word-break:break-all}.pix-copy-row button{border:0;border-radius:11px;background:#e5f3ef;color:#0f7f86;font-weight:900;padding:0 12px}
 .pix-order-id{display:block;margin-top:8px;color:#869497;font-size:9px;word-break:break-all}
 .payment-error-box{background:#fff0ef;color:#a7372f;border-radius:12px;padding:10px;margin:12px 0;font-size:12px}
+
+/* Beta 6.10 — status explícito do Pix sandbox */
+.pix-status-card{text-align:center}.pix-status-icon{width:58px;height:58px;border-radius:50%;display:grid;place-items:center;margin:2px auto 10px;font-size:27px;font-weight:900}
+.pix-status-pending .pix-status-icon{background:#fff2d8;color:#a86500}.pix-status-approved .pix-status-icon{background:#e5f6ec;color:#18864b}.pix-status-error .pix-status-icon{background:#fdebea;color:#ad342e}
+.pix-status-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:14px 0}.pix-status-grid>div{background:#f5f8f7;border-radius:12px;padding:10px;min-width:0}
+.pix-status-grid small{display:block;color:#7c8a8d;font-size:9px;text-transform:uppercase;letter-spacing:.08em}.pix-status-grid strong{display:block;margin-top:4px;font-size:11px;word-break:break-word}
+.pix-status-help{background:#fff8e9;border:1px solid #f1ddb2;border-radius:12px;padding:10px;margin:10px 0;color:#705a2f;font-size:11px;line-height:1.45}

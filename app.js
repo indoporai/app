@@ -833,30 +833,63 @@ async function checkMercadoPagoPix(paymentId,orderId,button){
    if(!response.ok||!result.ok)throw new Error(result?.error||`Erro ${response.status}`);
 
    const status=String(result.paymentStatus||result.orderStatus||'').toLowerCase();
+   const detail=String(result.paymentStatusDetail||result.orderStatusDetail||'').toLowerCase();
+
    IPAData.updatePayment(paymentId,{
      mpStatus:status,
-     mpStatusDetail:result.paymentStatusDetail||result.orderStatusDetail||''
+     mpStatusDetail:detail
    });
 
    if(['approved','processed','paid'].includes(status)){
-     // Somente demonstração local na Beta 6.9.
      IPAData.updatePayment(paymentId,{
        status:'Pago',
        paidAt:new Date().toISOString().slice(0,10),
        paymentEnvironment:'test'
      });
-     toast('Pagamento de teste aprovado ✓');
-     modal.close();render();
+     showPixStatusModal('approved',status,detail,orderId);
      return;
    }
 
-   toast(`Status Mercado Pago: ${status||'aguardando'}`);
+   if(['rejected','cancelled','canceled','expired','failed'].includes(status)){
+     showPixStatusModal('error',status,detail,orderId);
+     return;
+   }
+
+   showPixStatusModal('pending',status,detail,orderId);
  }catch(err){
    console.error(err);
-   toast('Erro ao consultar: '+(err?.message||''));
+   showPixStatusModal('error','erro_consulta',String(err?.message||''),orderId);
  }finally{
    button.disabled=false;button.textContent=original;
  }
+}
+
+function showPixStatusModal(kind,status,detail,orderId){
+ const isApproved=kind==='approved';
+ const isError=kind==='error';
+ const icon=isApproved?'✓':isError?'!':'⌛';
+ const title=isApproved?'Pagamento de teste aprovado':isError?'Não foi possível concluir a verificação':'Aguardando atualização do Mercado Pago';
+ const statusLabel=status||'sem status';
+ const detailLabel=detail||'sem detalhe';
+ const text=isApproved
+   ? 'O Mercado Pago retornou o pagamento como aprovado. A cobrança foi marcada como paga apenas no ambiente de teste.'
+   : isError
+     ? 'A consulta retornou erro, recusa ou expiração. Nenhum pagamento real foi realizado.'
+     : 'A Order existe e está sendo consultada corretamente. No teste oficial de Pix, o Mercado Pago pode iniciar em action_required / waiting_transfer e depois atualizar automaticamente para aprovado. Não faça um Pix real para testar.';
+
+ showModal(`<div class="pix-status-card pix-status-${kind}">
+   <div class="pix-status-icon">${icon}</div>
+   <span class="eyebrow">PIX · MERCADO PAGO · TESTE</span>
+   <h2>${title}</h2>
+   <p>${text}</p>
+   <div class="pix-status-grid">
+     <div><small>Status</small><strong>${statusLabel}</strong></div>
+     <div><small>Detalhe</small><strong>${detailLabel}</strong></div>
+   </div>
+   ${!isApproved&&!isError?`<div class="pix-status-help">Você pode aguardar alguns instantes e consultar novamente. O teste é feito pela própria API do Mercado Pago.</div>`:''}
+   <small class="pix-order-id">Order: ${orderId}</small>
+   <button class="btn btn-light btn-block" onclick="modal.close();render()">Voltar</button>
+ </div>`);
 }
 function paymentsView(){
  const d=ipaDB(),t=activeTrip();
