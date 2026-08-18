@@ -37,7 +37,7 @@ document.addEventListener('click', event => {
    event.preventDefault();
    const action=accountAction.dataset.accountAction;
    if(action==='payments'){ modal.close(); state.route='payments'; render(); return; }
-   if(action==='admin'){ modal.close(); state.profile='admin'; state.route='admin'; document.body.classList.add('hidden-nav'); render(); return; }
+   if(action==='admin'){ modal.close(); localStorage.removeItem('ipa-preview-trip-id'); state.profile='admin'; state.route='admin'; document.body.classList.add('hidden-nav'); render(); return; }
    if(action==='profile'){ modal.close(); openProfileChooser(); return; }
  }
  const modeButton = event.target.closest('[data-mode]');
@@ -111,10 +111,31 @@ function bind(){
  document.querySelectorAll('[data-open-plan]').forEach(btn=>btn.onclick=()=>openPlanDetails(btn.dataset.openPlan));
  document.querySelectorAll('[data-admin-section]').forEach(b=>b.onclick=()=>{adminSection=b.dataset.adminSection;state.route='admin';render()});
  document.querySelectorAll('[data-admin-trip]').forEach(b=>b.onclick=()=>{view.innerHTML=adminTripEditor(b.dataset.adminTrip);bind();window.scrollTo({top:0})});
+ document.querySelectorAll('[data-client-preview]').forEach(b=>b.onclick=()=>{
+   const tripId=b.dataset.clientPreview;
+   const clientId=b.dataset.clientPreviewClient;
+   const d=adminData();
+   const trip=d.trips.find(t=>t.id===tripId);
+   if(!trip){toast('Viagem não encontrada no ADM');return;}
+   if(trip.clientId!==clientId){toast('Esta viagem não está vinculada ao cliente selecionado');return;}
+
+   // Fonte de verdade da prévia: a própria viagem aberta no editor.
+   localStorage.setItem('ipa-active-trip-id',tripId);
+   localStorage.setItem('ipa-active-client-id',clientId);
+   localStorage.setItem('ipa-preview-trip-id',tripId);
+
+   state.profile='client';
+   state.mode='before';
+   state.route='today';
+   state.tripDay=Number((trip.itinerary||[])[0]?.day||1);
+   document.body.classList.remove('hidden-nav');
+   render();
+ });
+
  document.querySelectorAll('[data-admin-plan]').forEach(b=>b.onclick=()=>{IPAData.updateTrip(adminTripId,{plan:b.dataset.adminPlan});view.innerHTML=adminTripEditor(adminTripId);bind()});
  document.querySelectorAll('[data-admin-module]').forEach(x=>x.onchange=()=>{IPAData.toggleTripModule(adminTripId,x.dataset.adminModule,x.checked);view.innerHTML=adminTripEditor(adminTripId);bind()});
  document.querySelectorAll('[data-admin-publish]').forEach(b=>b.onclick=()=>{const t=adminData().trips.find(x=>x.id===b.dataset.adminPublish);IPAData.publishTrip(t.id,!t.published);view.innerHTML=adminTripEditor(t.id);bind()});
- document.querySelectorAll('[data-admin-preview]').forEach(b=>b.onclick=()=>{state.profile='client';state.mode='before';state.route='today';document.body.classList.remove('hidden-nav');render()});
+
  document.querySelectorAll('[data-admin-benefit]').forEach(x=>x.onchange=()=>{IPAData.setBenefit(x.dataset.adminBenefit,x.checked);render()});
  document.querySelectorAll('[data-admin-remind]').forEach(b=>b.onclick=()=>toast('Lembrete enviado ao cliente'));
  document.querySelectorAll('[data-admin-exit]').forEach(b=>b.onclick=()=>showInitialScenario());
@@ -361,7 +382,7 @@ function adminTripEditor(id){
  const c=d.clients.find(x=>x.id===t.clientId);
  const labels={itinerary:'Roteiro',documents:'Documentos',luggage:'Mala inteligente',checkin:'Check-in',exchange:'Exchange',payments:'Pagamentos',community:'Comunidade',live:'Live',album:'Álbum',movie:'Filme',passport:'Passaporte'};
  const country=tripCountry(t),flag=countryFlag(country);
- return `<div class="ipa-admin-editor-head"><button data-admin-section="trips">← Viagens</button><div><span class="eyebrow">${c?.name||'CLIENTE'}</span><h1>${flag} ${t.name}</h1><p>${tripDestination(t)}, ${country}</p></div><button class="btn btn-light" data-admin-preview="${t.id}">👁 Ver como cliente</button></div>
+ return `<div class="ipa-admin-editor-head"><button data-admin-section="trips">← Viagens</button><div><span class="eyebrow">${c?.name||'CLIENTE'}</span><h1>${flag} ${t.name}</h1><p>${tripDestination(t)}, ${country}</p></div><button class="btn btn-light" data-client-preview="${t.id}" data-client-preview-client="${t.clientId}">👁 Ver como cliente</button></div>
  <section class="ipa-admin-panel"><div class="section-head"><div><span class="eyebrow">VIAGEM</span><h2>Destino e pacote</h2></div><b class="ipa-plan">${t.plan}</b></div>
  <div class="admin-trip-fields"><label>Destino<input id="editTripDestination" value="${tripDestination(t)}"></label><label>País<input id="editTripCountry" value="${country}"></label><button class="btn btn-light" data-admin-save-destination="${t.id}">Salvar destino</button></div>
  <div class="ipa-admin-plan-grid">${['Explore','Signature','Elite','Groups'].map(p=>`<button data-admin-plan="${p}" class="${t.plan===p?'active':''}"><b>${p}</b><small>${p==='Explore'?'Roteiro + app':p==='Signature'?'Pré-embarque + compras':p==='Elite'?'Experiência completa':'Grandes grupos'}</small></button>`).join('')}</div></section>
@@ -469,11 +490,19 @@ ${modeCard()}
 function ipaDB(){return window.IPAData?IPAData.getAll():null}
 function activeTrip(){
  const d=ipaDB();
- const preview=new URLSearchParams(location.search).get('preview');
+ const previewTrip=localStorage.getItem('ipa-preview-trip-id');
+ const urlPreview=new URLSearchParams(location.search).get('preview');
  const storedTrip=localStorage.getItem('ipa-active-trip-id');
  const activeClient=localStorage.getItem('ipa-active-client-id');
- const trips=(d?.trips||[]).filter(t=>!activeClient||t.clientId===activeClient);
- return trips.find(t=>t.id===preview)
+ const allTrips=d?.trips||[];
+
+ // A prévia do ADM não depende de publicação, Firebase ou convite:
+ // mostra exatamente a viagem aberta pelo administrador.
+ const exactPreview=allTrips.find(t=>t.id===previewTrip);
+ if(exactPreview) return exactPreview;
+
+ const trips=allTrips.filter(t=>!activeClient||t.clientId===activeClient);
+ return trips.find(t=>t.id===urlPreview)
    ||trips.find(t=>t.id===storedTrip)
    ||trips.find(t=>t.published===true)
    ||trips[0]
