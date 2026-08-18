@@ -426,3 +426,8 @@ body{min-height:100vh}.app-shell{width:min(100%,520px);min-height:100vh;margin:a
 .admin-publish-actions .btn{margin:0}
 
 .client-active-trip{display:block;margin-top:5px;color:#0f7f86!important;font-weight:800}
+
+/* Beta 6.8 — cobranças por cliente e viagem */
+.payment-method-checks{display:flex;gap:10px;margin:8px 0 12px}.payment-method-checks label{display:flex!important;align-items:center;gap:6px;background:#f5faf8;border-radius:10px;padding:9px 11px;font-size:12px!important}
+.empty-payment-state{text-align:center;background:#f7faf9;border-radius:16px;padding:24px;color:#718083}.empty-payment-state span{display:block;font-size:32px;margin-bottom:7px}.empty-payment-state b,.empty-payment-state small{display:block}.empty-payment-state small{margin-top:4px}
+.admin-publish-actions{display:grid;gap:8px}

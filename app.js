@@ -247,22 +247,84 @@ function bind(){
      }catch(e){console.error(e);toast('Erro ao salvar viagem');save.disabled=false;save.textContent='Tentar novamente'}
    }},0)
  });
+ document.querySelectorAll('[data-admin-charge-trip]').forEach(b=>b.onclick=()=>{
+   const d=adminData();
+   const trip=d.trips.find(t=>t.id===b.dataset.adminChargeTrip);
+   const client=d.clients.find(c=>c.id===b.dataset.chargeClient);
+   if(!trip||!client){toast('Cliente ou viagem não encontrados');return}
+   showModal(`<span class="eyebrow">COBRANÇA · ${client.name}</span><h2>${trip.name}</h2>
+     <label>Título</label><input id="tripPayTitle" class="v2-concierge-input" value="Parcela da viagem">
+     <label>Descrição</label><input id="tripPayDescription" class="v2-concierge-input" placeholder="Ex.: Saldo do pacote ${trip.plan}">
+     <label>Valor</label><input id="tripPayAmount" type="number" min="0" step="0.01" class="v2-concierge-input">
+     <label>Vencimento</label><input id="tripPayDue" type="date" class="v2-concierge-input">
+     <div class="payment-method-checks"><label><input id="tripPayPix" type="checkbox" checked> Pix</label><label><input id="tripPayCard" type="checkbox" checked> Cartão</label></div>
+     <button id="saveTripCharge" class="btn btn-primary btn-block">Enviar cobrança</button>`);
+   setTimeout(()=>{document.querySelector('#saveTripCharge').onclick=async()=>{
+     const amount=Number(document.querySelector('#tripPayAmount').value);
+     const dueDate=document.querySelector('#tripPayDue').value;
+     const methods=[];if(document.querySelector('#tripPayPix').checked)methods.push('PIX');if(document.querySelector('#tripPayCard').checked)methods.push('Cartão');
+     if(!amount||amount<=0){toast('Informe o valor');return}
+     if(!dueDate){toast('Informe o vencimento');return}
+     if(!methods.length){toast('Selecione um método');return}
+     try{
+       IPAData.createPayment({clientId:client.id,clientName:client.name,tripId:trip.id,trip:trip.name,title:document.querySelector('#tripPayTitle').value||'Cobrança da viagem',description:document.querySelector('#tripPayDescription').value||'Cobrança enviada pelo Indo por Aí',amount,dueDate,methods,status:'Pendente'});
+       if(window.IPAFirebase?.user)await window.IPAFirebase.syncNow();
+       toast('Cobrança enviada para '+client.name+' ✓');modal.close();
+     }catch(e){console.error(e);toast('Erro ao enviar cobrança')}
+   }},0);
+ });
  document.querySelectorAll('[data-admin-new-charge]').forEach(b=>b.onclick=()=>{
+   const d=adminData();
    showModal(`<span class="eyebrow">FINANCEIRO</span><h2>Nova cobrança</h2>
-     <label>Descrição</label><input id="admPayTitle" class="v2-concierge-input" value="Parcela da viagem">
-     <label>Valor</label><input id="admPayAmount" type="number" class="v2-concierge-input" value="1500">
-     <button id="admSavePay" class="btn btn-primary btn-block">Enviar cobrança</button>`);
+     <label>Cliente</label><select id="admPayClient" class="v2-concierge-input">${d.clients.map(c=>`<option value="${c.id}">${c.name}</option>`).join('')}</select>
+     <label>Viagem</label><select id="admPayTrip" class="v2-concierge-input"></select>
+     <label>Título</label><input id="admPayTitle" class="v2-concierge-input" value="Parcela da viagem">
+     <label>Descrição</label><input id="admPayDescription" class="v2-concierge-input" placeholder="Ex.: 2ª parcela do pacote">
+     <label>Valor</label><input id="admPayAmount" type="number" min="0" step="0.01" class="v2-concierge-input" value="1500">
+     <label>Vencimento</label><input id="admPayDue" type="date" class="v2-concierge-input">
+     <label>Métodos disponíveis</label><div class="payment-method-checks"><label><input id="payPix" type="checkbox" checked> Pix</label><label><input id="payCard" type="checkbox" checked> Cartão</label></div>
+     <button id="admSavePay" class="btn btn-primary btn-block">Enviar cobrança ao cliente</button>
+     <small class="firebase-security-note">A cobrança aparecerá na área Pagamentos do cliente assim que sincronizar com o Firebase.</small>`);
    setTimeout(()=>{
+     const clientSel=document.querySelector('#admPayClient');
+     const tripSel=document.querySelector('#admPayTrip');
+     const fillTrips=()=>{
+       const trips=d.trips.filter(t=>t.clientId===clientSel.value);
+       tripSel.innerHTML=trips.map(t=>`<option value="${t.id}">${t.name}</option>`).join('');
+     };
+     clientSel.onchange=fillTrips;fillTrips();
      const save=document.querySelector('#admSavePay');
-     if(save)save.onclick=async()=>{
-       save.disabled=true;save.textContent='Salvando...';
+     save.onclick=async()=>{
+       const trip=d.trips.find(t=>t.id===tripSel.value);
+       const client=d.clients.find(c=>c.id===clientSel.value);
+       const amount=Number(document.querySelector('#admPayAmount').value);
+       const dueDate=document.querySelector('#admPayDue').value;
+       const methods=[];
+       if(document.querySelector('#payPix').checked)methods.push('PIX');
+       if(document.querySelector('#payCard').checked)methods.push('Cartão');
+       if(!trip){toast('Selecione uma viagem');return}
+       if(!amount||amount<=0){toast('Informe um valor válido');return}
+       if(!dueDate){toast('Informe o vencimento');return}
+       if(!methods.length){toast('Selecione pelo menos um método de pagamento');return}
+       save.disabled=true;save.textContent='Enviando...';
        try{
-         IPAData.createPayment({trip:'Portugal 2026',title:document.querySelector('#admPayTitle').value,description:'Cobrança pelo ADM',amount:Number(document.querySelector('#admPayAmount').value),dueDate:'2026-08-25',methods:['PIX','Cartão']});
+         IPAData.createPayment({
+           clientId:client.id,
+           clientName:client.name,
+           tripId:trip.id,
+           trip:trip.name,
+           title:document.querySelector('#admPayTitle').value||'Cobrança da viagem',
+           description:document.querySelector('#admPayDescription').value||'Cobrança enviada pelo Indo por Aí',
+           amount,
+           dueDate,
+           methods,
+           status:'Pendente'
+         });
          if(window.IPAFirebase?.user)await window.IPAFirebase.syncNow();
-         toast('Cobrança salva no Firebase ✓');
+         toast('Cobrança enviada para o cliente ✓');
          modal.close();adminSection='finance';render();
        }catch(err){
-         toast('Erro ao salvar cobrança');save.disabled=false;save.textContent='Tentar novamente';
+         console.error(err);toast('Erro ao enviar cobrança');save.disabled=false;save.textContent='Tentar novamente';
        }
      };
    },0);
@@ -369,7 +431,18 @@ function adminTripList(){const d=adminData();return `<div class="ipa-admin-trip-
 function adminDashboard(){const d=adminData(),open=d.payments.filter(p=>p.status!=='Pago').reduce((s,p)=>s+Number(p.amount||0),0);return `<div class="ipa-admin-head"><div><span class="eyebrow">INDO POR AÍ BUSINESS</span><h1>Dashboard</h1><p>Gerencie clientes, viagens e receita em um só lugar.</p></div><button class="btn btn-primary" data-admin-new-trip>+ Nova viagem</button></div><div class="ipa-admin-metrics">${adminMetric('👤','Clientes',d.clients.length,'ativos')}${adminMetric('✈️','Viagens',d.trips.length,'cadastradas')}${adminMetric('💳','Em aberto',adminMoney(open),'a receber')}${adminMetric('🔴','Live',d.trips.filter(t=>t.modules?.live).length,'habilitadas')}</div><section class="ipa-admin-panel"><div class="section-head"><div><span class="eyebrow">OPERAÇÃO</span><h2>Viagens</h2></div><button class="btn btn-light" data-admin-section="trips">Ver todas</button></div>${adminTripList()}</section><section class="ipa-admin-panel"><span class="eyebrow">PRÓXIMAS AÇÕES</span><h2>O que precisa da sua atenção</h2><div class="ipa-admin-attention"><div>💳 <span><b>Cobranças em aberto</b><small>Envie lembretes pelo Financeiro.</small></span></div><div>👁️ <span><b>Confira como cliente</b><small>Revise a experiência antes de publicar.</small></span></div><div>🔴 <span><b>Live</b><small>Ative apenas quando quiser transmissão.</small></span></div></div></section>`}
 function adminClients(){const d=adminData();return `<div class="ipa-admin-head"><div><span class="eyebrow">CRM</span><h1>Clientes</h1><p>Um cliente pode ter várias viagens.</p></div><button class="btn btn-primary" data-admin-new-client>+ Novo cliente</button></div><div class="ipa-admin-client-grid">${d.clients.map(c=>`<div class="ipa-admin-client"><div class="ipa-admin-avatar">${(c.name||'C').split(' ').map(x=>x[0]).slice(0,2).join('')}</div><div><b>${c.name}</b><small>${c.email||''}</small><em>${d.trips.filter(t=>t.clientId===c.id).length} viagem(ns)</em>${c.activeTripId?`<small class="client-active-trip">Viagem direcionada: ${d.trips.find(t=>t.id===c.activeTripId)?.name||c.activeTripId}</small>`:''}<button class="ipa-invite-btn" data-admin-invite="${c.id}" data-admin-email="${c.email||''}">✉ Enviar acesso geral</button></div></div>`).join('')}</div>`}
 function adminTrips(){return `<div class="ipa-admin-head"><div><span class="eyebrow">EXPERIÊNCIAS</span><h1>Viagens</h1><p>Escolha uma viagem para personalizar o app.</p></div><button class="btn btn-primary" data-admin-new-trip>+ Nova viagem</button></div><section class="ipa-admin-panel">${adminTripList()}</section>`}
-function adminFinance(){const d=adminData(),total=d.payments.reduce((s,p)=>s+Number(p.amount||0),0),paid=d.payments.filter(p=>p.status==='Pago').reduce((s,p)=>s+Number(p.amount||0),0);return `<div class="ipa-admin-head"><div><span class="eyebrow">FINANCEIRO</span><h1>Pagamentos</h1><p>Crie cobranças e acompanhe os recebimentos.</p></div><button class="btn btn-primary" data-admin-new-charge>+ Nova cobrança</button></div><div class="ipa-admin-metrics">${adminMetric('💼','Contratado',adminMoney(total))}${adminMetric('✓','Recebido',adminMoney(paid))}${adminMetric('⏱️','Em aberto',adminMoney(total-paid))}</div><section class="ipa-admin-panel"><div class="ipa-admin-payment-list">${d.payments.map(p=>`<div><span><b>${p.title}</b><small>${p.trip} · ${p.description}</small></span><strong>${adminMoney(p.amount)}</strong><em class="${p.status==='Pago'?'ok':'wait'}">${p.status}</em><button data-admin-remind="${p.id}">Lembrar</button></div>`).join('')}</div></section>`}
+function adminFinance(){
+ const d=adminData();
+ const total=d.payments.reduce((s,p)=>s+Number(p.amount||0),0);
+ const paid=d.payments.filter(p=>p.status==='Pago').reduce((s,p)=>s+Number(p.amount||0),0);
+ return `<div class="ipa-admin-head"><div><span class="eyebrow">FINANCEIRO</span><h1>Pagamentos</h1><p>Envie cobranças diretamente para a viagem do cliente.</p></div><button class="btn btn-primary" data-admin-new-charge>+ Nova cobrança</button></div>
+ <div class="ipa-admin-metrics">${adminMetric('💼','Contratado',adminMoney(total))}${adminMetric('✓','Recebido',adminMoney(paid))}${adminMetric('⏱️','Em aberto',adminMoney(total-paid))}</div>
+ <section class="ipa-admin-panel"><div class="ipa-admin-payment-list">${d.payments.map(p=>{
+   const c=d.clients.find(x=>x.id===p.clientId);
+   const t=d.trips.find(x=>x.id===p.tripId);
+   return `<div><span><b>${p.title}</b><small>${c?.name||'Cliente não vinculado'} · ${t?.name||p.trip||'Viagem'}</small><small>${p.description||''} · vence ${p.dueDate?new Date(p.dueDate+'T12:00:00').toLocaleDateString('pt-BR'):'-'}</small></span><strong>${adminMoney(p.amount)}</strong><em class="${p.status==='Pago'?'ok':'wait'}">${p.status}</em><button data-admin-remind="${p.id}">Lembrar</button></div>`;
+ }).join('')||'<p>Nenhuma cobrança criada.</p>'}</div></section>`;
+}
 function adminPartners(){const d=adminData();return `<div class="ipa-admin-head"><div><span class="eyebrow">MONETIZAÇÃO</span><h1>Parceiros</h1><p>Escolha os benefícios ativos.</p></div></div><section class="ipa-admin-panel"><div class="ipa-admin-partners">${d.benefits.map(b=>`<label><div><b>${b.title}</b><small>${b.sponsorLabel} · ${b.partner}</small></div><input type="checkbox" data-admin-benefit="${b.id}" ${b.enabled?'checked':''}></label>`).join('')}</div></section>`}
 function adminLive(){return `<div class="ipa-admin-head"><div><span class="eyebrow">LIVE</span><h1>Central de transmissões</h1><p>Controle as transmissões por viagem.</p></div></div><section class="ipa-admin-panel ipa-admin-live"><span>🔴</span><h2>Live preparada</h2><p>Próxima integração: Daily + Cloudflare.</p></section>`}
 function adminTemplates(){
@@ -390,6 +463,7 @@ function adminTripEditor(id){
  <section class="ipa-admin-panel"><div class="section-head"><div><span class="eyebrow">ROTEIRO</span><h2>Dias e locais</h2></div><button class="btn btn-light" data-admin-add-day="${t.id}">+ Adicionar dia</button></div><div class="ipa-admin-days">${(t.itinerary||[]).sort((a,b)=>a.day-b.day).map(day=>`<div class="admin-day-expanded"><div class="admin-day-title"><strong>${day.day}</strong><span><b>${day.title}</b><small>${day.date||''}</small></span><button class="admin-add-place-btn" data-admin-add-place="${t.id}:${day.day}">+ Adicionar local</button></div><div class="admin-place-list">${normalizedPlaces(day).map((p,i)=>`<div><span>${i+1}</span><div><b>${p.time?`${p.time} · `:''}${p.name}</b><small>${p.address||p.note||''}</small></div></div>`).join('')||'<small>Nenhum local neste dia.</small>'}</div></div>`).join('')||'<p>Comece adicionando o primeiro dia.</p>'}</div></section>
  <div class="admin-publish-actions">
  <button class="btn btn-primary btn-block" data-admin-publish="${t.id}">${t.published?'✓ Viagem publicada':'🚀 Publicar viagem'}</button>
+ <button class="btn btn-light btn-block" data-admin-charge-trip="${t.id}" data-charge-client="${t.clientId}">💳 Enviar cobrança para este cliente</button>
  ${t.published?`<button class="btn btn-light btn-block" data-admin-invite-trip="${t.id}" data-client-id="${t.clientId}" data-client-email="${c?.email||''}">✉ Enviar acesso desta viagem</button>`:''}
  </div>`;
 }
@@ -674,9 +748,13 @@ function simulatePayment(payload){
  setTimeout(()=>document.querySelectorAll('[data-confirm-payment]').forEach(btn=>btn.onclick=()=>{IPAData.markPaymentPaid(btn.dataset.confirmPayment);toast('Pagamento confirmado');modal.close();render()}),0);
 }
 function paymentsView(){
- const d=ipaDB();const s=paymentSummary();
- return `<section class="payments-hero"><span class="eyebrow">Minha Viagem</span><h1>Pagamentos</h1><p>Acompanhe parcelas, extras e comprovantes da sua viagem.</p><div class="payment-summary-grid"><div><small>Contratado</small><strong>${brl(s.total)}</strong></div><div><small>Pago</small><strong>${brl(s.paid)}</strong></div><div><small>Em aberto</small><strong>${brl(s.pending)}</strong></div></div></section>
- <section class="section"><div class="section-head"><h2>Suas cobranças</h2><span class="chip">${d.payments.length} lançamentos</span></div><div class="payment-list">${d.payments.map(p=>`<button class="payment-row" data-payment="${p.id}"><div class="payment-status ${p.status==='Pago'?'paid':'pending'}">${p.status==='Pago'?'✓':'!'}</div><div><span class="eyebrow">${p.trip}</span><h3>${p.title}</h3><p>${p.description}</p><small>Vencimento ${new Date(p.dueDate+'T12:00:00').toLocaleDateString('pt-BR')}</small></div><div class="payment-row-value"><strong>${brl(p.amount)}</strong><span class="${p.status==='Pago'?'paid-text':'pending-text'}">${p.status}</span></div></button>`).join('')}</div></section>`;
+ const d=ipaDB(),t=activeTrip();
+ const payments=(d.payments||[]).filter(p=>!t||p.tripId===t.id||(!p.tripId&&p.trip===t.name));
+ const total=payments.reduce((s,p)=>s+Number(p.amount||0),0);
+ const paid=payments.filter(p=>p.status==='Pago').reduce((s,p)=>s+Number(p.amount||0),0);
+ const pending=total-paid;
+ return `<section class="payments-hero"><span class="eyebrow">Minha Viagem</span><h1>Pagamentos</h1><p>${t?.name||'Sua viagem'} · acompanhe parcelas, extras e comprovantes.</p><div class="payment-summary-grid"><div><small>Contratado</small><strong>${brl(total)}</strong></div><div><small>Pago</small><strong>${brl(paid)}</strong></div><div><small>Em aberto</small><strong>${brl(pending)}</strong></div></div></section>
+ <section class="section"><div class="section-head"><h2>Suas cobranças</h2><span class="chip">${payments.length} lançamento(s)</span></div><div class="payment-list">${payments.map(p=>`<button class="payment-row" data-payment="${p.id}"><div class="payment-status ${p.status==='Pago'?'paid':'pending'}">${p.status==='Pago'?'✓':'!'}</div><div><span class="eyebrow">${p.trip||t?.name||''}</span><h3>${p.title}</h3><p>${p.description}</p><small>Vencimento ${p.dueDate?new Date(p.dueDate+'T12:00:00').toLocaleDateString('pt-BR'):'-'}</small></div><div class="payment-row-value"><strong>${brl(p.amount)}</strong><span class="${p.status==='Pago'?'paid-text':'pending-text'}">${p.status}</span></div></button>`).join('')||'<div class="empty-payment-state"><span>💳</span><b>Nenhuma cobrança pendente</b><small>Quando o Indo por Aí enviar uma cobrança, ela aparecerá aqui.</small></div>'}</div></section>`;
 }
 
 function beforeView(){
@@ -693,7 +771,7 @@ function beforeView(){
 ${modeCard()}
 <section class="section"><div class="v2-plan-card"><div><span class="eyebrow">Seu plano contratado</span><h3>${plan}</h3><p>${t?.name||'Minha viagem'} · ${dest}, ${country} ${flag}</p></div><button class="btn btn-light" data-plan-details="true">Ver benefícios</button></div></section>
 ${tripModule('itinerary')?`<section class="section"><div class="section-head"><div><span class="eyebrow">Seu roteiro</span><h2>${firstDay?firstDay.title:'Roteiro em preparação'}</h2></div><span class="chip">${t?.itinerary?.length||0} dias</span></div>${firstDay?`<div class="client-itinerary-preview">${normalizedPlaces(firstDay).slice(0,4).map((p,i)=>`<div><span>${i+1}</span><div><b>${p.name}</b><small>${p.time||p.address||'Programado no roteiro'}</small></div></div>`).join('')}</div>`:'<p>O Indo por Aí está preparando seus dias.</p>'}</section>`:''}
-${tripModule('payments')?`<section class="section"><button class="payment-alert-card" data-go="payments"><div class="payment-alert-icon">💳</div><div><span class="eyebrow">Pagamentos</span><h3>Acompanhe sua viagem</h3><p>${(d?.payments||[]).filter(p=>p.status!=='Pago').length} cobrança(s) em aberto</p></div><span>›</span></button></section>`:''}
+${tripModule('payments')?`<section class="section"><button class="payment-alert-card" data-go="payments"><div class="payment-alert-icon">💳</div><div><span class="eyebrow">Pagamentos</span><h3>Acompanhe sua viagem</h3><p>${(d?.payments||[]).filter(p=>p.status!=='Pago'&&(!t||p.tripId===t.id||(!p.tripId&&p.trip===t.name))).length} cobrança(s) em aberto</p></div><span>›</span></button></section>`:''}
 <section class="section"><div class="section-head"><div><span class="eyebrow">Sua jornada até o embarque</span><h2>Preparação da viagem</h2></div></div>
  <div class="v2-journey">
   ${tripModule('documents')?`<button class="v2-journey-step done" data-prep-section="documents"><span>✓</span><div><b>Documentos</b><small>Checklist necessário para ${country}</small></div></button>`:''}
