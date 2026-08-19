@@ -155,198 +155,255 @@ window.addEventListener("ipa-data-updated",event=>{
 
 
 
-function readInviteContext(){
-  const direct=new URLSearchParams(window.location.search);
-  let clientId=direct.get("clientId")||"";
-  let tripId=direct.get("tripId")||"";
 
-  // O Firebase pode encapsular nossa URL em continueUrl.
-  // Isso acontece principalmente quando o link é aberto em outro aparelho.
-  const continueUrl=direct.get("continueUrl")||direct.get("continue_url")||"";
-  if(continueUrl){
-    try{
-      const decoded=decodeURIComponent(continueUrl);
-      const u=new URL(decoded);
-      clientId=clientId||u.searchParams.get("clientId")||"";
-      tripId=tripId||u.searchParams.get("tripId")||"";
-    }catch(e){ console.warn("continueUrl inválida",e); }
-  }
+function parseInviteFromUrl(rawUrl){
+  let clientId="",tripId="";
+  const visited=new Set();
 
-  // Algumas variações de link trazem a URL encapsulada em "link".
-  const nestedLink=direct.get("link")||"";
-  if((!clientId||!tripId) && nestedLink){
-    try{
-      const u=new URL(decodeURIComponent(nestedLink));
-      const nestedContinue=u.searchParams.get("continueUrl")||"";
-      if(nestedContinue){
-        const cu=new URL(decodeURIComponent(nestedContinue));
-        clientId=clientId||cu.searchParams.get("clientId")||"";
-        tripId=tripId||cu.searchParams.get("tripId")||"";
+  function scan(urlText,depth=0){
+    if(!urlText || depth>4 || visited.has(urlText)) return;
+    visited.add(urlText);
+    let u;
+    try{ u=new URL(urlText,window.location.origin); }catch{return;}
+
+    clientId=clientId||u.searchParams.get("clientId")||"";
+    tripId=tripId||u.searchParams.get("tripId")||"";
+    const payload=u.searchParams.get("ipaInvite")||"";
+    if(payload && (!clientId||!tripId)){
+      try{
+        const obj=JSON.parse(decodeURIComponent(escape(atob(payload))));
+        clientId=clientId||obj.clientId||"";
+        tripId=tripId||obj.tripId||"";
+      }catch(e){}
+    }
+
+    // O Firebase/Google pode encapsular a URL original em vários parâmetros.
+    for(const key of ["continueUrl","continue_url","link","url","redirectUrl","redirect_url"]){
+      const nested=u.searchParams.get(key);
+      if(!nested)continue;
+      let decoded=nested;
+      for(let i=0;i<3;i++){
+        try{
+          const next=decodeURIComponent(decoded);
+          if(next===decoded)break;
+          decoded=next;
+        }catch{break;}
       }
-    }catch(e){}
+      scan(decoded,depth+1);
+    }
   }
 
-  clientId=clientId||localStorage.getItem("ipa-client-id-for-signin")||localStorage.getItem("ipa-active-client-id")||"";
-  tripId=tripId||localStorage.getItem("ipa-trip-id-for-signin")||localStorage.getItem("ipa-active-trip-id")||"";
+  scan(rawUrl);
+  return {clientId,tripId};
+}
+
+const BOOT_INVITE_CONTEXT=parseInviteFromUrl(window.location.href);
+
+function readInviteContext(){
+  const live=parseInviteFromUrl(window.location.href);
+  const clientId=
+    live.clientId
+    ||BOOT_INVITE_CONTEXT.clientId
+    ||localStorage.getItem("ipa-client-id-for-signin")
+    ||"";
+  const tripId=
+    live.tripId
+    ||BOOT_INVITE_CONTEXT.tripId
+    ||localStorage.getItem("ipa-trip-id-for-signin")
+    ||"";
 
   if(clientId)localStorage.setItem("ipa-client-id-for-signin",clientId);
   if(tripId)localStorage.setItem("ipa-trip-id-for-signin",tripId);
+
   return {clientId,tripId};
 }
 
 async function loadClientExperience(){
   if(!currentUser || currentUser.uid===ADMIN_UID) return null;
-  status="syncing";
-  notify();
 
+  status="syncing";
+  lastError="";
   const normalizedEmail=(currentUser.email||"").trim().toLowerCase();
-  const params=new URLSearchParams(window.location.search);
   const inviteContext=readInviteContext();
-  const invitedClientId=inviteContext.clientId;
 
   let clientDoc=null;
 
-  // Primeiro acesso: usa o ID que foi embutido no convite.
-  // Isso evita depender de consulta por authUid antes de o vínculo existir.
-  if(invitedClientId){
+  // 1. ID do convite (mais determinístico)
+  if(inviteContext.clientId){
     try{
-      const snap=await getDoc(doc(firestore,"clients",invitedClientId));
-      if(snap.exists()) clientDoc=snap;
+      const snap=await getDoc(doc(firestore,"clients",inviteContext.clientId));
+      if(snap.exists())clientDoc=snap;
     }catch(e){
-      console.warn("Não foi possível abrir o clientId do convite",e);
+      console.warn("Falha ao ler clientId do convite",e);
     }
   }
 
-  // Fallback seguro: o e-mail autenticado precisa ser igual ao e-mail do cadastro.
+  // 2. Cliente já vinculado ao UID em acesso anterior
   if(!clientDoc){
-    const clientSnap=await getDocs(
-      query(collection(firestore,"clients"),where("email","==",normalizedEmail),limit(1))
-    );
-    if(!clientSnap.empty) clientDoc=clientSnap.docs[0];
+    try{
+      const snap=await getDocs(
+        query(collection(firestore,"clients"),where("authUid","==",currentUser.uid),limit(1))
+      );
+      if(!snap.empty)clientDoc=snap.docs[0];
+    }catch(e){
+      console.warn("Busca por authUid indisponível",e);
+    }
+  }
+
+  // 3. Primeiro acesso: e-mail
+  if(!clientDoc){
+    try{
+      const snap=await getDocs(
+        query(collection(firestore,"clients"),where("email","==",normalizedEmail),limit(1))
+      );
+      if(!snap.empty)clientDoc=snap.docs[0];
+    }catch(e){
+      console.warn("Busca por e-mail falhou",e);
+    }
   }
 
   if(!clientDoc){
     status="client-no-profile";
-    lastError="Seu acesso existe, mas não encontramos um cadastro de cliente para este e-mail.";
+    lastError=`Acesso autenticado como ${normalizedEmail}, mas nenhum cadastro de cliente foi encontrado.`;
     notify("ipa-client-experience-ready");
     return null;
   }
 
   const client={id:clientDoc.id,...clientDoc.data()};
+  const clientEmail=String(client.email||"").trim().toLowerCase();
 
-  // Validação extra no front-end. As regras do Firestore repetem essa proteção.
-  if(String(client.email||"").trim().toLowerCase()!==normalizedEmail){
+  if(clientEmail!==normalizedEmail && client.authUid!==currentUser.uid){
     status="client-no-profile";
-    lastError="Este convite não pertence ao e-mail autenticado.";
+    lastError="O e-mail autenticado não corresponde ao cliente deste convite.";
     notify("ipa-client-experience-ready");
     return null;
   }
 
-  // Persist the UID back into the client document. Security Rules in this
-  // package allow the authenticated owner to claim only their own profile.
+  // Vincula UID no primeiro acesso.
   if(!client.authUid){
-    await setDoc(doc(firestore,"clients",client.id),{
-      authUid:currentUser.uid,
-      email:normalizedEmail,
-      firstAccessAt:serverTimestamp()
-    },{merge:true});
-    client.authUid=currentUser.uid;
-  }
-
-  const requestedTripId=
-    client.activeTripId
-    ||client.lastInvitedTripId
-    ||inviteContext.tripId
-    ||localStorage.getItem("ipa-trip-id-for-signin")
-    ||"";
-
-  let trips=[];
-
-  // Fluxo principal: o próprio documento do cliente informa qual viagem ele deve abrir.
-  if(requestedTripId){
     try{
-      const tripDoc=await getDoc(doc(firestore,"trips",requestedTripId));
-      if(tripDoc.exists()){
-        const requestedTrip={id:tripDoc.id,...tripDoc.data()};
-        if(requestedTrip.clientId===client.id && requestedTrip.published===true){
-          trips=[requestedTrip];
-        }else{
-          console.warn("Viagem vinculada não está publicada ou não pertence ao cliente",requestedTrip);
-        }
-      }else{
-        console.warn("Viagem vinculada não existe:",requestedTripId);
-      }
+      await setDoc(doc(firestore,"clients",client.id),{
+        authUid:currentUser.uid,
+        firstAccessAt:serverTimestamp()
+      },{merge:true});
+      client.authUid=currentUser.uid;
     }catch(e){
-      console.warn("Não foi possível carregar a viagem vinculada",e);
+      console.warn("Não foi possível registrar authUid",e);
     }
   }
 
-  // Fallback para cadastros antigos.
-  if(!trips.length){
-    const tripQuery=query(collection(firestore,"trips"),where("clientId","==",client.id));
-    const tripSnap=await getDocs(tripQuery);
-    trips=tripSnap.docs.map(d=>({id:d.id,...d.data()})).filter(t=>t.published===true);
+  let chosenTrip=null;
+
+  // A viagem enviada no e-mail é a primeira escolha e NÃO depende de activeTripId.
+  if(inviteContext.tripId){
+    try{
+      const snap=await getDoc(doc(firestore,"trips",inviteContext.tripId));
+      if(snap.exists()){
+        const trip={id:snap.id,...snap.data()};
+        if(trip.clientId===client.id && trip.published===true){
+          chosenTrip=trip;
+        }else{
+          console.warn("tripId do convite não pertence ao cliente ou não está publicado",trip);
+        }
+      }
+    }catch(e){
+      console.warn("Não foi possível abrir tripId do convite",e);
+    }
+  }
+
+  // Depois tenta activeTripId / último convite.
+  if(!chosenTrip){
+    const fallbackId=client.activeTripId||client.lastInvitedTripId||"";
+    if(fallbackId){
+      try{
+        const snap=await getDoc(doc(firestore,"trips",fallbackId));
+        if(snap.exists()){
+          const trip={id:snap.id,...snap.data()};
+          if(trip.clientId===client.id && trip.published===true)chosenTrip=trip;
+        }
+      }catch(e){
+        console.warn("Falha no fallback de viagem",e);
+      }
+    }
+  }
+
+  // Último fallback: qualquer viagem publicada daquele cliente.
+  let trips=[];
+  if(!chosenTrip){
+    try{
+      const snap=await getDocs(
+        query(collection(firestore,"trips"),where("clientId","==",client.id))
+      );
+      trips=snap.docs.map(d=>({id:d.id,...d.data()})).filter(t=>t.published===true);
+      const today=new Date().toISOString().slice(0,10);
+      trips.sort((a,b)=>{
+        const aa=String(a.startDate||"9999-12-31"),bb=String(b.startDate||"9999-12-31");
+        const af=aa>=today,bf=bb>=today;
+        if(af!==bf)return af?-1:1;
+        return af?aa.localeCompare(bb):bb.localeCompare(aa);
+      });
+      chosenTrip=trips[0]||null;
+    }catch(e){
+      console.warn("Busca de viagens do cliente falhou",e);
+    }
+  }
+
+  if(chosenTrip)trips=[chosenTrip];
+
+  if(!chosenTrip){
+    status="client-no-trip";
+    lastError=`Cliente encontrado (${client.name||client.id}), mas nenhuma viagem publicada pôde ser aberta. Convite: ${inviteContext.tripId||"sem tripId"}.`;
+    notify("ipa-client-experience-ready");
+    return null;
   }
 
   let payments=[];
   try{
-    const paymentQuery=query(collection(firestore,"payments"),where("clientId","==",client.id));
-    const paymentSnap=await getDocs(paymentQuery);
-    payments=paymentSnap.docs.map(d=>({id:d.id,...d.data()}));
-  }catch(e){
-    console.warn("Pagamentos do cliente ainda não vinculados",e);
-  }
+    const snap=await getDocs(
+      query(collection(firestore,"payments"),where("clientId","==",client.id))
+    );
+    payments=snap.docs.map(d=>({id:d.id,...d.data()}));
+  }catch(e){console.warn("Pagamentos indisponíveis",e);}
 
   let benefits=[];
-  try{
-    benefits=await readCollection("benefits");
-  }catch(e){
-    console.warn("Benefícios indisponíveis para cliente",e);
-  }
+  try{benefits=await readCollection("benefits");}
+  catch(e){console.warn("Benefícios indisponíveis",e);}
 
-  const today=new Date().toISOString().slice(0,10);
-  trips.sort((a,b)=>{
-    const aa=String(a.startDate||"9999-12-31"),bb=String(b.startDate||"9999-12-31");
-    const aFuture=aa>=today,bFuture=bb>=today;
-    if(aFuture!==bFuture) return aFuture?-1:1;
-    return aFuture ? aa.localeCompare(bb) : bb.localeCompare(aa);
-  });
-  const chosenTrip=trips[0]||null;
   const cloudData={
     activeClientId:client.id,
-    activeTripId:chosenTrip?.id||"",
+    activeTripId:chosenTrip.id,
     clients:[client],
     client:{
       id:client.id,
       name:client.name||"Viajante",
       email:client.email||normalizedEmail,
-      plan:chosenTrip?.plan||"Explore",
-      trip:chosenTrip?.name||"Minha viagem"
+      plan:chosenTrip.plan||"Explore",
+      trip:chosenTrip.name||"Minha viagem"
     },
-    trips,
+    trips:[chosenTrip],
     payments,
     benefits
   };
 
-  if(window.IPAData?.replaceFromCloud) window.IPAData.replaceFromCloud(cloudData);
-  localStorage.setItem("ipa-active-client-id",client.id);
-  if(chosenTrip){
-    localStorage.setItem("ipa-active-trip-id",chosenTrip.id);
-    localStorage.setItem("ipa-trip-id-for-signin",chosenTrip.id);
-  }
+  if(window.IPAData?.replaceFromCloud)window.IPAData.replaceFromCloud(cloudData);
 
-  // Remove o código de autenticação/convite da barra de endereço sem recarregar.
+  localStorage.setItem("ipa-active-client-id",client.id);
+  localStorage.setItem("ipa-active-trip-id",chosenTrip.id);
+  localStorage.setItem("ipa-client-id-for-signin",client.id);
+  localStorage.setItem("ipa-trip-id-for-signin",chosenTrip.id);
+
+  status="client-connected";
+  lastError="";
+  initialized=true;
+
+  // Limpa a URL somente DEPOIS de a viagem ter sido resolvida.
   try{
     const clean=new URL(window.location.href);
-    ["mode","oobCode","apiKey","lang","clientInvite","clientId","tripId"].forEach(k=>clean.searchParams.delete(k));
+    ["mode","oobCode","apiKey","lang","clientInvite","clientId","tripId","continueUrl","continue_url"]
+      .forEach(k=>clean.searchParams.delete(k));
     history.replaceState({},document.title,clean.pathname+(clean.searchParams.toString()?("?"+clean.searchParams.toString()):""));
   }catch(e){}
 
-  status=chosenTrip ? "client-connected" : "client-no-trip";
-  lastError=chosenTrip
-    ? ""
-    : `Seu cadastro foi encontrado, mas não conseguimos abrir a viagem vinculada. Cliente: ${client.id}. Viagem ativa: ${client.activeTripId||client.lastInvitedTripId||"não definida"}.`;
-  initialized=true;
   notify("ipa-client-experience-ready");
   return cloudData;
 }
@@ -450,6 +507,10 @@ window.IPAFirebase = {
     url.searchParams.set("clientInvite","1");
     if(clientId) url.searchParams.set("clientId",clientId);
     if(tripId) url.searchParams.set("tripId",tripId);
+    // redundância simples para facilitar diagnóstico/compatibilidade
+    if(clientId||tripId){
+      url.searchParams.set("ipaInvite",btoa(unescape(encodeURIComponent(JSON.stringify({clientId:clientId||"",tripId:tripId||""})))));
+    }
     const normalizedEmail=email.trim().toLowerCase();
     await sendSignInLinkToEmail(auth,normalizedEmail,{url:url.toString(),handleCodeInApp:true});
     localStorage.setItem("ipa-email-for-signin",normalizedEmail);

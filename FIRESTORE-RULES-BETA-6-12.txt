@@ -1,0 +1,80 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn(){ return request.auth != null; }
+
+    function isAdmin(){
+      return signedIn()
+        && request.auth.uid == "5dlGX6JlrUQHyjFWSHB9Dye0r1E3";
+    }
+
+    function clientDoc(clientId){
+      return get(/databases/$(database)/documents/clients/$(clientId));
+    }
+
+    function ownsClient(clientId){
+      return signedIn()
+        && (
+          clientDoc(clientId).data.authUid == request.auth.uid
+          || clientDoc(clientId).data.email == request.auth.token.email
+        );
+    }
+
+    match /clients/{clientId} {
+      allow read, write: if isAdmin();
+
+      allow read: if signedIn()
+        && (
+          resource.data.authUid == request.auth.uid
+          || resource.data.email == request.auth.token.email
+        );
+
+      allow update: if signedIn()
+        && resource.data.email == request.auth.token.email
+        && request.resource.data.email == resource.data.email
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['authUid','firstAccessAt'])
+        && request.resource.data.authUid == request.auth.uid;
+    }
+
+    match /trips/{tripId} {
+      allow read, write: if isAdmin();
+
+      // O cliente pode ler viagens PUBLICADAS que pertençam ao próprio cadastro.
+      // A viagem exata é escolhida pelo tripId do convite no app.
+      allow read: if signedIn()
+        && resource.data.published == true
+        && ownsClient(resource.data.clientId);
+    }
+
+    match /payments/{paymentId} {
+      allow read, write: if isAdmin();
+      allow read: if signedIn()
+        && resource.data.clientId != null
+        && ownsClient(resource.data.clientId);
+    }
+
+    match /benefits/{benefitId} {
+      allow read, write: if isAdmin();
+      allow read: if signedIn();
+    }
+
+    match /itineraryTemplates/{templateId} {
+      allow read, write: if isAdmin();
+    }
+
+    match /users/{userId} {
+      allow read, write: if isAdmin();
+      allow read: if signedIn() && request.auth.uid == userId;
+    }
+
+    match /settings/{document=**} {
+      allow read, write: if isAdmin();
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

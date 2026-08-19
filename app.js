@@ -205,7 +205,7 @@ function bind(){
      if(!save)return;
      save.onclick=async()=>{
        const name=document.querySelector('#admClientName')?.value.trim();
-       const email=document.querySelector('#admClientEmail')?.value.trim();
+       const email=(document.querySelector('#admClientEmail')?.value||'').trim().toLowerCase();
        const phone=document.querySelector('#admClientPhone')?.value.trim();
        const status=document.querySelector('#admClientSaveStatus');
        if(!name){toast('Informe o nome do cliente');return}
