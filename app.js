@@ -456,6 +456,380 @@ const routes={
 
 let adminSection='dashboard';
 let adminTripId='trip-portugal-2026';
+function ipaDB(){return window.IPAData?IPAData.getAll():null}
+function activeTrip(){
+ const d=ipaDB();
+ const allTrips=d?.trips||[];
+ const previewTrip=localStorage.getItem('ipa-preview-trip-id');
+
+ if(state.previewFromAdmin===true && previewTrip){
+   const exactPreview=allTrips.find(t=>t.id===previewTrip);
+   if(exactPreview)return exactPreview;
+ }
+
+ const storedTrip=localStorage.getItem('ipa-active-trip-id');
+ const activeClient=localStorage.getItem('ipa-active-client-id');
+ const trips=allTrips.filter(t=>!activeClient||t.clientId===activeClient);
+
+ return trips.find(t=>t.id===storedTrip)
+   ||trips.find(t=>t.published===true)
+   ||trips[0]
+   ||null;
+}
+
+const PLAN_INCLUDED_LABELS={
+ Explore:["Roteiro no app","Pagamentos","Álbum da viagem","Filme da viagem"],
+ Signature:["Tudo do Explore","Suporte pré-embarque","Documentos e mala","Check-in","Compra de hotel e passagens"],
+ Elite:["Tudo do Signature","Câmbio / Exchange","Comunidade","Live","Passaporte","Acesso full à plataforma"],
+ Groups:["Roteiro para grupos","Pré-embarque","Comunidade do grupo","Live","Álbum e filme compartilhados","Gestão de grupos"]
+};
+function packageIncluded(plan){return PLAN_INCLUDED_LABELS[plan]||PLAN_INCLUDED_LABELS.Explore}
+
+function countryFlag(country){
+ const map={"Portugal":"🇵🇹","Brasil":"🇧🇷","Espanha":"🇪🇸","França":"🇫🇷","Itália":"🇮🇹","Reino Unido":"🇬🇧","Inglaterra":"🇬🇧","Estados Unidos":"🇺🇸","Argentina":"🇦🇷","Alemanha":"🇩🇪","Holanda":"🇳🇱","Países Baixos":"🇳🇱","Suíça":"🇨🇭","Áustria":"🇦🇹","Grécia":"🇬🇷","Irlanda":"🇮🇪","Bélgica":"🇧🇪","Croácia":"🇭🇷","Japão":"🇯🇵","Canadá":"🇨🇦","México":"🇲🇽","Chile":"🇨🇱","Uruguai":"🇺🇾"};
+ return map[String(country||"").trim()]||"🌍";
+}
+function tripCountry(t){
+ if(t?.country)return t.country;
+ const txt=String(t?.destination||"");
+ const parts=txt.split(",").map(x=>x.trim());
+ return parts.length>1?parts[parts.length-1]:"";
+}
+function tripDestination(t){return String(t?.destination||t?.name||"Seu destino").split(",")[0].trim()}
+function normalizedPlaces(day){
+ return (day?.places||[]).map((p,i)=>typeof p==='string'?{id:'p-'+day.day+'-'+i,name:p,address:p,time:'',note:''}:p);
+}
+function googleMapsRouteUrl(day,t){
+ const places=normalizedPlaces(day).filter(p=>p.name||p.address);
+ if(!places.length)return "";
+ const q=p=>p.placeId?`place_id:${p.placeId}`:(p.address||`${p.name}, ${tripDestination(t)}, ${tripCountry(t)}`);
+ if(places.length===1)return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q(places[0]))}`;
+ const first=q(places[0]),last=q(places[places.length-1]);
+ const middle=places.slice(1,-1).map(q).join("|");
+ return `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(first)}&destination=${encodeURIComponent(last)}${middle?`&waypoints=${encodeURIComponent(middle)}`:''}&travelmode=walking`;
+}
+function tripModule(name){const t=activeTrip();return t?.modules?.[name]!==false}
+function showPlanDetails(){
+ const d=ipaDB();if(!d)return;
+ const plan=activeTrip()?.plan||d.client.plan||'Explore';
+ const items=d.plans[plan]||[];
+ showModal(`<span class="eyebrow">Seu plano</span><h2>Indo por Aí ${plan}</h2><div class="plan-feature-list">${items.map(x=>`<div>✓ <span>${x}</span></div>`).join('')}</div>`);
+}
+function prepChecklist(section,title){
+ const d=ipaDB();if(!d)return;
+ if(section==='exchange'){
+   const e=d.exchange;
+   showModal(`<div class="exchange-view"><span class="eyebrow">Indo por Aí Exchange</span><h2>Seu saldo para Portugal</h2><p>O Indo por Aí organiza seu câmbio de forma personalizada.</p><div class="exchange-balance"><small>Saldo reservado</small><strong>€ ${e.requestedEuro}</strong><span>€1 = R$ ${Number(e.sellRate).toFixed(2).replace('.',',')}</span><b>${e.status}</b></div><div class="partner-strip"><small>Benefício em parceria com</small><strong>${e.partner}</strong></div><button class="btn btn-primary btn-block" onclick="toast('Solicitação enviada ao Indo por Aí');modal.close()">Falar sobre meu câmbio</button></div>`);
+   return;
+ }
+ const items=d.prep[section]||[];
+ showModal(`<span class="eyebrow">Preparação da viagem</span><h2>${title}</h2><p>Marque os itens conforme concluir.</p><div class="prep-checklist">${items.map((x,i)=>`<label><input type="checkbox" data-prep-toggle="${section}:${i}" ${x.done?'checked':''}><span>${x.label}</span></label>`).join('')}</div>`);
+ setTimeout(()=>document.querySelectorAll('[data-prep-toggle]').forEach(cb=>cb.onchange=()=>{const [s,i]=cb.dataset.prepToggle.split(':');IPAData.togglePrep(s,Number(i))}),0);
+}
+function benefitsPersonalized(){
+ const d=ipaDB();if(!d)return'';
+ const active=d.benefits.filter(x=>x.enabled);
+ return `<section class="section"><div class="section-head"><div><span class="eyebrow">Personalizado para você</span><h2>Benefícios exclusivos</h2></div><span class="chip">${active.length} ativos</span></div><div class="benefit-market">${active.map(b=>`<button class="benefit-market-card" data-benefit-id="${b.id}"><div><span class="eyebrow">${b.sponsorLabel}</span><h3>${b.title}</h3><p>${b.partner}</p></div><span>›</span></button>`).join('')}</div></section>`;
+}
+function nextRecommended(){
+ return `<section class="section"><div class="next-recommended"><div class="next-recommended-icon">✨</div><div><span class="eyebrow">Seu próximo passo</span><h3>Prepare o câmbio da viagem</h3><p>Documentos e hotel estão confirmados. O check-in abre em 3 dias; enquanto isso, deixe seu saldo em euro preparado.</p></div><button class="btn btn-primary" data-prep-section="exchange">Ver Exchange</button></div></section>`;
+}
+
+function visitReview(id){
+ const d=ipaDB();return d?.visitReviews?.[id]||{visited:false,stars:0,note:""};
+}
+function itineraryReviewControls(id){
+ const v=visitReview(id);
+ return `<div class="itinerary-review" data-itinerary-review="${id}">
+  <label class="visit-check"><input type="checkbox" data-visit-check="${id}" ${v.visited?'checked':''}><span>${v.visited?'Visitado':'Marcar como visitado'}</span></label>
+  <div class="mini-stars" aria-label="Avaliação">${[1,2,3,4,5].map(n=>`<button type="button" data-itinerary-star="${id}:${n}" class="${v.stars>=n?'selected':''}">★</button>`).join('')}</div>
+  <input class="place-note" data-itinerary-note="${id}" maxlength="90" value="${String(v.note||'').replace(/"/g,'&quot;')}" placeholder="Em poucas palavras, o que achou?">
+  <button type="button" class="save-place-review" data-save-itinerary-review="${id}">Salvar</button>
+ </div>`;
+}
+function saveItineraryReview(id){
+ const visited=document.querySelector(`[data-visit-check="${id}"]`)?.checked||false;
+ const note=document.querySelector(`[data-itinerary-note="${id}"]`)?.value.trim()||'';
+ const stars=[...document.querySelectorAll(`[data-itinerary-star^="${id}:"]`)].filter(x=>x.classList.contains('selected')).length;
+ IPAData.saveVisitReview(id,{visited,stars,note});
+ if(stars>0){
+   const d=ipaDB();const existing=d?.ratings?.[id];
+   if(existing && note) IPAData.addRating(id,stars,note);
+ }
+ toast('Avaliação do roteiro salva');
+ render();
+}
+
+function ratingCard(id){
+ const d=ipaDB();const r=d?.ratings[id];if(!r)return'';
+ return `<button class="community-rating" data-rating-place="${id}"><div><span class="rating-score">${r.score.toFixed(1).replace('.',',')}</span><span>★★★★★</span></div><div><b>Dicas de quem foi com a gente</b><small>${r.count} avaliações · ${r.recommend}% recomendam</small></div><span>›</span></button>`;
+}
+function openPlaceCommunity(id){
+ const d=ipaDB();const r=d?.ratings[id];if(!r)return;
+ showModal(`<div class="community-place"><span class="eyebrow">Comunidade Indo por Aí</span><h2>${r.place}</h2><div class="community-score"><strong>${r.score.toFixed(1).replace('.',',')}</strong><span>★★★★★</span><small>${r.count} viajantes avaliaram</small></div><div class="guide-tip"><span>🎒</span><div><b>Dica do Guia</b><p>${r.guide}</p></div></div><h3>❤️ Dicas de quem foi com a gente</h3>${r.tips.slice(0,3).map(t=>`<div class="traveler-tip">“${t}”</div>`).join('')}<button class="btn btn-primary btn-block" data-rate-now="${id}">Avaliar este lugar</button></div>`);
+ setTimeout(()=>document.querySelectorAll('[data-rate-now]').forEach(btn=>btn.onclick=()=>ratePlace(btn.dataset.rateNow)),0);
+}
+function ratePlace(id){
+ const d=ipaDB();const r=d?.ratings[id];if(!r)return;
+ showModal(`<span class="eyebrow">Sua experiência</span><h2>Como foi ${r.place}?</h2><div class="star-picker">${[1,2,3,4,5].map(n=>`<button data-star="${n}">★</button>`).join('')}</div><textarea id="ratingTip" class="rating-text" placeholder="Deixe uma dica para os próximos viajantes..."></textarea><button id="saveRating" class="btn btn-primary btn-block" disabled>Publicar avaliação</button>`);
+ let chosen=0;
+ setTimeout(()=>{
+   const stars=[...document.querySelectorAll('[data-star]')],save=document.querySelector('#saveRating');
+   stars.forEach(s=>s.onclick=()=>{chosen=Number(s.dataset.star);stars.forEach(x=>x.classList.toggle('chosen',Number(x.dataset.star)<=chosen));save.disabled=false});
+   save.onclick=()=>{IPAData.addRating(id,chosen,document.querySelector('#ratingTip').value.trim());toast('Obrigado! Sua dica ajudará futuros viajantes.');modal.close();render()};
+ },0);
+}
+function plansSalesBlock(){
+ return `<section class="sales-plans">
+  <span class="eyebrow">Escolha como quer viajar</span>
+  <h2>Uma experiência para cada jeito de ir por aí.</h2>
+  <div class="sales-plan-grid">
+   <button class="sales-plan-card" data-open-plan="Explore">
+    <span>🌍</span><h3>Explore</h3><p>Roteiros configurados + acesso ao app.</p><small>Inclui álbum e filme</small><em>Ver tudo que inclui →</em>
+   </button>
+   <button class="sales-plan-card featured" data-open-plan="Signature">
+    <i>MAIS ESCOLHIDO</i><span>✨</span><h3>Signature</h3><p>Roteiros + suporte pré-embarque + hotéis e passagens.</p><small>Inclui álbum e filme</small><em>Ver tudo que inclui →</em>
+   </button>
+   <button class="sales-plan-card" data-open-plan="Elite">
+    <span>👑</span><h3>Elite</h3><p>Acesso full à plataforma e concierge.</p><small>Inclui álbum e filme</small><em>Ver tudo que inclui →</em>
+   </button>
+   <button class="sales-plan-card" data-open-plan="Groups">
+    <span>🚌</span><h3>Groups</h3><p>Excursões e grandes grupos com ferramentas exclusivas.</p><small>Inclui álbum e filme</small><em>Ver tudo que inclui →</em>
+   </button>
+  </div>
+ </section>`;
+}
+
+function openPlanDetails(plan){
+ const d=ipaDB();
+ const features=d?.plans?.[plan]||[];
+ const descriptions={
+   Explore:'Para quem gosta de viajar com autonomia, mas quer um roteiro organizado e uma experiência digital completa.',
+   Signature:'Para quem quer ajuda antes do embarque, incluindo organização, hotéis e passagens.',
+   Elite:'A experiência completa do Indo por Aí, com concierge e acesso aos recursos premium durante toda a viagem.',
+   Groups:'Pensado para excursões, famílias grandes, empresas e grupos que precisam de organização e comunicação centralizadas.'
+ };
+ const icons={Explore:'🌍',Signature:'✨',Elite:'👑',Groups:'🚌'};
+ showModal(`<div class="plan-detail-modal">
+   <div class="plan-detail-icon">${icons[plan]||'✈️'}</div>
+   <span class="eyebrow">Indo por Aí ${plan}</span>
+   <h2>${plan}</h2>
+   <p>${descriptions[plan]||''}</p>
+   <div class="plan-detail-list">${features.map((f,i)=>`<div><span>✓</span><b>${f}</b></div>`).join('')}</div>
+   <div class="plan-detail-footer">
+     <small>Álbum e filme da viagem estão incluídos em todos os planos.</small>
+     <button class="btn btn-primary btn-block" onclick="toast('Quero saber mais sobre o plano ${plan}');modal.close()">Quero este plano</button>
+   </div>
+  </div>`);
+}
+
+
+function brl(v){return new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(Number(v||0))}
+function paymentSummary(){
+ const d=ipaDB();if(!d)return'';
+ const total=d.payments.reduce((s,p)=>s+p.amount,0);
+ const paid=d.payments.filter(p=>p.status==='Pago').reduce((s,p)=>s+p.amount,0);
+ const pending=total-paid;
+ return {total,paid,pending};
+}
+function openPayment(id){
+ const d=ipaDB();const p=d?.payments.find(x=>x.id===id);if(!p)return;
+ if(p.status==='Pago'){
+   showModal(`<span class="eyebrow">Pagamento</span><h2>${p.title}</h2><div class="payment-paid-card"><span>✓</span><strong>Pagamento confirmado${p.paymentEnvironment==='test'?' (teste)':''}</strong><small>${brl(p.amount)} · ${p.paidAt||''}</small></div><p>${p.description}</p><button class="btn btn-light btn-block" onclick="toast('Comprovante disponível');modal.close()">Ver comprovante</button>`);
+   return;
+ }
+ showModal(`<div class="payment-modal"><span class="eyebrow">Pagamento disponível</span><h2>${p.title}</h2><p>${p.description}</p><div class="payment-amount">${brl(p.amount)}</div><small>Vencimento: ${new Date(p.dueDate+'T12:00:00').toLocaleDateString('pt-BR')}</small><div class="payment-methods"><button data-pay-method="pix:${p.id}"><span>◈</span><b>Pagar com Pix</b><small>Abra o app do seu banco</small></button><button data-pay-method="card:${p.id}"><span>💳</span><b>Pagar com cartão</b><small>Checkout seguro</small></button></div><p class="payment-safe">🔒 Os dados do cartão não ficam armazenados no Indo por Aí.</p></div>`);
+ setTimeout(()=>document.querySelectorAll('[data-pay-method]').forEach(btn=>btn.onclick=()=>simulatePayment(btn.dataset.payMethod)),0);
+}
+function simulatePayment(payload){
+ const [method,id]=payload.split(':');
+ const d=ipaDB();
+ const p=d?.payments.find(x=>x.id===id);
+ if(!p)return;
+
+ if(method==='pix'){
+   createMercadoPagoPix(p);
+   return;
+ }
+
+ showModal(`<span class="eyebrow">Checkout seguro</span><h2>${brl(p.amount)}</h2>
+   <div class="payment-test-badge">AMBIENTE DE TESTE</div>
+   <div class="fake-checkout">
+    <label>Nome no cartão<input value="Teste Mercado Pago"></label>
+    <label>Número do cartão<input value="•••• •••• •••• 4242"></label>
+    <div><label>Validade<input value="12/29"></label><label>CVV<input value="•••"></label></div>
+   </div>
+   <p class="payment-safe">Cartão real será conectado em uma próxima etapa.</p>`);
+}
+
+async function createMercadoPagoPix(payment){
+ showModal(`<div class="pix-real-loading"><span>◈</span><h2>Gerando Pix de teste...</h2><p>Conectando com o Mercado Pago de forma segura.</p></div>`);
+ try{
+   const response=await fetch('/api/pix/create',{
+     method:'POST',
+     headers:{'Content-Type':'application/json'},
+     body:JSON.stringify({
+       paymentId:payment.id,
+       requestedAmount:Number(payment.amount||0)
+     })
+   });
+   const result=await response.json().catch(()=>({}));
+   if(!response.ok||!result.ok){
+     throw new Error(result?.error||result?.details?.message||`Erro ${response.status}`);
+   }
+
+   IPAData.updatePayment(payment.id,{
+     mpOrderId:result.orderId,
+     mpPaymentId:result.paymentId,
+     mpStatus:result.paymentStatus||result.orderStatus,
+     paymentEnvironment:'test'
+   });
+
+   showPixResult(payment,result);
+ }catch(err){
+   console.error('Mercado Pago PIX',err);
+   showModal(`<span class="eyebrow">PIX · Mercado Pago</span><h2>Não conseguimos gerar o Pix</h2>
+     <div class="payment-error-box">${String(err?.message||err)}</div>
+     <p>Confira se a Beta 6.9 foi publicada depois da criação do Secret <b>MERCADO_PAGO_ACCESS_TOKEN</b>.</p>
+     <button class="btn btn-light btn-block" onclick="modal.close()">Fechar</button>`);
+ }
+}
+
+function showPixResult(payment,result){
+ const qrImage=result.qrCodeBase64
+   ? `<img class="pix-real-qr" alt="QR Code Pix" src="data:image/png;base64,${result.qrCodeBase64}">`
+   : `<div class="pix-real-qr-placeholder">PIX<br><small>QR indisponível no teste</small></div>`;
+
+ showModal(`<div class="pix-real-modal">
+   <span class="eyebrow">PIX · MERCADO PAGO</span>
+   <div class="payment-test-badge">AMBIENTE DE TESTE</div>
+   <h2>Pix criado com sucesso</h2>
+   <p class="pix-original-charge">Cobrança no Indo por Aí: <b>${brl(payment.amount)}</b></p>
+   <div class="pix-test-warning">O Mercado Pago exige <b>R$ 50,00</b> na compra Pix de teste. Nenhum valor real será movimentado.</div>
+   ${qrImage}
+   ${result.qrCode?`<label class="pix-copy-label">Pix Copia e Cola</label><div class="pix-copy-row"><textarea id="pixCopyCode" readonly>${result.qrCode}</textarea><button data-copy-pix>Copiar</button></div>`:''}
+   ${result.ticketUrl?`<button class="btn btn-primary btn-block" data-open-pix-ticket="${result.ticketUrl}">Abrir Pix de teste</button>`:''}
+   <button class="btn btn-light btn-block" data-check-pix="${payment.id}:${result.orderId}">Verificar pagamento</button>
+   <small class="pix-order-id">Order: ${result.orderId}</small>
+ </div>`);
+
+ setTimeout(()=>{
+   document.querySelectorAll('[data-copy-pix]').forEach(b=>b.onclick=async()=>{
+     const code=document.querySelector('#pixCopyCode')?.value||'';
+     try{await navigator.clipboard.writeText(code);toast('Pix copiado ✓')}
+     catch{toast('Selecione e copie o código')}
+   });
+   document.querySelectorAll('[data-open-pix-ticket]').forEach(b=>b.onclick=()=>window.open(b.dataset.openPixTicket,'_blank'));
+   document.querySelectorAll('[data-check-pix]').forEach(b=>b.onclick=()=>{
+     const [paymentId,orderId]=b.dataset.checkPix.split(':');
+     checkMercadoPagoPix(paymentId,orderId,b);
+   });
+ },0);
+}
+
+async function checkMercadoPagoPix(paymentId,orderId,button){
+ const original=button.textContent;
+ button.disabled=true;button.textContent='Consultando...';
+ try{
+   const response=await fetch(`/api/pix/status?orderId=${encodeURIComponent(orderId)}`,{cache:'no-store'});
+   const result=await response.json().catch(()=>({}));
+   if(!response.ok||!result.ok)throw new Error(result?.error||`Erro ${response.status}`);
+
+   const status=String(result.paymentStatus||result.orderStatus||'').toLowerCase();
+   const detail=String(result.paymentStatusDetail||result.orderStatusDetail||'').toLowerCase();
+
+   IPAData.updatePayment(paymentId,{
+     mpStatus:status,
+     mpStatusDetail:detail
+   });
+
+   if(['approved','processed','paid'].includes(status)){
+     IPAData.updatePayment(paymentId,{
+       status:'Pago',
+       paidAt:new Date().toISOString().slice(0,10),
+       paymentEnvironment:'test'
+     });
+     showPixStatusModal('approved',status,detail,orderId);
+     return;
+   }
+
+   if(['rejected','cancelled','canceled','expired','failed'].includes(status)){
+     showPixStatusModal('error',status,detail,orderId);
+     return;
+   }
+
+   showPixStatusModal('pending',status,detail,orderId);
+ }catch(err){
+   console.error(err);
+   showPixStatusModal('error','erro_consulta',String(err?.message||''),orderId);
+ }finally{
+   button.disabled=false;button.textContent=original;
+ }
+}
+
+function showPixStatusModal(kind,status,detail,orderId){
+ const isApproved=kind==='approved';
+ const isError=kind==='error';
+ const icon=isApproved?'✓':isError?'!':'⌛';
+ const title=isApproved?'Pagamento de teste aprovado':isError?'Não foi possível concluir a verificação':'Aguardando atualização do Mercado Pago';
+ const statusLabel=status||'sem status';
+ const detailLabel=detail||'sem detalhe';
+ const text=isApproved
+   ? 'O Mercado Pago retornou o pagamento como aprovado. A cobrança foi marcada como paga apenas no ambiente de teste.'
+   : isError
+     ? 'A consulta retornou erro, recusa ou expiração. Nenhum pagamento real foi realizado.'
+     : 'A Order existe e está sendo consultada corretamente. No teste oficial de Pix, o Mercado Pago pode iniciar em action_required / waiting_transfer e depois atualizar automaticamente para aprovado. Não faça um Pix real para testar.';
+
+ showModal(`<div class="pix-status-card pix-status-${kind}">
+   <div class="pix-status-icon">${icon}</div>
+   <span class="eyebrow">PIX · MERCADO PAGO · TESTE</span>
+   <h2>${title}</h2>
+   <p>${text}</p>
+   <div class="pix-status-grid">
+     <div><small>Status</small><strong>${statusLabel}</strong></div>
+     <div><small>Detalhe</small><strong>${detailLabel}</strong></div>
+   </div>
+   ${!isApproved&&!isError?`<div class="pix-status-help">Você pode aguardar alguns instantes e consultar novamente. O teste é feito pela própria API do Mercado Pago.</div>`:''}
+   <small class="pix-order-id">Order: ${orderId}</small>
+   <button class="btn btn-light btn-block" onclick="modal.close();render()">Voltar</button>
+ </div>`);
+}
+function paymentsView(){
+ const d=ipaDB(),t=activeTrip();
+ const payments=(d.payments||[]).filter(p=>!t||p.tripId===t.id||(!p.tripId&&p.trip===t.name));
+ const total=payments.reduce((s,p)=>s+Number(p.amount||0),0);
+ const paid=payments.filter(p=>p.status==='Pago').reduce((s,p)=>s+Number(p.amount||0),0);
+ const pending=total-paid;
+ return `<section class="payments-hero"><span class="eyebrow">Minha Viagem</span><h1>Pagamentos</h1><p>${t?.name||'Sua viagem'} · acompanhe parcelas, extras e comprovantes.</p><div class="payment-summary-grid"><div><small>Contratado</small><strong>${brl(total)}</strong></div><div><small>Pago</small><strong>${brl(paid)}</strong></div><div><small>Em aberto</small><strong>${brl(pending)}</strong></div></div></section>
+ <section class="section"><div class="section-head"><h2>Suas cobranças</h2><span class="chip">${payments.length} lançamento(s)</span></div><div class="payment-list">${payments.map(p=>`<button class="payment-row" data-payment="${p.id}"><div class="payment-status ${p.status==='Pago'?'paid':'pending'}">${p.status==='Pago'?'✓':'!'}</div><div><span class="eyebrow">${p.trip||t?.name||''}</span><h3>${p.title}</h3><p>${p.description}</p><small>Vencimento ${p.dueDate?new Date(p.dueDate+'T12:00:00').toLocaleDateString('pt-BR'):'-'}</small></div><div class="payment-row-value"><strong>${brl(p.amount)}</strong><span class="${p.status==='Pago'?'paid-text':'pending-text'}">${p.status}</span></div></button>`).join('')||'<div class="empty-payment-state"><span>💳</span><b>Nenhuma cobrança pendente</b><small>Quando o Indo por Aí enviar uma cobrança, ela aparecerá aqui.</small></div>'}</div></section>`;
+}
+
+function beforeView(){
+ const d=ipaDB(),t=activeTrip();
+ const country=tripCountry(t)||"sua próxima viagem",flag=countryFlag(country),dest=tripDestination(t);
+ const client=d?.clients?.[0]||d?.client||{};
+ const plan=t?.plan||d?.client?.plan||"Explore";
+ const firstDay=t?.itinerary?.[0];
+ return `<section class="v2-hero v2-before-hero">
+ <div class="v2-hero-top"><div><span class="eyebrow">Antes da viagem</span><h1>${dest} já está esperando por você. ${flag}</h1><p>${t?.published?'Sua experiência personalizada está publicada.':'Sua viagem está em preparação.'}</p></div><span class="v2-weather">✈️ ${country}</span></div>
+ <div class="v2-countdown"><div><strong>${t?.startDate?new Date(t.startDate+'T12:00:00').toLocaleDateString('pt-BR',{day:'2-digit'}):'--'}</strong><small>embarque</small></div><div><strong>${t?.itinerary?.length||0}</strong><small>dias de roteiro</small></div><div><strong>${plan}</strong><small>plano</small></div></div>
+ <button class="btn btn-primary btn-block" data-go="trip">Abrir meu roteiro</button>
+</section>
+${modeCard()}
+<section class="section"><div class="v2-plan-card"><div><span class="eyebrow">Seu plano contratado</span><h3>${plan}</h3><p>${t?.name||'Minha viagem'} · ${dest}, ${country} ${flag}</p></div><button class="btn btn-light" data-plan-details="true">Ver benefícios</button></div></section>
+${tripModule('itinerary')?`<section class="section"><div class="section-head"><div><span class="eyebrow">Seu roteiro</span><h2>${firstDay?firstDay.title:'Roteiro em preparação'}</h2></div><span class="chip">${t?.itinerary?.length||0} dias</span></div>${firstDay?`<div class="client-itinerary-preview">${normalizedPlaces(firstDay).slice(0,4).map((p,i)=>`<div><span>${i+1}</span><div><b>${p.name}</b><small>${p.time||p.address||'Programado no roteiro'}</small></div></div>`).join('')}</div>`:'<p>O Indo por Aí está preparando seus dias.</p>'}</section>`:''}
+${tripModule('payments')?`<section class="section"><button class="payment-alert-card" data-go="payments"><div class="payment-alert-icon">💳</div><div><span class="eyebrow">Pagamentos</span><h3>Acompanhe sua viagem</h3><p>${(d?.payments||[]).filter(p=>p.status!=='Pago'&&(!t||p.tripId===t.id||(!p.tripId&&p.trip===t.name))).length} cobrança(s) em aberto</p></div><span>›</span></button></section>`:''}
+<section class="section"><div class="section-head"><div><span class="eyebrow">Sua jornada até o embarque</span><h2>Preparação da viagem</h2></div></div>
+ <div class="v2-journey">
+  ${tripModule('documents')?`<button class="v2-journey-step done" data-prep-section="documents"><span>✓</span><div><b>Documentos</b><small>Checklist necessário para ${country}</small></div></button>`:''}
+  ${tripModule('checkin')?`<button class="v2-journey-step active" data-prep-section="checkin"><span>✓</span><div><b>Check-in</b><small>Acompanhe quando estiver disponível</small></div></button>`:''}
+  ${tripModule('luggage')?`<button class="v2-journey-step" data-prep-section="luggage"><span>🧳</span><div><b>Mala inteligente</b><small>Itens recomendados para ${country}</small></div></button>`:''}
+  ${tripModule('exchange')?`<button class="v2-journey-step" data-prep-section="exchange"><span>💱</span><div><b>Indo por Aí Exchange</b><small>Oferta personalizada</small></div></button>`:''}
+ </div>
+</section>
+${(tripModule('preboardingSupport')||tripModule('bookingSupport')||tripModule('exchange')||tripModule('community'))?`<section class="section"><div class="section-head"><div><span class="eyebrow">Serviços do seu pacote</span><h2>Incluídos na sua experiência</h2></div></div><div class="native-service-grid">${tripModule('preboardingSupport')?`<div><span>🧭</span><b>Suporte pré-embarque</b><small>Orientação antes da viagem</small></div>`:''}${tripModule('bookingSupport')?`<div><span>🏨</span><b>Hotel & passagens</b><small>Apoio nas compras e reservas</small></div>`:''}${tripModule('exchange')?`<div><span>💱</span><b>Exchange</b><small>Câmbio disponível no pacote</small></div>`:''}${tripModule('community')?`<div><span>💬</span><b>Comunidade</b><small>Comunicação durante a viagem</small></div>`:''}</div></section>`:''}
+${benefitsPersonalized()}`}
+
 function adminData(){const d=ipaDB()||{};d.clients=Array.isArray(d.clients)?d.clients:[];d.trips=Array.isArray(d.trips)?d.trips:[];d.payments=Array.isArray(d.payments)?d.payments:[];d.benefits=Array.isArray(d.benefits)?d.benefits:[];d.itineraryTemplates=Array.isArray(d.itineraryTemplates)?d.itineraryTemplates:[];return d}
 function adminMoney(v){return new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(Number(v||0))}
 function adminMetric(icon,label,value,sub=''){return `<div class="ipa-admin-metric"><span>${icon}</span><div><small>${label}</small><strong>${value}</strong><em>${sub}</em></div></div>`}
