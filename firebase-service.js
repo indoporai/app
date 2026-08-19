@@ -154,6 +154,46 @@ window.addEventListener("ipa-data-updated",event=>{
 });
 
 
+
+function readInviteContext(){
+  const direct=new URLSearchParams(window.location.search);
+  let clientId=direct.get("clientId")||"";
+  let tripId=direct.get("tripId")||"";
+
+  // O Firebase pode encapsular nossa URL em continueUrl.
+  // Isso acontece principalmente quando o link é aberto em outro aparelho.
+  const continueUrl=direct.get("continueUrl")||direct.get("continue_url")||"";
+  if(continueUrl){
+    try{
+      const decoded=decodeURIComponent(continueUrl);
+      const u=new URL(decoded);
+      clientId=clientId||u.searchParams.get("clientId")||"";
+      tripId=tripId||u.searchParams.get("tripId")||"";
+    }catch(e){ console.warn("continueUrl inválida",e); }
+  }
+
+  // Algumas variações de link trazem a URL encapsulada em "link".
+  const nestedLink=direct.get("link")||"";
+  if((!clientId||!tripId) && nestedLink){
+    try{
+      const u=new URL(decodeURIComponent(nestedLink));
+      const nestedContinue=u.searchParams.get("continueUrl")||"";
+      if(nestedContinue){
+        const cu=new URL(decodeURIComponent(nestedContinue));
+        clientId=clientId||cu.searchParams.get("clientId")||"";
+        tripId=tripId||cu.searchParams.get("tripId")||"";
+      }
+    }catch(e){}
+  }
+
+  clientId=clientId||localStorage.getItem("ipa-client-id-for-signin")||localStorage.getItem("ipa-active-client-id")||"";
+  tripId=tripId||localStorage.getItem("ipa-trip-id-for-signin")||localStorage.getItem("ipa-active-trip-id")||"";
+
+  if(clientId)localStorage.setItem("ipa-client-id-for-signin",clientId);
+  if(tripId)localStorage.setItem("ipa-trip-id-for-signin",tripId);
+  return {clientId,tripId};
+}
+
 async function loadClientExperience(){
   if(!currentUser || currentUser.uid===ADMIN_UID) return null;
   status="syncing";
@@ -161,7 +201,8 @@ async function loadClientExperience(){
 
   const normalizedEmail=(currentUser.email||"").trim().toLowerCase();
   const params=new URLSearchParams(window.location.search);
-  const invitedClientId=params.get("clientId")||localStorage.getItem("ipa-active-client-id")||"";
+  const inviteContext=readInviteContext();
+  const invitedClientId=inviteContext.clientId;
 
   let clientDoc=null;
 
@@ -215,7 +256,7 @@ async function loadClientExperience(){
   const requestedTripId=
     client.activeTripId
     ||client.lastInvitedTripId
-    ||params.get("tripId")
+    ||inviteContext.tripId
     ||localStorage.getItem("ipa-trip-id-for-signin")
     ||"";
 
@@ -272,6 +313,8 @@ async function loadClientExperience(){
   });
   const chosenTrip=trips[0]||null;
   const cloudData={
+    activeClientId:client.id,
+    activeTripId:chosenTrip?.id||"",
     clients:[client],
     client:{
       id:client.id,
@@ -388,6 +431,9 @@ window.IPAFirebase = {
   isEmailSignInLink(){ return isSignInWithEmailLink(auth,window.location.href); },
   async completeEmailLink(email){
     if(!isSignInWithEmailLink(auth,window.location.href)) return null;
+    const context=readInviteContext();
+    if(context.clientId)localStorage.setItem("ipa-client-id-for-signin",context.clientId);
+    if(context.tripId)localStorage.setItem("ipa-trip-id-for-signin",context.tripId);
     email=(email||localStorage.getItem("ipa-email-for-signin")||"").trim().toLowerCase();
     if(!email) throw new Error("Confirme o e-mail que recebeu o convite.");
     const user=(await signInWithEmailLink(auth,email,window.location.href)).user;

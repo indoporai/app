@@ -1,3 +1,34 @@
+
+const IPA_PLAN_PRESETS = {
+  Explore:{
+    itinerary:true, documents:false, luggage:false, checkin:false,
+    preboardingSupport:false, bookingSupport:false, exchange:false,
+    payments:true, community:false, live:false,
+    album:true, movie:true, passport:false, groupManagement:false
+  },
+  Signature:{
+    itinerary:true, documents:true, luggage:true, checkin:true,
+    preboardingSupport:true, bookingSupport:true, exchange:false,
+    payments:true, community:false, live:false,
+    album:true, movie:true, passport:false, groupManagement:false
+  },
+  Elite:{
+    itinerary:true, documents:true, luggage:true, checkin:true,
+    preboardingSupport:true, bookingSupport:true, exchange:true,
+    payments:true, community:true, live:true,
+    album:true, movie:true, passport:true, groupManagement:false
+  },
+  Groups:{
+    itinerary:true, documents:true, luggage:true, checkin:true,
+    preboardingSupport:true, bookingSupport:true, exchange:false,
+    payments:true, community:true, live:true,
+    album:true, movie:true, passport:true, groupManagement:true
+  }
+};
+function ipaPlanModules(plan){
+  return {...(IPA_PLAN_PRESETS[plan]||IPA_PLAN_PRESETS.Explore)};
+}
+
 const IPA_DEFAULT_DATA = {
   client:{id:"demo-renato",name:"Renato",plan:"Signature",trip:"Portugal 2026"},
   plans:{
@@ -110,7 +141,8 @@ window.IPAData={
  updatePayment(id,patch){const d=readData();const p=d.payments.find(x=>x.id===id);if(p)Object.assign(p,patch);writeData(d);return p},
  createClient(client){const d=readData();client.id=client.id||("cli-"+Date.now());client.status=client.status||"Ativo";d.clients=d.clients||[];d.clients.push(client);writeData(d);return client},
  updateClientById(id,patch){const d=readData();const c=(d.clients||[]).find(x=>x.id===id);if(c)Object.assign(c,patch);writeData(d);return c},
- createTrip(trip){const d=readData();trip.id=trip.id||("trip-"+Date.now());trip.status=trip.status||"Em preparação";trip.published=false;trip.country=trip.country||"";trip.modules=trip.modules||{itinerary:true,documents:true,luggage:true,checkin:true,exchange:false,payments:true,community:false,live:false,album:true,movie:true,passport:true};trip.itinerary=trip.itinerary||[];d.trips=d.trips||[];d.trips.push(trip);writeData(d);return trip},
+ createTrip(trip){const d=readData();trip.id=trip.id||("trip-"+Date.now());trip.status=trip.status||"Em preparação";trip.published=false;trip.country=trip.country||"";trip.plan=trip.plan||"Explore";trip.modules=trip.modules||ipaPlanModules(trip.plan);trip.itinerary=trip.itinerary||[];d.trips=d.trips||[];d.trips.push(trip);writeData(d);return trip},
+ applyPlanPreset(id,plan){const d=readData();const t=(d.trips||[]).find(x=>x.id===id);if(!t)return null;t.plan=plan;t.modules=ipaPlanModules(plan);writeData(d);return t},
  updateTrip(id,patch){const d=readData();const t=(d.trips||[]).find(x=>x.id===id);if(t)Object.assign(t,patch);writeData(d);return t},
  toggleTripModule(tripId,module,enabled){const d=readData();const t=(d.trips||[]).find(x=>x.id===tripId);if(t){t.modules=t.modules||{};t.modules[module]=enabled}writeData(d);return t},
  publishTrip(id,published=true){return this.updateTrip(id,{published,status:published?"Publicado":"Em preparação"})},
