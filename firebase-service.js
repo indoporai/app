@@ -408,8 +408,21 @@ window.IPAFirebase = {
     status="signing-in";
     lastError="";
     notify();
-    const credential = await signInWithEmailAndPassword(auth,email,password);
-    return credential.user;
+    try{
+      const credential = await signInWithEmailAndPassword(auth,email,password);
+      // Não espere o bootstrap do Firestore para liberar a tela do ADM.
+      // O onAuthStateChanged continuará a sincronização em seguida.
+      currentUser=credential.user;
+      status=currentUser.uid===ADMIN_UID ? "syncing" : "connecting";
+      notify("ipa-firebase-ready");
+      return credential.user;
+    }catch(err){
+      currentUser=null;
+      status="signed-out";
+      lastError=err?.message||String(err);
+      notify("ipa-firebase-ready");
+      throw err;
+    }
   },
   async logout(){
     await signOut(auth);
