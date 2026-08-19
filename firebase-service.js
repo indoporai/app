@@ -407,20 +407,36 @@ window.IPAFirebase = {
   async login(email,password){
     status="signing-in";
     lastError="";
-    notify();
+    // IMPORTANTE: não dispara notify() aqui.
+    // O notify anterior fazia o app re-renderizar o formulário no meio do login,
+    // recriando o botão "Entrando..." e causando o looping visual.
     try{
       const credential = await signInWithEmailAndPassword(auth,email,password);
-      // Não espere o bootstrap do Firestore para liberar a tela do ADM.
-      // O onAuthStateChanged continuará a sincronização em seguida.
       currentUser=credential.user;
-      status=currentUser.uid===ADMIN_UID ? "syncing" : "connecting";
-      notify("ipa-firebase-ready");
+
+      if(currentUser.uid!==ADMIN_UID){
+        await signOut(auth);
+        currentUser=null;
+        status="unauthorized";
+        lastError="Este usuário não é o administrador autorizado.";
+        notify("ipa-firebase-ready");
+        throw new Error(lastError);
+      }
+
+      // Libera o painel imediatamente.
+      status="connected";
+      lastError="";
+      notify("ipa-admin-login-success");
+
+      // A sincronização completa continua pelo onAuthStateChanged.
       return credential.user;
     }catch(err){
-      currentUser=null;
-      status="signed-out";
-      lastError=err?.message||String(err);
-      notify("ipa-firebase-ready");
+      if(status!=="unauthorized"){
+        currentUser=null;
+        status="signed-out";
+        lastError=err?.message||String(err);
+        notify("ipa-admin-login-error");
+      }
       throw err;
     }
   },

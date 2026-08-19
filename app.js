@@ -342,8 +342,33 @@ function bind(){
    const password=document.querySelector('#firebaseAdminPassword')?.value||'';
    if(!email||!password){toast('Informe e-mail e senha');return}
    firebaseLogin.disabled=true;firebaseLogin.textContent='Entrando...';
-   try{await window.IPAFirebase.login(email,password)}
-   catch(err){toast(err?.message||'Não foi possível entrar');firebaseLogin.disabled=false;firebaseLogin.textContent='Entrar no ADM'}
+
+   // Proteção visual: nunca deixa o botão preso indefinidamente.
+   const watchdog=setTimeout(()=>{
+     const btn=document.querySelector('#firebaseAdminLogin');
+     if(btn){btn.disabled=false;btn.textContent='Entrar no ADM'}
+   },12000);
+
+   try{
+     const user=await window.IPAFirebase.login(email,password);
+     clearTimeout(watchdog);
+
+     if(!user || user.uid!=='5dlGX6JlrUQHyjFWSHB9Dye0r1E3'){
+       throw new Error('Usuário administrador não autorizado.');
+     }
+
+     state.profile='admin';
+     state.route='admin';
+     state.scenarioChosen=true;
+     document.body.classList.add('hidden-nav');
+     render();
+     toast('ADM conectado ✓');
+   }catch(err){
+     clearTimeout(watchdog);
+     toast(err?.message||'Não foi possível entrar');
+     const btn=document.querySelector('#firebaseAdminLogin');
+     if(btn){btn.disabled=false;btn.textContent='Entrar no ADM'}
+   }
  };
  document.querySelectorAll('[data-firebase-logout]').forEach(b=>b.onclick=async()=>{await window.IPAFirebase.logout();render()});
  document.querySelectorAll('[data-firebase-sync]').forEach(b=>b.onclick=async()=>{toast('Sincronizando com Firebase...');try{await window.IPAFirebase.syncNow();toast('Firebase sincronizado')}catch(e){toast(e.message||'Erro ao sincronizar')}});
@@ -678,6 +703,16 @@ window.addEventListener('ipa-client-experience-ready',()=>{
    document.body.classList.remove('hidden-nav');
    render();
  }
+});
+window.addEventListener('ipa-admin-login-success',()=>{
+  state.profile='admin';
+  state.route='admin';
+  state.scenarioChosen=true;
+  document.body.classList.add('hidden-nav');
+  render();
+});
+window.addEventListener('ipa-admin-login-error',()=>{
+  if(state.profile==='admin'||state.route==='admin')render();
 });
 window.addEventListener('ipa-firebase-service-loaded',()=>{if(state.profile==='admin'||state.route==='admin')render()});
 window.addEventListener('ipa-firebase-ready',()=>{
