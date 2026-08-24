@@ -130,9 +130,40 @@ async function getPixStatus(url, env) {
   });
 }
 
+
+async function dailyFetch(env,path,init={}){
+  const key=env.DAILY_API_KEY;
+  if(!key)return {ok:false,response:json({ok:false,error:"DAILY_API_KEY não configurada no Cloudflare."},500)};
+  const r=await fetch(`https://api.daily.co/v1${path}`,{...init,headers:{"authorization":`Bearer ${key}`,"content-type":"application/json",...(init.headers||{})}});
+  let body={};try{body=await r.json()}catch{}
+  if(!r.ok)return {ok:false,response:json({ok:false,error:body?.info||body?.error||"Erro Daily",details:body},r.status)};
+  return {ok:true,body};
+}
+async function createLiveRoom(env){
+ const now=Math.floor(Date.now()/1000),exp=now+7200,name=`indo-por-ai-${Date.now()}`;
+ const rr=await dailyFetch(env,"/rooms",{method:"POST",body:JSON.stringify({name,privacy:"private",properties:{exp,enable_chat:true,enable_prejoin_ui:true,max_participants:50}})});
+ if(!rr.ok)return rr.response;
+ const tr=await dailyFetch(env,"/meeting-tokens",{method:"POST",body:JSON.stringify({properties:{room_name:name,is_owner:true,user_name:"Indo por Aí",exp}})});
+ if(!tr.ok)return tr.response;
+ return json({ok:true,roomName:name,hostJoinUrl:`${rr.body.url}?t=${encodeURIComponent(tr.body.token)}`});
+}
+async function joinLiveRoom(request,env){
+ let b={};try{b=await request.json()}catch{return json({ok:false,error:"JSON inválido"},400)}
+ const name=String(b.roomName||"").trim(),viewer=String(b.viewerName||"Viajante").slice(0,50);
+ if(!name)return json({ok:false,error:"Código da transmissão obrigatório."},400);
+ const rr=await dailyFetch(env,`/rooms/${encodeURIComponent(name)}`,{method:"GET"});if(!rr.ok)return rr.response;
+ const exp=Math.min(rr.body?.config?.exp||Math.floor(Date.now()/1000)+3600,Math.floor(Date.now()/1000)+3600);
+ const tr=await dailyFetch(env,"/meeting-tokens",{method:"POST",body:JSON.stringify({properties:{room_name:name,is_owner:false,user_name:viewer,exp,start_video_off:true,start_audio_off:true}})});
+ if(!tr.ok)return tr.response;
+ return json({ok:true,viewerJoinUrl:`${rr.body.url}?t=${encodeURIComponent(tr.body.token)}`});
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+
+    if (url.pathname === "/api/live/create" && request.method === "POST") return createLiveRoom(env);
+    if (url.pathname === "/api/live/join" && request.method === "POST") return joinLiveRoom(request,env);
 
     if (url.pathname === "/api/pix/create" && request.method === "POST") {
       return createTestPix(request, env);

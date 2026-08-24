@@ -95,6 +95,23 @@ function bind(){
  document.querySelectorAll('[data-person]').forEach(b=>b.onclick=()=>toast(`Centralizando em ${b.dataset.person}`));
  document.querySelectorAll('[data-open-movie]').forEach(btn=>btn.onclick=()=>openTravelMovie());
  document.querySelectorAll('[data-open-album]').forEach(btn=>btn.onclick=()=>{state.route='memories';render();});
+
+ document.querySelectorAll('[data-journey-check]').forEach(btn=>btn.onclick=()=>{
+   const [tripId,dayNo,placeId]=btn.dataset.journeyCheck.split('|');
+   const d=ipaDB(),k=[tripId,dayNo,placeId].join(':'),current=d.journeyPlaces?.[k]||{};
+   IPAData.saveJourneyPlace(tripId,dayNo,placeId,{checked:!current.checked});
+   toast(!current.checked?'Check realizado ✓':'Check removido');render();
+ });
+ document.querySelectorAll('[data-journey-rate]').forEach(btn=>btn.onclick=()=>{
+   const [tripId,dayNo,placeId]=btn.dataset.journeyRate.split('|');
+   const placeName=decodeURIComponent(btn.dataset.placeName||'Local');
+   showJourneyRating(tripId,dayNo,placeId,placeName);
+ });
+ document.querySelectorAll('[data-memory-prompt]').forEach(btn=>btn.onclick=()=>{
+   localStorage.setItem('ipa-memory-prompt',btn.dataset.memoryPrompt||'Memória da viagem');
+   photoInput.click();
+ });
+
  document.querySelectorAll('[data-memory-day]').forEach(btn=>btn.onclick=()=>showMemoryDay(btn.dataset.memoryDay));
  document.querySelectorAll('[data-concierge]').forEach(btn=>btn.onclick=()=>openConcierge());
  document.querySelectorAll('[data-journey-step]').forEach(btn=>btn.onclick=()=>showJourneyStep(btn.dataset.journeyStep));
@@ -859,7 +876,7 @@ function adminTripEditor(id){
  const d=adminData(),t=d.trips.find(x=>x.id===id);if(!t)return adminTrips();
  adminTripId=id;
  const c=d.clients.find(x=>x.id===t.clientId);
- const labels={itinerary:'Roteiro',documents:'Documentos',luggage:'Mala inteligente',checkin:'Check-in',preboardingSupport:'Suporte pré-embarque',bookingSupport:'Hotel & passagens',exchange:'Câmbio / Exchange',payments:'Pagamentos',community:'Comunidade',live:'Live',album:'Álbum',movie:'Filme',passport:'Passaporte',groupManagement:'Gestão de grupos'};
+ const labels={itinerary:'Roteiro',documents:'Documentos',luggage:'Mala inteligente',checkin:'Check-in',preboardingSupport:'Suporte pré-embarque',bookingSupport:'Hotel & passagens',concierge:'Concierge',exchange:'Câmbio / Exchange',payments:'Pagamentos',community:'Comunidade',live:'Live',album:'Álbum',movie:'Filme',passport:'Passaporte',groupManagement:'Gestão de grupos'};
  const country=tripCountry(t),flag=countryFlag(country);
  return `<div class="ipa-admin-editor-head"><button data-admin-section="trips">← Viagens</button><div><span class="eyebrow">${c?.name||'CLIENTE'}</span><h1>${flag} ${t.name}</h1><p>${tripDestination(t)}, ${country}</p></div><button class="btn btn-light" data-client-preview="${t.id}" data-client-preview-client="${t.clientId}">👁 Ver como cliente</button></div>
  <section class="ipa-admin-panel"><div class="section-head"><div><span class="eyebrow">VIAGEM</span><h2>Destino e pacote</h2></div><b class="ipa-plan">${t.plan}</b></div>
@@ -942,24 +959,31 @@ function duringView(){
  state.tripDay=Number(day.day||1);
  const places=normalizedPlaces(day);
  const country=tripCountry(t),flag=countryFlag(country),route=googleMapsRouteUrl(day,t);
- return `<section class="hero during-personalized-hero"><span class="eyebrow">Durante a viagem</span><h1>${tripDestination(t)} ${flag}</h1><p>${t.name} · Dia ${day.day}${day.title?` · ${day.title}`:''}</p><div class="hero-actions">${route?`<button class="btn btn-light" data-external-route="${route}">Abrir rota</button>`:''}${tripModule('live')?`<button class="btn btn-primary" id="realLiveBtn">Entrar na Live</button>`:''}</div></section>
+ return `<section class="hero during-personalized-hero"><span class="eyebrow">Durante a viagem</span><h1>${tripDestination(t)} ${flag}</h1><p>${t.name} · Dia ${day.day}${day.title?` · ${day.title}`:''}</p><div class="hero-actions">${route?`<button class="btn btn-light" data-external-route="${route}">Abrir rota</button>`:''}${tripModule('concierge')?`<button class="btn btn-light" data-concierge>👑 Concierge</button>`:''}${tripModule('live')?`<button class="btn btn-primary" id="realLiveBtn">🔴 Live</button>`:''}</div></section>
  ${modeCard()}
- <section class="section"><div class="section-head"><div><span class="eyebrow">Roteiro real</span><h2>${day.title||`Dia ${day.day}`}</h2></div><span class="chip">${places.length} locais</span></div><div class="during-place-list">${places.map((p,i)=>`<div class="during-place-card"><div class="during-place-number">${i+1}</div><div><small>${p.time||'Horário livre'}</small><b>${p.name}</b><p>${p.address||p.note||'Programado no roteiro'}</p><div class="during-place-actions"><button data-map="${(p.address||p.name)+', '+country}">Mapa</button><button>✓ Check</button><button>★ Avaliar</button></div></div></div>`).join('')||'<p>Nenhum local cadastrado para este dia.</p>'}</div></section>
+ <section class="section"><div class="section-head"><div><span class="eyebrow">Roteiro real</span><h2>${day.title||`Dia ${day.day}`}</h2></div><span class="chip">${places.length} locais</span></div><div class="during-place-list">${places.map((p,i)=>`<div class="during-place-card"><div class="during-place-number">${i+1}</div><div><small>${p.time||'Horário livre'}</small><b>${p.name}</b><p>${p.address||p.note||'Programado no roteiro'}</p><div class="during-place-actions"><button data-map="${(p.address||p.name)+', '+country}">Mapa</button><button class="${(ipaDB().journeyPlaces?.[[t.id,day.day,p.id||i].join(':')]?.checked)?'checked':''}" data-journey-check="${t.id}|${day.day}|${p.id||i}">${(ipaDB().journeyPlaces?.[[t.id,day.day,p.id||i].join(':')]?.checked)?'✓ Feito':'✓ Check'}</button><button data-journey-rate="${t.id}|${day.day}|${p.id||i}" data-place-name="${encodeURIComponent(p.name)}">★ Avaliar</button></div></div></div>`).join('')||'<p>Nenhum local cadastrado para este dia.</p>'}</div></section>
  <section class="section"><div class="section-head"><h2>Dias da viagem</h2></div><div class="day-strip">${days.map(x=>`<button class="day-pill ${Number(x.day)===Number(day.day)?'active':''}" data-day="${x.day}"><small>Dia</small><strong>${x.day}</strong></button>`).join('')}</div></section>`;
 }
 function afterView(){
- const t=activeTrip();
- if(!t)return `<section class="section"><h2>Viagem não encontrada</h2></section>`;
+ const t=activeTrip();if(!t)return `<section class="section"><h2>Viagem não encontrada</h2></section>`;
  const days=(t.itinerary||[]).sort((a,b)=>Number(a.day)-Number(b.day));
- const allPlaces=days.flatMap(day=>normalizedPlaces(day));
  const country=tripCountry(t),flag=countryFlag(country);
- return `<section class="hero after-personalized-hero"><span class="eyebrow">Depois da viagem</span><h1>${t.name} ${flag}</h1><p>${tripDestination(t)}, ${country} · suas memórias em um só lugar.</p></section>
+ const memories=(ipaDB().memories||[]).filter(m=>m.tripId===t.id);
+ const prompts=[
+  ['🥂','Hora do brinde','Registre o brinde da viagem'],
+  ['👨‍👩‍👧','Nossa turma','Uma foto de quem está vivendo isso com você'],
+  ['🍽️','Sabor inesquecível','Fotografe o prato ou bebida que marcou o dia'],
+  ['🌅','A vista do dia','Guarde a paisagem que você não quer esquecer'],
+  ['😂','Momento espontâneo','Aquela foto que ninguém planejou'],
+  ['❤️','Meu momento favorito','Escolha uma lembrança especial']
+ ];
+ return `<section class="hero after-personalized-hero"><span class="eyebrow">Memórias · sendo criadas agora</span><h1>${t.name} ${flag}</h1><p>Você não precisa esperar a viagem acabar. Fotos, vídeos, checks e avaliações já começam a construir sua história.</p><div class="hero-actions"><button class="btn btn-primary" id="addPhoto">+ Foto ou vídeo</button></div></section>
  ${modeCard()}
- <section class="section"><div class="after-stats-grid"><div><strong>${days.length}</strong><small>dias</small></div><div><strong>${allPlaces.length}</strong><small>lugares</small></div><div><strong>${t.plan}</strong><small>pacote</small></div><div><strong>${flag}</strong><small>${country}</small></div></div></section>
- ${tripModule('album')?`<section class="section"><button class="memory-feature-card" data-open-album="true"><span>📸</span><div><span class="eyebrow">Álbum da viagem</span><h3>${t.name}</h3><p>Organizado pelos dias do seu roteiro.</p></div><b>›</b></button></section>`:''}
- ${tripModule('movie')?`<section class="section"><button class="memory-feature-card" data-open-movie="true"><span>🎬</span><div><span class="eyebrow">Filme da viagem</span><h3>Reviva ${tripDestination(t)}</h3><p>Uma retrospectiva dos seus melhores momentos.</p></div><b>›</b></button></section>`:''}
- <section class="section"><div class="section-head"><div><span class="eyebrow">Roteiro vivido</span><h2>Sua história por dia</h2></div></div><div class="after-days-list">${days.map(day=>`<div class="after-day-card"><div><strong>Dia ${day.day}</strong><span>${day.title||''}</span></div><small>${normalizedPlaces(day).length} locais</small></div>`).join('')||'<p>Roteiro não cadastrado.</p>'}</div></section>
- ${tripModule('passport')?`<section class="section"><div class="passport-card"><span>🛂</span><div><span class="eyebrow">Passaporte Indo por Aí</span><h3>${country}</h3><p>Mais uma experiência concluída.</p></div></div></section>`:''}`;
+ <section class="section"><div class="section-head"><div><span class="eyebrow">Inspirações</span><h2>Que memória vamos guardar?</h2></div></div><div class="memory-prompt-grid">${prompts.map(p=>`<button data-memory-prompt="${p[1]}"><span>${p[0]}</span><b>${p[1]}</b><small>${p[2]}</small></button>`).join('')}</div></section>
+ <section class="section"><div class="section-head"><div><span class="eyebrow">Sua história</span><h2>${memories.length?`${memories.length} memórias adicionadas`:'Comece seu álbum agora'}</h2></div></div><div class="live-memory-grid">${memories.map(m=>m.type==='video'?`<div class="live-memory"><video src="${m.src}" controls playsinline></video><b>${m.prompt||'Vídeo da viagem'}</b></div>`:`<div class="live-memory"><img src="${m.src}" alt="${m.prompt||'Memória'}"><b>${m.prompt||'Foto da viagem'}</b></div>`).join('')||`<div class="empty-memory"><span>✨</span><h3>Sua primeira memória está esperando</h3><p>Escolha uma sugestão acima ou envie uma foto/vídeo.</p></div>`}</div></section>
+ <section class="section"><div class="after-stats-grid"><div><strong>${days.length}</strong><small>dias</small></div><div><strong>${days.flatMap(d=>normalizedPlaces(d)).length}</strong><small>lugares</small></div><div><strong>${memories.filter(m=>m.type==='image').length}</strong><small>fotos</small></div><div><strong>${memories.filter(m=>m.type==='video').length}</strong><small>vídeos</small></div></div></section>
+ ${tripModule('movie')?`<section class="section"><div class="memory-building-card"><span>🎬</span><div><b>Seu filme está sendo montado</b><p>As memórias adicionadas durante a viagem serão a matéria-prima da retrospectiva.</p></div></div></section>`:''}
+ ${tripModule('passport')?`<section class="section"><div class="passport-card"><span>🛂</span><div><span class="eyebrow">Passaporte Indo por Aí</span><h3>${country}</h3><p>Experiência em andamento.</p></div></div></section>`:''}`;
 }
 function modeCard(){return `<section class="section"><div class="card mode-card"><span class="eyebrow">Simular momento da jornada</span><h2>${state.mode==='before'?'Preparando sua viagem':state.mode==='during'?'Vivendo sua viagem':'Reviva suas melhores memórias'}</h2><div class="mode-switch"><button type="button" data-mode="before" class="${state.mode==='before'?'active':''}">Antes</button><button type="button" data-mode="during" class="${state.mode==='during'?'active':''}">Durante</button><button type="button" data-mode="after" class="${state.mode==='after'?'active':''}">Depois</button></div></div></section>`}
 function tripView(){
@@ -1019,7 +1043,19 @@ function submitLead(e){e.preventDefault();state.leadStage='sent';toast('Solicita
 function toggleLive(){state.live=!state.live;state.route='community';if(state.live){state.liveSeconds=0;state.liveTimer=setInterval(()=>{state.liveSeconds++;const badge=document.querySelector('.live-badge');if(badge)badge.textContent=`● AO VIVO · ${timeFmt(state.liveSeconds)}`},1000)}else{clearInterval(state.liveTimer);state.liveTimer=null}toast(state.live?'Transmissão iniciada para o grupo':'Transmissão encerrada');render()}
 function addReaction(emoji){state.reactions++;const host=document.querySelector('#liveReactions');if(host){const el=document.createElement('div');el.className='reaction-float';el.textContent=emoji;host.appendChild(el);setTimeout(()=>el.remove(),2400)}toast(`${emoji} reação enviada`)}
 function sendMessage(){const input=document.querySelector('#messageInput');if(!input||!input.value.trim())return;state.messages.push({type:'me',name:'Você',text:input.value.trim(),time:new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})});render()}
-function handlePhotos(e){[...e.target.files].slice(0,8).forEach(file=>{const r=new FileReader();r.onload=()=>{state.photos.push(r.result);localStorage.setItem('ipa_beta06_photos',JSON.stringify(state.photos));state.route='memories';render()};r.readAsDataURL(file)})}
+function handlePhotos(e){
+ const t=activeTrip(),prompt=localStorage.getItem('ipa-memory-prompt')||'Memória da viagem';
+ [...e.target.files].slice(0,8).forEach(file=>{
+   const r=new FileReader();
+   r.onload=()=>{
+     const type=file.type.startsWith('video/')?'video':'image';
+     IPAData.addMemory({tripId:t?.id||'',clientId:t?.clientId||'',prompt,type,src:r.result,name:file.name});
+     state.mode='after';state.route='today';localStorage.removeItem('ipa-memory-prompt');render();
+   };
+   r.readAsDataURL(file);
+ });
+ e.target.value='';
+}
 function showModal(html){modalContent.innerHTML=html;modal.showModal();setTimeout(()=>{modalContent.querySelectorAll('[data-map]').forEach(b=>b.onclick=()=>window.open('https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(b.dataset.map),'_blank'));modalContent.querySelectorAll('[data-profile]').forEach(b=>b.onclick=()=>{modal.close();setProfile(b.dataset.profile)})},0)}
 function showInitialScenario(){
  document.body.classList.add('hidden-nav');
@@ -1145,9 +1181,14 @@ function showMemoryDay(title){
 }
 
 
+function showJourneyRating(tripId,dayNo,placeId,placeName){
+ showModal(`<span class="eyebrow">Sua experiência</span><h2>Como foi ${placeName}?</h2><div class="star-picker">${[1,2,3,4,5].map(n=>`<button data-journey-star="${n}">★</button>`).join('')}</div><textarea id="journeyRatingNote" class="rating-text" placeholder="Conte em poucas palavras..."></textarea><button id="saveJourneyRating" class="btn btn-primary btn-block" disabled>Salvar avaliação</button>`);
+ setTimeout(()=>{let chosen=0;const stars=[...document.querySelectorAll('[data-journey-star]')],save=document.querySelector('#saveJourneyRating');stars.forEach(b=>b.onclick=()=>{chosen=Number(b.dataset.journeyStar);stars.forEach(x=>x.classList.toggle('selected',Number(x.dataset.journeyStar)<=chosen));save.disabled=false});save.onclick=()=>{IPAData.saveJourneyPlace(tripId,dayNo,placeId,{rating:chosen,note:document.querySelector('#journeyRatingNote').value.trim()});toast('Avaliação salva ✓');modal.close();render()};},0);
+}
 function openConcierge(){
- showModal(`<div class="v2-concierge"><span class="eyebrow">Seu Concierge</span><h2>Como posso ajudar agora?</h2><p>Escolha uma necessidade para receber uma sugestão contextualizada.</p><div class="v2-concierge-grid"><button data-concierge-choice="lunch">🍽️ Onde almoço?</button><button data-concierge-choice="next">📅 Próximo passeio</button><button data-concierge-choice="transport">🚕 Preciso de transporte</button><button data-concierge-choice="pharmacy">💊 Farmácia próxima</button></div><label>Ou escreva sua pergunta</label><input class="v2-concierge-input" placeholder="Ex.: onde encontro um banheiro?"><button class="btn btn-primary btn-block" onclick="toast('Pergunta enviada ao concierge');modal.close()">Enviar pergunta</button></div>`);
- setTimeout(()=>document.querySelectorAll('[data-concierge-choice]').forEach(btn=>btn.onclick=()=>showConciergeResult(btn.dataset.conciergeChoice)),0);
+ const t=activeTrip();
+ showModal(`<div class="v2-concierge"><span class="eyebrow">Concierge Elite</span><h2>O que você precisa?</h2><p>Envie um pedido para a equipe Indo por Aí cuidar durante a viagem.</p><div class="v2-concierge-grid"><button data-concierge-type="Restaurante">🍽️ Reserva de restaurante</button><button data-concierge-type="Ingresso">🎟️ Comprar ingresso</button><button data-concierge-type="Compra">🛍️ Comprar item</button><button data-concierge-type="Transporte">🚕 Transporte</button><button data-concierge-type="Experiência">✨ Experiência</button><button data-concierge-type="Outro">💬 Outro pedido</button></div><label>Detalhes do pedido</label><textarea id="conciergeRequestText" class="rating-text" placeholder="Ex.: jantar para 4 pessoas amanhã às 20h, perto do hotel..."></textarea><input type="hidden" id="conciergeRequestType" value="Outro"><button id="sendConciergeRequest" class="btn btn-primary btn-block">Enviar ao concierge</button></div>`);
+ setTimeout(()=>{document.querySelectorAll('[data-concierge-type]').forEach(b=>b.onclick=()=>{document.querySelector('#conciergeRequestType').value=b.dataset.conciergeType;document.querySelectorAll('[data-concierge-type]').forEach(x=>x.classList.toggle('selected',x===b))});document.querySelector('#sendConciergeRequest').onclick=()=>{const text=document.querySelector('#conciergeRequestText').value.trim();if(!text){toast('Conte o que você precisa');return}IPAData.createConciergeRequest({tripId:t?.id||'',clientId:t?.clientId||'',type:document.querySelector('#conciergeRequestType').value,text});toast('Pedido enviado ao concierge ✓');modal.close()};},0);
 }
 function showConciergeResult(choice){
  const options={

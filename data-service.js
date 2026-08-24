@@ -2,25 +2,25 @@
 const IPA_PLAN_PRESETS = {
   Explore:{
     itinerary:true, documents:false, luggage:false, checkin:false,
-    preboardingSupport:false, bookingSupport:false, exchange:false,
+    preboardingSupport:false, bookingSupport:false, exchange:false, concierge:false,
     payments:true, community:false, live:false,
     album:true, movie:true, passport:false, groupManagement:false
   },
   Signature:{
     itinerary:true, documents:true, luggage:true, checkin:true,
-    preboardingSupport:true, bookingSupport:true, exchange:false,
+    preboardingSupport:true, bookingSupport:true, exchange:false, concierge:false,
     payments:true, community:false, live:false,
     album:true, movie:true, passport:false, groupManagement:false
   },
   Elite:{
     itinerary:true, documents:true, luggage:true, checkin:true,
-    preboardingSupport:true, bookingSupport:true, exchange:true,
+    preboardingSupport:true, bookingSupport:true, exchange:true, concierge:true,
     payments:true, community:true, live:true,
     album:true, movie:true, passport:true, groupManagement:false
   },
   Groups:{
     itinerary:true, documents:true, luggage:true, checkin:true,
-    preboardingSupport:true, bookingSupport:true, exchange:false,
+    preboardingSupport:true, bookingSupport:true, exchange:false, concierge:false,
     payments:true, community:true, live:true,
     album:true, movie:true, passport:true, groupManagement:true
   }
@@ -137,6 +137,9 @@ window.IPAData={
  togglePrep(section,index){const d=readData();if(d.prep[section]?.[index])d.prep[section][index].done=!d.prep[section][index].done;writeData(d)},
  saveVisitReview(id,patch){const d=readData();if(!d.visitReviews)d.visitReviews={};d.visitReviews[id]={...(d.visitReviews[id]||{visited:false,stars:0,note:""}),...patch};writeData(d);return d.visitReviews[id]},
  addRating(id,stars,tip){const d=readData();const r=d.ratings[id];if(!r)return;const total=r.score*r.count+stars;r.count+=1;r.score=Math.round((total/r.count)*10)/10;if(tip)r.tips.unshift(tip);writeData(d)},
+ saveJourneyPlace(tripId,dayNo,placeId,patch){const d=readData();d.journeyPlaces=d.journeyPlaces||{};const k=[tripId,dayNo,placeId].join(":");d.journeyPlaces[k]={...(d.journeyPlaces[k]||{}),...patch,updatedAt:new Date().toISOString()};writeData(d);return d.journeyPlaces[k]},
+ addMemory(memory){const d=readData();d.memories=d.memories||[];memory.id=memory.id||("mem-"+Date.now()+"-"+Math.random().toString(36).slice(2,6));memory.createdAt=memory.createdAt||new Date().toISOString();d.memories.unshift(memory);writeData(d);return memory},
+ createConciergeRequest(req){const d=readData();d.conciergeRequests=d.conciergeRequests||[];req.id=req.id||("conc-"+Date.now());req.status=req.status||"Enviado";req.createdAt=new Date().toISOString();d.conciergeRequests.unshift(req);writeData(d);return req},
  createPayment(payment){const d=readData();payment.id=payment.id||("pay-"+Date.now());payment.status=payment.status||"Pendente";payment.createdAt=new Date().toISOString().slice(0,10);payment.paidAt=null;d.payments.unshift(payment);writeData(d);return payment},
  updatePayment(id,patch){const d=readData();const p=d.payments.find(x=>x.id===id);if(p)Object.assign(p,patch);writeData(d);return p},
  createClient(client){const d=readData();client.id=client.id||("cli-"+Date.now());client.status=client.status||"Ativo";d.clients=d.clients||[];d.clients.push(client);writeData(d);return client},
