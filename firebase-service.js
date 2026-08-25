@@ -22,6 +22,7 @@ import {
   where,
   limit
 } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-firestore.js";
+import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-storage.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyD_EYtJ3h_WDvga2eV8LKEiCpDaT8gSEiM",
@@ -38,6 +39,7 @@ const ADMIN_UID = "5dlGX6JlrUQHyjFWSHB9Dye0r1E3";
 const firebaseApp = initializeApp(firebaseConfig);
 const auth = getAuth(firebaseApp);
 const firestore = getFirestore(firebaseApp);
+const storage = getStorage(firebaseApp);
 
 await setPersistence(auth, browserLocalPersistence);
 
@@ -63,12 +65,17 @@ async function remoteHasData(){
 }
 
 async function pullAll(){
-  const [clients,trips,payments,benefits,itineraryTemplates] = await Promise.all([
+  const [clients,trips,payments,benefits,itineraryTemplates,paymentPlans,recommendations,tripDocuments,memories,conciergeRequests] = await Promise.all([
     readCollection("clients"),
     readCollection("trips"),
     readCollection("payments"),
     readCollection("benefits"),
-    readCollection("itineraryTemplates")
+    readCollection("itineraryTemplates"),
+    readCollection("paymentPlans"),
+    readCollection("recommendations"),
+    readCollection("tripDocuments"),
+    readCollection("memories"),
+    readCollection("conciergeRequests")
   ]);
 
   const settingsSnap = await getDoc(doc(firestore,"settings","main"));
@@ -80,7 +87,12 @@ async function pullAll(){
     trips,
     payments,
     benefits,
-    itineraryTemplates
+    itineraryTemplates,
+    paymentPlans,
+    recommendations,
+    tripDocuments,
+    memories,
+    conciergeRequests
   };
 
   if(window.IPAData?.replaceFromCloud){
@@ -108,7 +120,12 @@ async function syncAll(data){
       upsertCollection("trips",data.trips),
       upsertCollection("payments",data.payments),
       upsertCollection("benefits",data.benefits),
-      upsertCollection("itineraryTemplates",data.itineraryTemplates)
+      upsertCollection("itineraryTemplates",data.itineraryTemplates),
+      upsertCollection("paymentPlans",data.paymentPlans),
+      upsertCollection("recommendations",data.recommendations),
+      upsertCollection("tripDocuments",data.tripDocuments),
+      upsertCollection("memories",data.memories),
+      upsertCollection("conciergeRequests",data.conciergeRequests)
     ]);
 
     await setDoc(doc(firestore,"settings","main"),{
@@ -311,7 +328,15 @@ async function loadClientExperience(){
     }
   }
 
-  // Depois tenta activeTripId / último convite.
+  // Convite com tripId é estrito: nunca abre uma viagem antiga como fallback.
+  if(inviteContext.tripId && !chosenTrip){
+    status="client-no-trip";
+    lastError="O link desta viagem não é mais válido ou a viagem ainda não foi publicada.";
+    notify("ipa-client-experience-ready");
+    return null;
+  }
+
+  // Sem tripId no link (acesso geral), aí sim usa a viagem ativa.
   if(!chosenTrip){
     const fallbackId=client.activeTripId||client.lastInvitedTripId||"";
     if(fallbackId){
@@ -369,6 +394,11 @@ async function loadClientExperience(){
   try{benefits=await readCollection("benefits");}
   catch(e){console.warn("Benefícios indisponíveis",e);}
 
+  let memories=[],tripDocuments=[],recommendations=[];
+  try{const s=await getDocs(query(collection(firestore,"memories"),where("clientId","==",client.id)));memories=s.docs.map(d=>({id:d.id,...d.data()})).filter(x=>x.tripId===chosenTrip.id)}catch(e){}
+  try{const s=await getDocs(query(collection(firestore,"tripDocuments"),where("clientId","==",client.id)));tripDocuments=s.docs.map(d=>({id:d.id,...d.data()})).filter(x=>x.tripId===chosenTrip.id)}catch(e){}
+  try{const s=await getDocs(query(collection(firestore,"recommendations"),where("tripId","==",chosenTrip.id)));recommendations=s.docs.map(d=>({id:d.id,...d.data()}))}catch(e){}
+
   const cloudData={
     activeClientId:client.id,
     activeTripId:chosenTrip.id,
@@ -382,7 +412,10 @@ async function loadClientExperience(){
     },
     trips:[chosenTrip],
     payments,
-    benefits
+    benefits,
+    memories,
+    tripDocuments,
+    recommendations
   };
 
   if(window.IPAData?.replaceFromCloud)window.IPAData.replaceFromCloud(cloudData);
@@ -457,6 +490,21 @@ onAuthStateChanged(auth,async user=>{
 });
 
 window.IPAFirebase = {
+  async uploadMemory(file,clientId,tripId){
+    if(!currentUser)throw new Error("Faça login para enviar a memória.");
+    const safe=(file.name||"arquivo").replace(/[^a-zA-Z0-9._-]/g,"_");
+    const path=`memories/${clientId}/${tripId}/${Date.now()}-${safe}`;
+    const snap=await uploadBytes(storageRef(storage,path),file,{contentType:file.type||"application/octet-stream"});
+    return {url:await getDownloadURL(snap.ref),path};
+  },
+  async uploadTripDocument(file,clientId,tripId){
+    if(!currentUser || currentUser.uid!==ADMIN_UID)throw new Error("Somente o ADM pode enviar documentos.");
+    const safe=(file.name||"documento").replace(/[^a-zA-Z0-9._-]/g,"_");
+    const path=`documents/${clientId}/${tripId}/${Date.now()}-${safe}`;
+    const snap=await uploadBytes(storageRef(storage,path),file,{contentType:file.type||"application/octet-stream"});
+    return {url:await getDownloadURL(snap.ref),path};
+  },
+
   get user(){ return currentUser; },
   get status(){ return status; },
   get error(){ return lastError; },

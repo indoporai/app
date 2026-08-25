@@ -141,7 +141,7 @@ async function dailyFetch(env,path,init={}){
 }
 async function createLiveRoom(env){
  const now=Math.floor(Date.now()/1000),exp=now+7200,name=`indo-por-ai-${Date.now()}`;
- const rr=await dailyFetch(env,"/rooms",{method:"POST",body:JSON.stringify({name,privacy:"private",properties:{exp,enable_chat:true,enable_prejoin_ui:true,max_participants:50}})});
+ const rr=await dailyFetch(env,"/rooms",{method:"POST",body:JSON.stringify({name,privacy:"private",properties:{exp,enable_chat:true,enable_prejoin_ui:true}})});
  if(!rr.ok)return rr.response;
  const tr=await dailyFetch(env,"/meeting-tokens",{method:"POST",body:JSON.stringify({properties:{room_name:name,is_owner:true,user_name:"Indo por Aí",exp}})});
  if(!tr.ok)return tr.response;
@@ -158,10 +158,31 @@ async function joinLiveRoom(request,env){
  return json({ok:true,viewerJoinUrl:`${rr.body.url}?t=${encodeURIComponent(tr.body.token)}`});
 }
 
+
+async function googlePlaceSearch(request,env){
+  const key=env.GOOGLE_MAPS_API_KEY;
+  const u=new URL(request.url), q=(u.searchParams.get("q")||"").trim(), destination=(u.searchParams.get("destination")||"").trim();
+  if(q.length<2)return json({ok:true,places:[]});
+  if(!key)return json({ok:false,needsKey:true,error:"GOOGLE_MAPS_API_KEY não configurada",places:[]},200);
+  const text=[q,destination].filter(Boolean).join(", ");
+  const r=await fetch("https://places.googleapis.com/v1/places:searchText",{
+    method:"POST",
+    headers:{"Content-Type":"application/json","X-Goog-Api-Key":key,"X-Goog-FieldMask":"places.id,places.displayName,places.formattedAddress,places.googleMapsUri,places.primaryType,places.rating,places.userRatingCount"},
+    body:JSON.stringify({textQuery:text,languageCode:"pt-BR",maxResultCount:6})
+  });
+  const body=await r.json().catch(()=>({}));
+  if(!r.ok)return json({ok:false,error:body?.error?.message||"Erro Google Places",places:[]},r.status);
+  return json({ok:true,places:(body.places||[]).map(p=>({
+    id:p.id||"",name:p.displayName?.text||"",address:p.formattedAddress||"",mapsUrl:p.googleMapsUri||"",
+    category:p.primaryType||"",rating:p.rating||null,reviews:p.userRatingCount||0
+  }))});
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
 
+    if (url.pathname === "/api/places/search" && request.method === "GET") return googlePlaceSearch(request,env);
     if (url.pathname === "/api/live/create" && request.method === "POST") return createLiveRoom(env);
     if (url.pathname === "/api/live/join" && request.method === "POST") return joinLiveRoom(request,env);
 

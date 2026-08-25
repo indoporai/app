@@ -82,6 +82,12 @@ const IPA_DEFAULT_DATA = {
     {id:"tpl-lisboa-5",name:"Lisboa Essencial · 5 dias",destination:"Lisboa, Portugal",days:5,description:"Belém, Alfama, Baixa, Sintra e gastronomia."},
     {id:"tpl-paris-6",name:"Paris Clássica · 6 dias",destination:"Paris, França",days:6,description:"Principais ícones, bairros e experiências gastronômicas."}
   ],
+  paymentPlans:[],
+  recommendations:[],
+  tripDocuments:[],
+  memories:[],
+  journeyPlaces:{},
+  conciergeRequests:[],
   payments:[
     {id:"pay-001",trip:"Portugal 2026",title:"Parcela da viagem",description:"2ª parcela do pacote Signature",amount:1500,dueDate:"2026-08-15",status:"Pendente",methods:["PIX","Cartão"],createdAt:"2026-08-10",paidAt:null},
     {id:"pay-002",trip:"Portugal 2026",title:"Passeio Vale do Douro",description:"Experiência adicional",amount:450,dueDate:"2026-08-20",status:"Pago",methods:["PIX","Cartão"],createdAt:"2026-08-09",paidAt:"2026-08-09"},
@@ -140,6 +146,9 @@ window.IPAData={
  saveJourneyPlace(tripId,dayNo,placeId,patch){const d=readData();d.journeyPlaces=d.journeyPlaces||{};const k=[tripId,dayNo,placeId].join(":");d.journeyPlaces[k]={...(d.journeyPlaces[k]||{}),...patch,updatedAt:new Date().toISOString()};writeData(d);return d.journeyPlaces[k]},
  addMemory(memory){const d=readData();d.memories=d.memories||[];memory.id=memory.id||("mem-"+Date.now()+"-"+Math.random().toString(36).slice(2,6));memory.createdAt=memory.createdAt||new Date().toISOString();d.memories.unshift(memory);writeData(d);return memory},
  createConciergeRequest(req){const d=readData();d.conciergeRequests=d.conciergeRequests||[];req.id=req.id||("conc-"+Date.now());req.status=req.status||"Enviado";req.createdAt=new Date().toISOString();d.conciergeRequests.unshift(req);writeData(d);return req},
+ addRecommendation(rec){const d=readData();d.recommendations=d.recommendations||[];rec.id=rec.id||("rec-"+Date.now());rec.createdAt=new Date().toISOString();d.recommendations.unshift(rec);writeData(d);return rec},
+ createPaymentPlan(plan){const d=readData();d.paymentPlans=d.paymentPlans||[];plan.id=plan.id||("plan-"+Date.now());plan.installments=Math.max(1,Number(plan.installments)||1);plan.createdAt=new Date().toISOString();d.paymentPlans.unshift(plan);const total=Number(plan.totalAmount)||0;const base=Math.floor((total/plan.installments)*100)/100;const start=new Date((plan.firstDueDate||new Date().toISOString().slice(0,10))+"T12:00:00");for(let i=1;i<=plan.installments;i++){const due=new Date(start);due.setMonth(start.getMonth()+i-1);const amount=i===plan.installments?Math.round((total-base*(plan.installments-1))*100)/100:base;d.payments.unshift({id:"pay-"+Date.now()+"-"+i,paymentPlanId:plan.id,installmentNumber:i,installmentTotal:plan.installments,clientId:plan.clientId,clientName:plan.clientName,tripId:plan.tripId,trip:plan.trip,title:`${i}ª parcela · ${plan.title||"Viagem"}`,description:plan.description||"",amount,dueDate:due.toISOString().slice(0,10),methods:plan.methods||["PIX"],status:"Pendente",createdAt:new Date().toISOString().slice(0,10),paidAt:null})}writeData(d);return plan},
+ addTripDocument(docu){const d=readData();d.tripDocuments=d.tripDocuments||[];docu.id=docu.id||("doc-"+Date.now());docu.createdAt=new Date().toISOString();d.tripDocuments.unshift(docu);writeData(d);return docu},
  createPayment(payment){const d=readData();payment.id=payment.id||("pay-"+Date.now());payment.status=payment.status||"Pendente";payment.createdAt=new Date().toISOString().slice(0,10);payment.paidAt=null;d.payments.unshift(payment);writeData(d);return payment},
  updatePayment(id,patch){const d=readData();const p=d.payments.find(x=>x.id===id);if(p)Object.assign(p,patch);writeData(d);return p},
  createClient(client){const d=readData();client.id=client.id||("cli-"+Date.now());client.status=client.status||"Ativo";d.clients=d.clients||[];d.clients.push(client);writeData(d);return client},
@@ -155,7 +164,7 @@ window.IPAData={
    {day:3,title:"Gastronomia e cultura",places:["Mercado local","Restaurante recomendado"]}
  ]}writeData(d);return t},
  addItineraryDay(tripId,dayData){const d=readData();const t=(d.trips||[]).find(x=>x.id===tripId);if(!t)return null;t.itinerary=t.itinerary||[];const next=Math.max(0,...t.itinerary.map(x=>Number(x.day)||0))+1;t.itinerary.push({day:dayData.day||next,title:dayData.title||("Dia "+next),date:dayData.date||"",places:[]});writeData(d);return t},
- addItineraryPlace(tripId,dayNumber,place){const d=readData();const t=(d.trips||[]).find(x=>x.id===tripId);if(!t)return null;t.itinerary=t.itinerary||[];let day=t.itinerary.find(x=>Number(x.day)===Number(dayNumber));if(!day){day={day:Number(dayNumber),title:"Dia "+dayNumber,date:"",places:[]};t.itinerary.push(day)}day.places=day.places||[];day.places.push({id:place.id||("place-"+Date.now()),name:place.name||"Novo local",address:place.address||"",time:place.time||"",note:place.note||"",placeId:place.placeId||""});writeData(d);return t},
+ addItineraryPlace(tripId,dayNumber,place){const d=readData();const t=(d.trips||[]).find(x=>x.id===tripId);if(!t)return null;t.itinerary=t.itinerary||[];let day=t.itinerary.find(x=>Number(x.day)===Number(dayNumber));if(!day){day={day:Number(dayNumber),title:"Dia "+dayNumber,date:"",places:[]};t.itinerary.push(day)}day.places=day.places||[];day.places.push({id:place.id||("place-"+Date.now()),name:place.name||"Novo local",address:place.address||"",time:place.time||"",note:place.note||"",placeId:place.placeId||"",mapsUrl:place.mapsUrl||"",category:place.category||"Atração",smartTip:place.smartTip||"",networkRecommended:!!place.networkRecommended});writeData(d);return t},
  createItineraryTemplate(template){const d=readData();template.id=template.id||("tpl-"+Date.now());template.days=Number(template.days)||1;template.itinerary=template.itinerary||[];d.itineraryTemplates=d.itineraryTemplates||[];d.itineraryTemplates.push(template);writeData(d);return template},
  markPaymentPaid(id){const d=readData();const p=d.payments.find(x=>x.id===id);if(p){p.status="Pago";p.paidAt=new Date().toISOString().slice(0,10)}writeData(d);return p},
  replaceFromCloud(cloudData){const current=readData();const merged={...current,...cloudData};writeData(merged,"cloud");return merged}

@@ -107,6 +107,7 @@ function bind(){
    const placeName=decodeURIComponent(btn.dataset.placeName||'Local');
    showJourneyRating(tripId,dayNo,placeId,placeName);
  });
+ document.querySelectorAll('[data-memory-movie]').forEach(btn=>btn.onclick=()=>{const t=activeTrip(),m=(ipaDB().memories||[]).filter(x=>x.tripId===t?.id);showModal(`<span class="eyebrow">FILME DA VIAGEM</span><h2>${t?.name||'Sua viagem'}</h2><p>${m.length?`Selecionamos ${m.length} memórias para sua retrospectiva.`:'Adicione fotos e vídeos para criar a retrospectiva.'}</p><div class="movie-preview-strip">${m.slice(0,6).map(x=>x.type==='video'?`<video src="${x.src||x.url}" muted playsinline></video>`:`<img src="${x.src||x.url}">`).join('')}</div><small>A montagem automática completa será gerada a partir das memórias salvas.</small>`)});
  document.querySelectorAll('[data-memory-prompt]').forEach(btn=>btn.onclick=()=>{
    localStorage.setItem('ipa-memory-prompt',btn.dataset.memoryPrompt||'Memória da viagem');
    photoInput.click();
@@ -272,30 +273,17 @@ function bind(){
    }},0)
  });
  document.querySelectorAll('[data-admin-charge-trip]').forEach(b=>b.onclick=()=>{
-   const d=adminData();
-   const trip=d.trips.find(t=>t.id===b.dataset.adminChargeTrip);
-   const client=d.clients.find(c=>c.id===b.dataset.chargeClient);
+   const d=adminData(),trip=d.trips.find(t=>t.id===b.dataset.adminChargeTrip),client=d.clients.find(c=>c.id===b.dataset.chargeClient);
    if(!trip||!client){toast('Cliente ou viagem não encontrados');return}
-   showModal(`<span class="eyebrow">COBRANÇA · ${client.name}</span><h2>${trip.name}</h2>
-     <label>Título</label><input id="tripPayTitle" class="v2-concierge-input" value="Parcela da viagem">
-     <label>Descrição</label><input id="tripPayDescription" class="v2-concierge-input" placeholder="Ex.: Saldo do pacote ${trip.plan}">
-     <label>Valor</label><input id="tripPayAmount" type="number" min="0" step="0.01" class="v2-concierge-input">
-     <label>Vencimento</label><input id="tripPayDue" type="date" class="v2-concierge-input">
-     <div class="payment-method-checks"><label><input id="tripPayPix" type="checkbox" checked> Pix</label><label><input id="tripPayCard" type="checkbox" checked> Cartão</label></div>
-     <button id="saveTripCharge" class="btn btn-primary btn-block">Enviar cobrança</button>`);
-   setTimeout(()=>{document.querySelector('#saveTripCharge').onclick=async()=>{
-     const amount=Number(document.querySelector('#tripPayAmount').value);
-     const dueDate=document.querySelector('#tripPayDue').value;
-     const methods=[];if(document.querySelector('#tripPayPix').checked)methods.push('PIX');if(document.querySelector('#tripPayCard').checked)methods.push('Cartão');
-     if(!amount||amount<=0){toast('Informe o valor');return}
-     if(!dueDate){toast('Informe o vencimento');return}
-     if(!methods.length){toast('Selecione um método');return}
-     try{
-       IPAData.createPayment({clientId:client.id,clientName:client.name,tripId:trip.id,trip:trip.name,title:document.querySelector('#tripPayTitle').value||'Cobrança da viagem',description:document.querySelector('#tripPayDescription').value||'Cobrança enviada pelo Indo por Aí',amount,dueDate,methods,status:'Pendente'});
-       if(window.IPAFirebase?.user)await window.IPAFirebase.syncNow();
-       toast('Cobrança enviada para '+client.name+' ✓');modal.close();
-     }catch(e){console.error(e);toast('Erro ao enviar cobrança')}
-   }},0);
+   showModal(`<span class="eyebrow">PLANO DE PAGAMENTO · ${client.name}</span><h2>${trip.name}</h2>
+   <label>Descrição</label><input id="planTitle" class="v2-concierge-input" value="Pacote ${trip.plan}">
+   <label>Valor total</label><input id="planTotal" type="number" min="0" step="0.01" class="v2-concierge-input">
+   <label>Parcelas</label><select id="planInstallments" class="v2-concierge-input">${[1,2,3,4,5,6,8,10,12].map(n=>`<option>${n}</option>`).join('')}</select>
+   <label>Vencimento da 1ª parcela</label><input id="planFirstDue" type="date" class="v2-concierge-input">
+   <div class="payment-method-checks"><label><input id="planPix" type="checkbox" checked> Pix</label><label><input id="planCard" type="checkbox"> Cartão</label></div>
+   <div id="planPreview" class="payment-plan-preview"></div>
+   <button id="savePaymentPlan" class="btn btn-primary btn-block">Criar plano e parcelas</button>`);
+   setTimeout(()=>{const total=document.querySelector('#planTotal'),n=document.querySelector('#planInstallments'),preview=document.querySelector('#planPreview');const calc=()=>{const v=Number(total.value||0),q=Number(n.value||1);preview.innerHTML=v?`<b>${q}x de aproximadamente ${adminMoney(v/q)}</b><small>O cliente receberá cada cobrança separadamente. No ADM você acompanha e usa “Lembrar parcela”.</small>`:''};total.oninput=n.onchange=calc;document.querySelector('#savePaymentPlan').onclick=async()=>{const v=Number(total.value),q=Number(n.value),due=document.querySelector('#planFirstDue').value;if(!v||!due){toast('Informe valor e primeiro vencimento');return}const methods=[];if(document.querySelector('#planPix').checked)methods.push('PIX');if(document.querySelector('#planCard').checked)methods.push('Cartão');IPAData.createPaymentPlan({clientId:client.id,clientName:client.name,tripId:trip.id,trip:trip.name,title:document.querySelector('#planTitle').value,totalAmount:v,installments:q,firstDueDate:due,methods});if(window.IPAFirebase?.user)await window.IPAFirebase.syncNow();toast('Plano de pagamento criado ✓');modal.close();adminSection='finance';render()};},0);
  });
  document.querySelectorAll('[data-admin-new-charge]').forEach(b=>b.onclick=()=>{
    const d=adminData();
@@ -407,13 +395,36 @@ function bind(){
  });
  document.querySelectorAll('[data-admin-add-place]').forEach(b=>b.onclick=()=>{
    const [tripId,day]=b.dataset.adminAddPlace.split(':');
-   showModal(`<span class="eyebrow">ROTEIRO · DIA ${day}</span><h2>Adicionar local</h2><label>Nome do local</label><input id="routePlaceName" class="v2-concierge-input" placeholder="Ex.: Museu do Louvre"><label>Endereço</label><input id="routePlaceAddress" class="v2-concierge-input" placeholder="Endereço ou bairro"><label>Horário</label><input id="routePlaceTime" type="time" class="v2-concierge-input"><label>Observação</label><input id="routePlaceNote" class="v2-concierge-input" maxlength="100" placeholder="Reserva, ingresso, dica..."><label>Google Place ID (opcional)</label><input id="routePlaceId" class="v2-concierge-input" placeholder="Pode deixar vazio no teste"><button id="saveRoutePlace" class="btn btn-primary btn-block">Salvar local</button>`);
-   setTimeout(()=>{const save=document.querySelector('#saveRoutePlace');if(save)save.onclick=async()=>{
-     const name=document.querySelector('#routePlaceName').value.trim();if(!name){toast('Informe o nome do local');return}
-     IPAData.addItineraryPlace(tripId,Number(day),{name,address:document.querySelector('#routePlaceAddress').value.trim(),time:document.querySelector('#routePlaceTime').value,note:document.querySelector('#routePlaceNote').value.trim(),placeId:document.querySelector('#routePlaceId').value.trim()});
-     if(window.IPAFirebase?.user)await window.IPAFirebase.syncNow();
-     toast('Local salvo no roteiro ✓');modal.close();view.innerHTML=adminTripEditor(tripId);bind();
-   }},0);
+   const trip=adminData().trips.find(t=>t.id===tripId);
+   showModal(`<span class="eyebrow">ROTEIRO INTELIGENTE · DIA ${day}</span><h2>Adicionar lugar ou dica</h2>
+   <label>Buscar lugar</label><div class="smart-place-search"><input id="routePlaceName" class="v2-concierge-input" autocomplete="off" placeholder="Ex.: Torre Eiffel, Café de Flore..."><button id="openGoogleSearch" class="btn btn-light">Maps ↗</button></div>
+   <div id="placeSuggestions" class="place-suggestions"><small>Comece digitando. Com GOOGLE_MAPS_API_KEY, o endereço será sugerido automaticamente.</small></div>
+   <label>Categoria</label><select id="routePlaceCategory" class="v2-concierge-input"><option>🏛️ Atração</option><option>☕ Cafeteria</option><option>🍽️ Restaurante</option><option>🛍️ Loja</option><option>🌳 Parque</option><option>🏨 Hotel</option><option>🎟️ Experiência</option><option>📍 Outro</option></select>
+   <label>Endereço</label><input id="routePlaceAddress" class="v2-concierge-input" placeholder="Preenchido pela busca ou manualmente">
+   <label>Horário</label><input id="routePlaceTime" type="time" class="v2-concierge-input">
+   <label>Dica inteligente</label><textarea id="routePlaceTip" class="rating-text" placeholder="Ex.: melhor horário, reserva, tempo sugerido, o que pedir..."></textarea>
+   <label>Observação operacional</label><input id="routePlaceNote" class="v2-concierge-input" maxlength="140" placeholder="Ingresso, reserva, ponto de encontro...">
+   <input id="routePlaceId" type="hidden"><input id="routeMapsUrl" type="hidden">
+   <div class="smart-place-actions"><button id="saveRoutePlace" class="btn btn-primary">+ Adicionar ao roteiro</button><button id="saveAsTip" class="btn btn-light">💡 Adicionar como dica</button></div>`);
+   setTimeout(()=>{
+     const q=document.querySelector('#routePlaceName'), box=document.querySelector('#placeSuggestions');
+     let timer;
+     q.oninput=()=>{clearTimeout(timer);timer=setTimeout(async()=>{
+       const text=q.value.trim();if(text.length<2)return;
+       box.innerHTML='<small>Buscando lugares...</small>';
+       try{
+         const r=await fetch(`/api/places/search?q=${encodeURIComponent(text)}&destination=${encodeURIComponent([trip?.destination,trip?.country].filter(Boolean).join(', '))}`);
+         const j=await r.json();
+         if(j.needsKey){box.innerHTML=`<small>Busca automática pronta, mas falta configurar <b>GOOGLE_MAPS_API_KEY</b> no Cloudflare. O botão Maps já funciona.</small>`;return}
+         box.innerHTML=(j.places||[]).map((p,i)=>`<button type="button" data-place-result='${encodeURIComponent(JSON.stringify(p))}'><b>${p.name}</b><small>${p.address}</small>${p.rating?`<em>★ ${p.rating} · ${p.reviews} avaliações</em>`:''}</button>`).join('')||'<small>Nenhum resultado. Tente outro termo.</small>';
+         box.querySelectorAll('[data-place-result]').forEach(x=>x.onclick=()=>{const p=JSON.parse(decodeURIComponent(x.dataset.placeResult));q.value=p.name;document.querySelector('#routePlaceAddress').value=p.address||'';document.querySelector('#routePlaceId').value=p.id||'';document.querySelector('#routeMapsUrl').value=p.mapsUrl||'';box.innerHTML=`<div class="selected-place">✓ ${p.name}<small>${p.address}</small></div>`});
+       }catch(e){box.innerHTML='<small>Não foi possível buscar agora. Use o botão Maps.</small>'}
+     },350)};
+     document.querySelector('#openGoogleSearch').onclick=()=>window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q.value+' '+(trip?.destination||''))}`,'_blank');
+     const collect=()=>({name:q.value.trim(),address:document.querySelector('#routePlaceAddress').value.trim(),time:document.querySelector('#routePlaceTime').value,note:document.querySelector('#routePlaceNote').value.trim(),placeId:document.querySelector('#routePlaceId').value,mapsUrl:document.querySelector('#routeMapsUrl').value,category:document.querySelector('#routePlaceCategory').value,smartTip:document.querySelector('#routePlaceTip').value.trim()});
+     document.querySelector('#saveRoutePlace').onclick=async()=>{const p=collect();if(!p.name){toast('Informe o nome do local');return}IPAData.addItineraryPlace(tripId,Number(day),p);if(window.IPAFirebase?.user)await window.IPAFirebase.syncNow();toast('Local adicionado ao roteiro ✓');modal.close();view.innerHTML=adminTripEditor(tripId);bind()};
+     document.querySelector('#saveAsTip').onclick=async()=>{const p=collect();if(!p.name){toast('Informe o nome do local');return}IPAData.addRecommendation({...p,tripId,clientId:trip?.clientId,day:Number(day),networkRecommended:true});if(window.IPAFirebase?.user)await window.IPAFirebase.syncNow();toast('Dica adicionada à viagem ✓');modal.close();view.innerHTML=adminTripEditor(tripId);bind()};
+   },0);
  });
  document.querySelectorAll('[data-admin-new-template]').forEach(b=>b.onclick=()=>{
    showModal(`<span class="eyebrow">BIBLIOTECA</span><h2>Novo modelo de roteiro</h2><label>Nome</label><input id="templateName" class="v2-concierge-input" placeholder="Ex.: Paris Essencial"><label>Destino</label><input id="templateDestination" class="v2-concierge-input" placeholder="Paris, França"><label>Descrição</label><input id="templateDescription" class="v2-concierge-input"><label>Dias</label><input id="templateDays" type="number" min="1" value="5" class="v2-concierge-input"><button id="saveTemplate" class="btn btn-primary btn-block">Salvar roteiro</button>`);
@@ -422,6 +433,12 @@ function bind(){
      if(window.IPAFirebase?.user)await window.IPAFirebase.syncNow();
      toast('Modelo de roteiro salvo ✓');modal.close();adminSection='templates';render();
    }},0);
+ });
+
+ document.querySelectorAll('[data-admin-document]').forEach(b=>b.onclick=()=>{
+   const tripId=b.dataset.adminDocument,clientId=b.dataset.clientId;
+   showModal(`<span class="eyebrow">CARTEIRA DA VIAGEM</span><h2>Novo documento</h2><label>Tipo</label><select id="docType" class="v2-concierge-input"><option>Passagem aérea</option><option>Hotel</option><option>Ingresso</option><option>Voucher</option><option>Seguro viagem</option><option>Transfer</option><option>Outro</option></select><label>Título</label><input id="docTitle" class="v2-concierge-input" placeholder="Ex.: Voo GRU → CDG"><label>Data</label><input id="docDate" type="date" class="v2-concierge-input"><label>Horário</label><input id="docTime" type="time" class="v2-concierge-input"><div class="doc-row"><input id="docTerminal" class="v2-concierge-input" placeholder="Terminal"><input id="docGate" class="v2-concierge-input" placeholder="Portão"></div><label>Localizador / reserva</label><input id="docLocator" class="v2-concierge-input"><label>Arquivo</label><input id="docFile" type="file" class="v2-concierge-input" accept="application/pdf,image/*"><button id="saveTripDocument" class="btn btn-primary btn-block">Salvar documento</button>`);
+   setTimeout(()=>document.querySelector('#saveTripDocument').onclick=async()=>{const file=document.querySelector('#docFile').files[0];let uploaded={url:"",path:""};try{if(file)uploaded=await window.IPAFirebase.uploadTripDocument(file,clientId,tripId);IPAData.addTripDocument({tripId,clientId,type:document.querySelector('#docType').value,title:document.querySelector('#docTitle').value||document.querySelector('#docType').value,date:document.querySelector('#docDate').value,time:document.querySelector('#docTime').value,terminal:document.querySelector('#docTerminal').value,gate:document.querySelector('#docGate').value,locator:document.querySelector('#docLocator').value,url:uploaded.url,path:uploaded.path});if(window.IPAFirebase?.user)await window.IPAFirebase.syncNow();toast('Documento salvo ✓');modal.close();view.innerHTML=adminTripEditor(tripId);bind()}catch(e){console.error(e);toast(e.message||'Erro ao enviar documento')}},0);
  });
  const instagramBtn=document.querySelector('#instagramBtn');
  if(instagramBtn)instagramBtn.onclick=()=>window.open('https://www.instagram.com/indo.por.ai.com.a.gente/','_blank');
@@ -845,6 +862,8 @@ ${tripModule('payments')?`<section class="section"><button class="payment-alert-
  </div>
 </section>
 ${(tripModule('preboardingSupport')||tripModule('bookingSupport')||tripModule('exchange')||tripModule('community'))?`<section class="section"><div class="section-head"><div><span class="eyebrow">Serviços do seu pacote</span><h2>Incluídos na sua experiência</h2></div></div><div class="native-service-grid">${tripModule('preboardingSupport')?`<div><span>🧭</span><b>Suporte pré-embarque</b><small>Orientação antes da viagem</small></div>`:''}${tripModule('bookingSupport')?`<div><span>🏨</span><b>Hotel & passagens</b><small>Apoio nas compras e reservas</small></div>`:''}${tripModule('exchange')?`<div><span>💱</span><b>Exchange</b><small>Câmbio disponível no pacote</small></div>`:''}${tripModule('community')?`<div><span>💬</span><b>Comunidade</b><small>Comunicação durante a viagem</small></div>`:''}</div></section>`:''}
+${(ipaDB().tripDocuments||[]).filter(x=>x.tripId===t.id).length?`<section class="section"><div class="section-head"><div><span class="eyebrow">CARTEIRA DA VIAGEM</span><h2>Seus documentos</h2></div></div><div class="travel-wallet">${(ipaDB().tripDocuments||[]).filter(x=>x.tripId===t.id).map(x=>`<div><span>${x.type==='Passagem aérea'?'✈️':'📄'}</span><div><b>${x.title}</b><small>${[x.date,x.time,x.terminal&&('Terminal '+x.terminal),x.gate&&('Portão '+x.gate),x.locator&&('Localizador '+x.locator)].filter(Boolean).join(' · ')}</small></div>${x.url?`<button data-external-route="${x.url}">Abrir</button>`:''}</div>`).join('')}</div></section>`:''}
+${(ipaDB().recommendations||[]).filter(x=>x.tripId===t.id).length?`<section class="section"><div class="section-head"><div><span class="eyebrow">INDO POR AÍ NETWORK</span><h2>Recomendados para você</h2></div></div><div class="network-client-grid">${(ipaDB().recommendations||[]).filter(x=>x.tripId===t.id).slice(0,6).map(x=>`<div><span>💡</span><b>${x.name}</b><small>${x.category||'Dica'} · ${x.address||tripDestination(t)}</small><p>${x.smartTip||'Selecionado pela rede Indo por Aí.'}</p><button data-map="${x.address||x.name}">Maps ↗</button></div>`).join('')}</div></section>`:''}
 ${benefitsPersonalized()}`}
 
 function adminData(){const d=ipaDB()||{};d.clients=Array.isArray(d.clients)?d.clients:[];d.trips=Array.isArray(d.trips)?d.trips:[];d.payments=Array.isArray(d.payments)?d.payments:[];d.benefits=Array.isArray(d.benefits)?d.benefits:[];d.itineraryTemplates=Array.isArray(d.itineraryTemplates)?d.itineraryTemplates:[];return d}
@@ -884,7 +903,11 @@ function adminTripEditor(id){
  <div class="ipa-admin-plan-grid">${['Explore','Signature','Elite','Groups'].map(p=>`<button data-admin-plan="${p}" class="${t.plan===p?'active':''}"><b>${p}</b><small>${p==='Explore'?'Roteiro + app':p==='Signature'?'Pré-embarque + compras':p==='Elite'?'Experiência completa':'Grandes grupos'}</small></button>`).join('')}</div>
  <div class="package-native-box"><span class="eyebrow">NATIVO DO ${t.plan.toUpperCase()}</span><div>${packageIncluded(t.plan).map(x=>`<span>✓ ${x}</span>`).join('')}</div><small>Ao trocar de pacote, estes recursos são habilitados automaticamente. Você ainda pode ajustar os módulos manualmente abaixo.</small></div></section>
  <section class="ipa-admin-panel"><span class="eyebrow">EXPERIÊNCIA DO CLIENTE</span><h2>O que aparece no app</h2><div class="ipa-admin-module-grid">${Object.entries(labels).map(([k,v])=>`<label class="${t.modules?.[k]?'on':''}"><div><b>${v}</b><small>${t.modules?.[k]?'Visível':'Oculto'}</small></div><input type="checkbox" data-admin-module="${k}" ${t.modules?.[k]?'checked':''}></label>`).join('')}</div></section>
- <section class="ipa-admin-panel"><div class="section-head"><div><span class="eyebrow">ROTEIRO</span><h2>Dias e locais</h2></div><button class="btn btn-light" data-admin-add-day="${t.id}">+ Adicionar dia</button></div><div class="ipa-admin-days">${(t.itinerary||[]).sort((a,b)=>a.day-b.day).map(day=>`<div class="admin-day-expanded"><div class="admin-day-title"><strong>${day.day}</strong><span><b>${day.title}</b><small>${day.date||''}</small></span><button class="admin-add-place-btn" data-admin-add-place="${t.id}:${day.day}">+ Adicionar local</button></div><div class="admin-place-list">${normalizedPlaces(day).map((p,i)=>`<div><span>${i+1}</span><div><b>${p.time?`${p.time} · `:''}${p.name}</b><small>${p.address||p.note||''}</small></div></div>`).join('')||'<small>Nenhum local neste dia.</small>'}</div></div>`).join('')||'<p>Comece adicionando o primeiro dia.</p>'}</div></section>
+ <section class="ipa-admin-panel"><div class="section-head"><div><span class="eyebrow">ROTEIRO INTELIGENTE</span><h2>Dias, lugares e dicas</h2></div><button class="btn btn-light" data-admin-add-day="${t.id}">+ Adicionar dia</button></div>
+ <div class="smart-route-banner"><span>✨</span><div><b>Dica Inteligente</b><small>Cadastre atrações, cafés, restaurantes, lojas e experiências. Use “Adicionar como dica” para recomendações fora do roteiro principal.</small></div></div>
+ <div class="ipa-admin-days">${(t.itinerary||[]).sort((a,b)=>a.day-b.day).map(day=>`<div class="admin-day-expanded"><div class="admin-day-title"><strong>${day.day}</strong><span><b>${day.title}</b><small>${day.date||''}</small></span><button class="admin-add-place-btn" data-admin-add-place="${t.id}:${day.day}">+ Lugar / dica</button></div><div class="admin-place-list">${normalizedPlaces(day).map((p,i)=>`<div><span>${i+1}</span><div><b>${p.time?`${p.time} · `:''}${p.category||'📍'} ${p.name}</b><small>${p.address||p.note||''}</small>${p.smartTip?`<em>💡 ${p.smartTip}</em>`:''}</div>${p.mapsUrl?`<button data-external-route="${p.mapsUrl}">Maps ↗</button>`:''}</div>`).join('')||'<small>Nenhum local neste dia.</small>'}</div></div>`).join('')||'<p>Comece adicionando o primeiro dia.</p>'}</div>
+ <div class="network-tip-list">${(d.recommendations||[]).filter(r=>r.tripId===t.id).map(r=>`<div><span>💡</span><div><b>${r.category||'Dica'} · ${r.name}</b><small>${r.address||''}</small><em>${r.smartTip||'Indo por Aí recomenda'}</em></div></div>`).join('')||'<small>Nenhuma dica extra cadastrada.</small>'}</div></section>
+ <section class="ipa-admin-panel"><div class="section-head"><div><span class="eyebrow">ANTES · CARTEIRA DA VIAGEM</span><h2>Documentos do cliente</h2></div><button class="btn btn-light" data-admin-document="${t.id}" data-client-id="${t.clientId}">+ Documento</button></div><p>Passagens, hotel, vouchers, seguro, ingressos e transfer. O ADM cadastra e o cliente consulta no Antes.</p><div class="admin-doc-list">${(d.tripDocuments||[]).filter(x=>x.tripId===t.id).map(x=>`<div><span>${x.type==='Passagem aérea'?'✈️':'📄'}</span><div><b>${x.title}</b><small>${[x.date,x.time,x.terminal&&('Terminal '+x.terminal),x.gate&&('Portão '+x.gate)].filter(Boolean).join(' · ')}</small></div>${x.url?`<button data-external-route="${x.url}">Abrir</button>`:''}</div>`).join('')||'<small>Nenhum documento cadastrado.</small>'}</div></section>
  <div class="admin-publish-actions">
  <button class="btn btn-primary btn-block" data-admin-publish="${t.id}">${t.published?'✓ Viagem publicada':'🚀 Publicar viagem'}</button>
  <button class="btn btn-light btn-block" data-admin-charge-trip="${t.id}" data-charge-client="${t.clientId}">💳 Enviar cobrança para este cliente</button>
@@ -1012,7 +1035,7 @@ function exploreView(){
  <section class="section"><div class="dynamic-route-map"><div class="map-grid"></div><svg class="dynamic-route-line" viewBox="0 0 400 500"><path d="M70 60 C150 90, 285 100, 315 180 S130 270, 95 355 S250 400, 320 450" fill="none" stroke="#147ce5" stroke-width="5" stroke-linecap="round" stroke-dasharray="8 9"/></svg>${places.slice(0,6).map((p,i)=>`<button class="dynamic-pin pin-${i+1}" data-map="${(p.address||p.name)+', '+tripCountry(t)}"><span>${i+1}</span><small>${p.name}</small></button>`).join('')}<div class="dynamic-map-caption">Rota criada a partir do roteiro cadastrado no ADM.</div></div></section>
  <section class="section"><div class="section-head"><div><span class="eyebrow">Rota completa</span><h2>Locais do Dia ${day.day}</h2></div></div><div class="route-summary dynamic-route-summary"><div class="route-line"></div>${places.map((p,i)=>`<div class="route-stop"><span>${i+1}</span><div><b>${p.name}</b><small>${p.time||''}${p.address?` · ${p.address}`:''}</small></div></div>`).join('')}</div>${route?`<button class="btn btn-primary btn-block" data-external-route="${route}">Abrir todos no Google Maps</button>`:''}</section>`;
 }
-function communityView(){return `<section class="section" style="margin-top:0"><div class="section-head"><div><span class="eyebrow">Portugal 2026 · 28 pessoas</span><h2>Grupo da viagem</h2></div><button id="liveBtn">🔴 Iniciar live</button></div><div class="card"><div class="people"><div class="person"><i>RF</i><small>Renato</small></div><div class="person"><i>MS</i><small>Marina</small></div><div class="person"><i>CS</i><small>Carlos</small></div><div class="person"><i>JS</i><small>Julia</small></div><div class="person"><i>+8</i><small>Mais</small></div></div></div></section><section class="section"><div class="message guide"><b>📢 Aviso do guia</b><br>Amanhã sairemos às 8h30. O ponto de encontro será na recepção do hotel.<small>09:30</small></div><div class="chat">${state.messages.map(m=>`<div class="message ${m.type==='me'?'me':m.type==='guide'?'guide':''}"><b>${m.name}</b><br>${m.text}<small>${m.time}</small></div>`).join('')}</div><div class="composer"><input id="messageInput" placeholder="Digite uma mensagem..."/><button class="btn btn-purple" id="sendMessage">➤</button></div></section>`}
+function communityView(){return `<section class="section" style="margin-top:0"><div class="section-head"><div><span class="eyebrow">${activeTrip()?.name||'Sua viagem'} · comunidade</span><h2>Grupo da viagem</h2></div><button id="liveBtn">🔴 Iniciar live</button></div><div class="card"><div class="people"><div class="person"><i>RF</i><small>Renato</small></div><div class="person"><i>MS</i><small>Marina</small></div><div class="person"><i>CS</i><small>Carlos</small></div><div class="person"><i>JS</i><small>Julia</small></div><div class="person"><i>+8</i><small>Mais</small></div></div></div></section><section class="section"><div class="message guide"><b>📢 Aviso do guia</b><br>Amanhã sairemos às 8h30. O ponto de encontro será na recepção do hotel.<small>09:30</small></div><div class="chat">${state.messages.map(m=>`<div class="message ${m.type==='me'?'me':m.type==='guide'?'guide':''}"><b>${m.name}</b><br>${m.text}<small>${m.time}</small></div>`).join('')}</div><div class="composer"><input id="messageInput" placeholder="Digite uma mensagem..."/><button class="btn btn-purple" id="sendMessage">➤</button></div></section>`}
 function diaryView(){return `<section class="diary-page-hero"><span class="eyebrow">Diário da viagem</span><h1>08 de setembro · Porto</h1><p>Um dia cheio de descobertas, sabores e histórias em família.</p><div class="diary-page-metrics"><span>🚶 8,6 km</span><span>✅ 5 experiências</span><span>📸 36 lembranças</span></div></section>
 <section class="section"><div class="diary-feature-photo"><span>🌅</span><div><small>MOMENTO DO DIA</small><strong>Pôr do sol na Ribeira</strong><p>O céu ficou dourado enquanto o grupo encerrava o passeio às margens do Douro.</p></div></div></section>
 <section class="section"><div class="section-head"><h2>Linha do tempo</h2><span class="chip green">Dia completo</span></div><div class="diary-timeline">
@@ -1024,37 +1047,35 @@ function diaryView(){return `<section class="diary-page-hero"><span class="eyebr
 <section class="section"><div class="section-head"><h2>Curiosidade do destino</h2></div><div class="diary-curiosity"><span>💡</span><p>A Ribeira é uma das áreas mais antigas do Porto e integra a zona histórica classificada como Patrimônio Mundial.</p></div></section>
 <section class="section"><div class="section-head"><h2>Frase do guia</h2></div><blockquote class="diary-quote">“Hoje vocês não conheceram apenas o Porto — começaram a criar a história que vão contar quando voltarem.”</blockquote></section>
 <section class="section"><button class="btn btn-primary btn-block" data-go="memories">Ver fotos e vídeos do dia</button></section>`}
-function memoriesView(){return `<section class="album-hero"><span class="eyebrow">Álbum da viagem</span><h1>Portugal 2026</h1><p>Organizado automaticamente por dias, lugares e momentos.</p><div class="album-stats"><span>📸 624 fotos</span><span>🎥 27 vídeos</span><span>📍 34 lugares</span></div></section>
-<section class="section"><div class="section-head"><h2>Dias da viagem</h2><button id="addPhoto">+ Adicionar foto</button></div><div class="album-timeline">
- <button class="album-day" data-memory-day="Dia 1 · Chegada ao Porto"><div class="album-day-cover cover-airport">✈️</div><div><span>Dia 1</span><h3>Chegada ao Porto</h3><p>Aeroporto, hotel, Ribeira e primeiro jantar.</p><small>18 fotos · 2 vídeos</small></div><b>›</b></button>
- <button class="album-day" data-memory-day="Dia 2 · Clássicos do Porto"><div class="album-day-cover cover-city">🏰</div><div><span>Dia 2</span><h3>Clássicos do Porto</h3><p>Clérigos, Livraria Lello e Cruzeiro das Seis Pontes.</p><small>42 fotos · 4 vídeos</small></div><b>›</b></button>
- <button class="album-day" data-memory-day="Dia 3 · Vale do Douro"><div class="album-day-cover cover-wine">🍷</div><div><span>Dia 3</span><h3>Vale do Douro</h3><p>Vinícola, almoço harmonizado e passeio de barco.</p><small>68 fotos · 6 vídeos</small></div><b>›</b></button>
- <button class="album-day" data-memory-day="Dia 4 · Lisboa"><div class="album-day-cover cover-lisbon">🚋</div><div><span>Dia 4</span><h3>Lisboa</h3><p>Belém, elétrico, miradouros e jantar de despedida.</p><small>55 fotos · 3 vídeos</small></div><b>›</b></button>
-</div></section>
-<section class="section"><div class="section-head"><h2>Momentos favoritos</h2><span class="chip orange">Selecionados por IA</span></div><div class="favorite-grid">
- <button data-memory-day="Pôr do sol no Douro"><span>🌅</span><b>Pôr do sol</b><small>Douro</small></button>
- <button data-memory-day="Primeiro brinde"><span>🥂</span><b>Primeiro brinde</b><small>Porto</small></button>
- <button data-memory-day="Passeio em família"><span>👨‍👩‍👧</span><b>Em família</b><small>Lisboa</small></button>
- <button data-memory-day="Vista da Ribeira"><span>🌉</span><b>Ribeira</b><small>Porto</small></button>
-</div></section>
-<section class="section"><div class="section-head"><h2>Fotos adicionadas por você</h2></div><div class="photo-grid">${state.photos.length?state.photos.map((src,i)=>`<div class="photo"><img src="${src}" alt="Foto da viagem"><em>Memória ${i+1}</em></div>`).join(''):`<div class="empty-memory"><span>📷</span><h3>Seu álbum está esperando novas memórias</h3><p>Adicione fotos do celular para visualizar aqui.</p><button class="btn btn-primary" id="addPhoto">Adicionar fotos</button></div>`}</div></section>`}
-function liveView(){return `<section class="live-stage"><img class="live-video" src="https://images.unsplash.com/photo-1555881400-74d7acaacd8b?auto=format&fit=crop&w=1200&q=85" alt="Simulação de transmissão em Porto"><div class="live-top"><span class="live-badge">● AO VIVO · ${timeFmt(state.liveSeconds)}</span><span>👥 ${state.liveViewers}</span></div><div class="live-comments"><div class="live-comment"><b>João</b> Onde nos encontramos?</div><div class="live-comment"><b>Marina</b> Que lugar lindo! ❤️</div><div class="live-comment"><b>Você</b> Entrada principal, direto ao ponto 1.</div></div><div class="live-reactions" id="liveReactions"></div><div class="live-controls"><button id="livePhoto">📷</button><button id="liveMic">🎙️</button><button class="hang" id="liveBtn">✕</button><button id="shareLocation">📍</button></div></section><section class="section"><div class="live-metrics"><div class="card"><strong>${state.liveViewers}</strong><small>Assistindo</small></div><div class="card"><strong>${state.reactions}</strong><small>Reações</small></div><div class="card"><strong>${state.messages.length}</strong><small>Mensagens</small></div></div><div class="live-actions"><button data-reaction="❤️">❤️ Curtir</button><button data-reaction="👏">👏 Aplaudir</button><button data-reaction="🔥">🔥 Incrível</button></div></section><section class="section"><div class="card"><h3>Simulação do Modo Live</h3><p>O cronômetro, audiência, reações, foto, microfone e localização funcionam localmente para você testar a experiência.</p></div></section>`}
-function submitLead(e){e.preventDefault();state.leadStage='sent';toast('Solicitação enviada para a equipe');render()}
-function toggleLive(){state.live=!state.live;state.route='community';if(state.live){state.liveSeconds=0;state.liveTimer=setInterval(()=>{state.liveSeconds++;const badge=document.querySelector('.live-badge');if(badge)badge.textContent=`● AO VIVO · ${timeFmt(state.liveSeconds)}`},1000)}else{clearInterval(state.liveTimer);state.liveTimer=null}toast(state.live?'Transmissão iniciada para o grupo':'Transmissão encerrada');render()}
-function addReaction(emoji){state.reactions++;const host=document.querySelector('#liveReactions');if(host){const el=document.createElement('div');el.className='reaction-float';el.textContent=emoji;host.appendChild(el);setTimeout(()=>el.remove(),2400)}toast(`${emoji} reação enviada`)}
-function sendMessage(){const input=document.querySelector('#messageInput');if(!input||!input.value.trim())return;state.messages.push({type:'me',name:'Você',text:input.value.trim(),time:new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})});render()}
-function handlePhotos(e){
+function memoriesView(){
+ const t=activeTrip();if(!t)return `<section class="section"><h2>Viagem não encontrada</h2></section>`;
+ const days=(t.itinerary||[]).sort((a,b)=>Number(a.day)-Number(b.day)),country=tripCountry(t),flag=countryFlag(country);
+ const memories=(ipaDB().memories||[]).filter(m=>m.tripId===t.id);
+ const jp=ipaDB().journeyPlaces||{};
+ const dayCards=days.map(day=>{const places=normalizedPlaces(day),done=places.filter((p,i)=>jp[[t.id,day.day,p.id||i].join(':')]?.checked).length,dayMem=memories.filter(m=>Number(m.day||0)===Number(day.day));return `<button class="album-day" data-memory-day="${encodeURIComponent(day.title)}"><div class="album-day-cover">📍</div><div><span>Dia ${day.day}</span><h3>${day.title}</h3><p>${done}/${places.length} lugares visitados · ${dayMem.length} memórias</p><small>${day.date||tripDestination(t)}</small></div><b>›</b></button>`}).join('');
+ return `<section class="album-hero"><span class="eyebrow">DIÁRIO AUTOMÁTICO · ${flag} ${country}</span><h1>${t.name}</h1><p>Seu diário cresce com checks, avaliações, fotos e vídeos desta viagem.</p><div class="album-stats"><span>📸 ${memories.filter(m=>m.type==='image').length} fotos</span><span>🎥 ${memories.filter(m=>m.type==='video').length} vídeos</span><span>📍 ${days.flatMap(d=>normalizedPlaces(d)).length} lugares</span></div></section>
+ <section class="section"><div class="section-head"><div><span class="eyebrow">LINHA DO TEMPO</span><h2>A viagem, dia por dia</h2></div></div><div class="album-days">${dayCards||'<p>O diário começará quando o roteiro for cadastrado.</p>'}</div></section>
+ <section class="section"><div class="section-head"><div><span class="eyebrow">MOMENTOS SUGERIDOS</span><h2>Crie uma memória agora</h2></div></div><div class="memory-prompt-grid">${[['🥂','Hora do brinde'],['👨‍👩‍👧','Nossa turma'],['🍽️','Sabor inesquecível'],['🌅','A vista do dia'],['😂','Momento espontâneo'],['❤️','Meu favorito']].map(x=>`<button data-memory-prompt="${x[1]}"><span>${x[0]}</span><b>${x[1]}</b><small>${tripDestination(t)}</small></button>`).join('')}</div></section>
+ <section class="section"><div class="section-head"><h2>Suas fotos e vídeos</h2></div><div class="live-memory-grid">${memories.map(m=>m.type==='video'?`<div class="live-memory"><video src="${m.src||m.url}" controls playsinline></video><b>${m.prompt||'Vídeo'}</b></div>`:`<div class="live-memory"><img src="${m.src||m.url}" alt=""><b>${m.prompt||'Memória'}</b></div>`).join('')||`<div class="empty-memory"><span>📷</span><h3>Seu álbum começa aqui</h3><button class="btn btn-primary" id="addPhoto">Adicionar foto ou vídeo</button></div>`}</div></section>
+ ${tripModule('movie')?`<section class="section"><div class="memory-building-card"><span>🎬</span><div><b>Filme da viagem</b><p>${memories.length>=3?'Já temos material para a retrospectiva.':'Adicione pelo menos 3 memórias para começar a retrospectiva.'}</p></div><button class="btn btn-light" data-memory-movie>Assistir prévia</button></div></section>`:''}`;
+}
+async function handlePhotos(e){
  const t=activeTrip(),prompt=localStorage.getItem('ipa-memory-prompt')||'Memória da viagem';
- [...e.target.files].slice(0,8).forEach(file=>{
-   const r=new FileReader();
-   r.onload=()=>{
+ const files=[...e.target.files].slice(0,8);
+ for(const file of files){
+   try{
      const type=file.type.startsWith('video/')?'video':'image';
-     IPAData.addMemory({tripId:t?.id||'',clientId:t?.clientId||'',prompt,type,src:r.result,name:file.name});
-     state.mode='after';state.route='today';localStorage.removeItem('ipa-memory-prompt');render();
-   };
-   r.readAsDataURL(file);
- });
- e.target.value='';
+     let src="",path="";
+     if(window.IPAFirebase?.uploadMemory && t?.clientId){
+       const up=await window.IPAFirebase.uploadMemory(file,t.clientId,t.id);src=up.url;path=up.path;
+     }else{
+       src=await new Promise(res=>{const r=new FileReader();r.onload=()=>res(r.result);r.readAsDataURL(file)});
+     }
+     IPAData.addMemory({tripId:t?.id||'',clientId:t?.clientId||'',prompt,type,src,url:src,path,name:file.name,day:state.tripDay||1});
+   }catch(err){console.error(err);toast('Não foi possível enviar '+file.name)}
+ }
+ if(window.IPAFirebase?.user && window.IPAFirebase?.syncNow)try{await window.IPAFirebase.syncNow()}catch{}
+ state.mode='after';state.route='memories';localStorage.removeItem('ipa-memory-prompt');e.target.value='';render();
 }
 function showModal(html){modalContent.innerHTML=html;modal.showModal();setTimeout(()=>{modalContent.querySelectorAll('[data-map]').forEach(b=>b.onclick=()=>window.open('https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(b.dataset.map),'_blank'));modalContent.querySelectorAll('[data-profile]').forEach(b=>b.onclick=()=>{modal.close();setProfile(b.dataset.profile)})},0)}
 function showInitialScenario(){
@@ -1174,7 +1195,7 @@ if(!(window.IPAFirebase?.isEmailSignInLink?.())){
 
 function openTravelMovie(){
  showModal(`<div class="fake-movie-player"><div class="fake-movie-screen"><div class="movie-scene"><span>PORTUGAL 2026</span><strong>Uma história Indo por Aí</strong></div><button class="fake-play-button" id="fakePlayButton">▶</button><div class="fake-progress"><span id="fakeMovieProgress"></span></div></div><div class="fake-movie-details"><h2>Seu filme da viagem</h2><p id="fakeMovieText">Abertura cinematográfica · mapa animado · melhores momentos · créditos finais.</p><div class="movie-chapters"><span>00:00 Porto</span><span>00:42 Douro</span><span>01:28 Lisboa</span><span>02:18 Créditos</span></div></div></div>`);
- setTimeout(()=>{const btn=document.querySelector('#fakePlayButton');const bar=document.querySelector('#fakeMovieProgress');const text=document.querySelector('#fakeMovieText');if(btn)btn.onclick=()=>{btn.textContent='❚❚';if(bar)bar.style.width='78%';if(text)text.textContent='Reproduzindo uma demonstração fictícia do filme Portugal 2026.';setTimeout(()=>{if(btn)btn.textContent='▶';},3500);};},0);
+ setTimeout(()=>{const btn=document.querySelector('#fakePlayButton');const bar=document.querySelector('#fakeMovieProgress');const text=document.querySelector('#fakeMovieText');if(btn)btn.onclick=()=>{btn.textContent='❚❚';if(bar)bar.style.width='78%';if(text)text.textContent='Montando uma prévia com as memórias reais desta viagem.';setTimeout(()=>{if(btn)btn.textContent='▶';},3500);};},0);
 }
 function showMemoryDay(title){
  showModal(`<div class="memory-day-modal"><span class="eyebrow">Álbum de lembranças</span><h2>${title}</h2><div class="memory-modal-grid"><div>📸<small>Foto favorita</small></div><div>🎥<small>Vídeo do dia</small></div><div>📍<small>Mapa visitado</small></div><div>❤️<small>Momento salvo</small></div></div><p>Esta é uma demonstração visual. Na versão real, as fotos, vídeos, locais, avaliações e mensagens daquele dia aparecerão aqui automaticamente.</p></div>`);
