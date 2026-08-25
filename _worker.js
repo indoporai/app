@@ -178,10 +178,19 @@ async function googlePlaceSearch(request,env){
   }))});
 }
 
+
+function whatsappContact(env){
+  const raw=String(env.WHATSAPP_NUMBER||"").replace(/\D/g,"");
+  if(!raw)return json({ok:false,error:"WHATSAPP_NUMBER não configurado no Cloudflare."},500);
+  const message=encodeURIComponent("Olá! Vim pelo app Indo por Aí e quero planejar minha próxima viagem.");
+  return json({ok:true,url:`https://wa.me/${raw}?text=${message}`});
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
 
+    if (url.pathname === "/api/contact/whatsapp" && request.method === "GET") return whatsappContact(env);
     if (url.pathname === "/api/places/search" && request.method === "GET") return googlePlaceSearch(request,env);
     if (url.pathname === "/api/live/create" && request.method === "POST") return createLiveRoom(env);
     if (url.pathname === "/api/live/join" && request.method === "POST") return joinLiveRoom(request,env);

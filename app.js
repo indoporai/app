@@ -440,6 +440,22 @@ function bind(){
    showModal(`<span class="eyebrow">CARTEIRA DA VIAGEM</span><h2>Novo documento</h2><label>Tipo</label><select id="docType" class="v2-concierge-input"><option>Passagem aérea</option><option>Hotel</option><option>Ingresso</option><option>Voucher</option><option>Seguro viagem</option><option>Transfer</option><option>Outro</option></select><label>Título</label><input id="docTitle" class="v2-concierge-input" placeholder="Ex.: Voo GRU → CDG"><label>Data</label><input id="docDate" type="date" class="v2-concierge-input"><label>Horário</label><input id="docTime" type="time" class="v2-concierge-input"><div class="doc-row"><input id="docTerminal" class="v2-concierge-input" placeholder="Terminal"><input id="docGate" class="v2-concierge-input" placeholder="Portão"></div><label>Localizador / reserva</label><input id="docLocator" class="v2-concierge-input"><label>Arquivo</label><input id="docFile" type="file" class="v2-concierge-input" accept="application/pdf,image/*"><button id="saveTripDocument" class="btn btn-primary btn-block">Salvar documento</button>`);
    setTimeout(()=>document.querySelector('#saveTripDocument').onclick=async()=>{const file=document.querySelector('#docFile').files[0];let uploaded={url:"",path:""};try{if(file)uploaded=await window.IPAFirebase.uploadTripDocument(file,clientId,tripId);IPAData.addTripDocument({tripId,clientId,type:document.querySelector('#docType').value,title:document.querySelector('#docTitle').value||document.querySelector('#docType').value,date:document.querySelector('#docDate').value,time:document.querySelector('#docTime').value,terminal:document.querySelector('#docTerminal').value,gate:document.querySelector('#docGate').value,locator:document.querySelector('#docLocator').value,url:uploaded.url,path:uploaded.path});if(window.IPAFirebase?.user)await window.IPAFirebase.syncNow();toast('Documento salvo ✓');modal.close();view.innerHTML=adminTripEditor(tripId);bind()}catch(e){console.error(e);toast(e.message||'Erro ao enviar documento')}},0);
  });
+ const whatsappProspectBtn=document.querySelector('#whatsappProspectBtn');
+ if(whatsappProspectBtn) whatsappProspectBtn.onclick=async()=>{
+   const original=whatsappProspectBtn.textContent;
+   whatsappProspectBtn.disabled=true;
+   whatsappProspectBtn.textContent='Abrindo WhatsApp...';
+   try{
+     const r=await fetch('/api/contact/whatsapp',{cache:'no-store'});
+     const j=await r.json();
+     if(!r.ok||!j.ok)throw new Error(j.error||'WhatsApp não configurado');
+     window.location.href=j.url;
+   }catch(e){
+     toast(e.message||'Não foi possível abrir o WhatsApp');
+     whatsappProspectBtn.disabled=false;
+     whatsappProspectBtn.textContent=original;
+   }
+ };
  const instagramBtn=document.querySelector('#instagramBtn');
  if(instagramBtn)instagramBtn.onclick=()=>window.open('https://www.instagram.com/indo.por.ai.com.a.gente/','_blank');
  document.querySelectorAll('[data-discovery]').forEach(card=>card.onclick=()=>{
@@ -846,7 +862,7 @@ function beforeView(){
  const firstDay=t?.itinerary?.[0];
  return `<section class="v2-hero v2-before-hero">
  <div class="v2-hero-top"><div><span class="eyebrow">Antes da viagem</span><h1>${dest} já está esperando por você. ${flag}</h1><p>${t?.published?'Sua experiência personalizada está publicada.':'Sua viagem está em preparação.'}</p></div><span class="v2-weather">✈️ ${country}</span></div>
- <div class="v2-countdown"><div><strong>${t?.startDate?new Date(t.startDate+'T12:00:00').toLocaleDateString('pt-BR',{day:'2-digit'}):'--'}</strong><small>embarque</small></div><div><strong>${t?.itinerary?.length||0}</strong><small>dias de roteiro</small></div><div><strong>${plan}</strong><small>plano</small></div></div>
+ <div class="v2-countdown"><div><strong>${t?.startDate?new Date(t.startDate+'T12:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'}):'--/--'}</strong><small>embarque</small></div><div><strong>${t?.itinerary?.length||0}</strong><small>dias de roteiro</small></div><div><strong>${plan}</strong><small>plano</small></div></div>
  <button class="btn btn-primary btn-block" data-go="trip">Abrir meu roteiro</button>
 </section>
 ${modeCard()}
@@ -968,7 +984,7 @@ function adminIntegratedView(){
 }
 
 function prospectView(){return `<section class="prospect-premium">
- <span class="eyebrow">Ainda não sou cliente</span><h1>Sua viagem começa antes do embarque.</h1><p>Roteiros, organização, acompanhamento e memórias em uma única experiência.</p><button class="btn btn-primary">Quero viajar com o Indo por Aí</button>
+ <span class="eyebrow">Ainda não sou cliente</span><h1>Sua viagem começa antes do embarque.</h1><p>Roteiros, organização, acompanhamento e memórias em uma única experiência.</p><button class="btn btn-primary" id="whatsappProspectBtn">Quero viajar com o Indo por Aí</button>
 </section>
 ${plansSalesBlock()}
 <section class="section"><div class="instagram-showcase"><div class="instagram-mark">◎</div><div><span class="eyebrow">Conheça nossa comunidade</span><h2>Uma comunidade com mais de 21 mil apaixonados por viagens.</h2><p>Roteiros, dicas e experiências reais para inspirar sua próxima história.</p><b>@indo.por.ai.com.a.gente</b></div><button class="btn btn-primary" id="instagramBtn">Abrir Instagram</button></div></section>
