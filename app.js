@@ -102,10 +102,14 @@ function bind(){
    IPAData.saveJourneyPlace(tripId,dayNo,placeId,{checked:!current.checked});
    toast(!current.checked?'Check realizado ✓':'Check removido');render();
  });
- document.querySelectorAll('[data-journey-rate]').forEach(btn=>btn.onclick=()=>{
-   const [tripId,dayNo,placeId]=btn.dataset.journeyRate.split('|');
-   const placeName=decodeURIComponent(btn.dataset.placeName||'Local');
-   showJourneyRating(tripId,dayNo,placeId,placeName);
+ document.querySelectorAll('[data-journey-rate]').forEach(btn=>{
+   btn.onclick=(ev)=>{
+     ev.preventDefault();
+     ev.stopPropagation();
+     const [tripId,dayNo,placeId]=btn.dataset.journeyRate.split('|');
+     const placeName=decodeURIComponent(btn.dataset.placeName||'Local');
+     showJourneyRating(tripId,dayNo,placeId,placeName);
+   };
  });
  document.querySelectorAll('[data-memory-movie]').forEach(btn=>btn.onclick=()=>{const t=activeTrip(),m=(ipaDB().memories||[]).filter(x=>x.tripId===t?.id);showModal(`<span class="eyebrow">FILME DA VIAGEM</span><h2>${t?.name||'Sua viagem'}</h2><p>${m.length?`Selecionamos ${m.length} memórias para sua retrospectiva.`:'Adicione fotos e vídeos para criar a retrospectiva.'}</p><div class="movie-preview-strip">${m.slice(0,6).map(x=>x.type==='video'?`<video src="${x.src||x.url}" muted playsinline></video>`:`<img src="${x.src||x.url}">`).join('')}</div><small>A montagem automática completa será gerada a partir das memórias salvas.</small>`)});
  document.querySelectorAll('[data-memory-prompt]').forEach(btn=>btn.onclick=()=>{
@@ -1219,8 +1223,63 @@ function showMemoryDay(title){
 
 
 function showJourneyRating(tripId,dayNo,placeId,placeName){
- showModal(`<span class="eyebrow">Sua experiência</span><h2>Como foi ${placeName}?</h2><div class="star-picker">${[1,2,3,4,5].map(n=>`<button data-journey-star="${n}">★</button>`).join('')}</div><textarea id="journeyRatingNote" class="rating-text" placeholder="Conte em poucas palavras..."></textarea><button id="saveJourneyRating" class="btn btn-primary btn-block" disabled>Salvar avaliação</button>`);
- setTimeout(()=>{let chosen=0;const stars=[...document.querySelectorAll('[data-journey-star]')],save=document.querySelector('#saveJourneyRating');stars.forEach(b=>b.onclick=()=>{chosen=Number(b.dataset.journeyStar);stars.forEach(x=>x.classList.toggle('selected',Number(x.dataset.journeyStar)<=chosen));save.disabled=false});save.onclick=()=>{IPAData.saveJourneyPlace(tripId,dayNo,placeId,{rating:chosen,note:document.querySelector('#journeyRatingNote').value.trim()});toast('Avaliação salva ✓');modal.close();render()};},0);
+  const d=ipaDB(),key=[tripId,dayNo,placeId].join(':'),current=d.journeyPlaces?.[key]||{};
+  const currentRating=Number(current.rating||0);
+  showModal(`<span class="eyebrow">SUA EXPERIÊNCIA</span>
+    <h2>Como foi ${placeName}?</h2>
+    <p class="rating-help">Toque nas estrelas para dar sua nota.</p>
+    <div class="star-picker" role="radiogroup" aria-label="Avaliação de 1 a 5 estrelas">
+      ${[1,2,3,4,5].map(n=>`<button type="button" class="${n<=currentRating?'selected':''}" data-journey-star="${n}" aria-label="${n} estrela${n>1?'s':''}" aria-pressed="${n<=currentRating?'true':'false'}">★</button>`).join('')}
+    </div>
+    <div id="journeyRatingValue" class="rating-value">${currentRating?`${currentRating}/5`:'Selecione uma nota'}</div>
+    <textarea id="journeyRatingNote" class="rating-text" placeholder="Conte em poucas palavras...">${current.note||''}</textarea>
+    <button type="button" id="saveJourneyRating" class="btn btn-primary btn-block" ${currentRating?'':'disabled'}>Salvar avaliação</button>`);
+
+  setTimeout(()=>{
+    let chosen=currentRating;
+    const stars=[...document.querySelectorAll('[data-journey-star]')];
+    const save=document.querySelector('#saveJourneyRating');
+    const label=document.querySelector('#journeyRatingValue');
+
+    const paint=()=>{
+      stars.forEach(star=>{
+        const n=Number(star.dataset.journeyStar);
+        const on=n<=chosen;
+        star.classList.toggle('selected',on);
+        star.setAttribute('aria-pressed',on?'true':'false');
+      });
+      if(label)label.textContent=chosen?`${chosen}/5`:'Selecione uma nota';
+      if(save)save.disabled=!chosen;
+    };
+
+    stars.forEach(star=>{
+      const choose=(ev)=>{
+        ev.preventDefault();
+        ev.stopPropagation();
+        chosen=Number(star.dataset.journeyStar);
+        paint();
+      };
+      star.onclick=choose;
+      star.ontouchend=choose;
+    });
+
+    paint();
+
+    if(save){
+      save.onclick=async(ev)=>{
+        ev.preventDefault();
+        if(!chosen){toast('Selecione de 1 a 5 estrelas');return}
+        const note=document.querySelector('#journeyRatingNote')?.value.trim()||'';
+        IPAData.saveJourneyPlace(tripId,dayNo,placeId,{rating:chosen,note});
+        if(window.IPAFirebase?.user && window.IPAFirebase?.syncNow){
+          try{await window.IPAFirebase.syncNow()}catch(e){console.warn('Avaliação salva localmente; sincronização pendente',e)}
+        }
+        toast(`Avaliação ${chosen}★ salva ✓`);
+        modal.close();
+        render();
+      };
+    }
+  },40);
 }
 function openConcierge(){
  const t=activeTrip();
