@@ -1,11 +1,11 @@
-const CACHE = "indo-por-ai-v2-beta-6-15-1-2-2-1-2-2-1";
+const CACHE = "indo-por-ai-v2-beta-6-15-1-1-1-2-2-1-2-2-1";
 const CORE = [
   "./",
   "index.html",
-  "styles.css?v=v2-beta-6-15-2-2",
-  "app.js?v=v2-beta-6-15-2-2",
-  "data-service.js?v=v2-beta-6-15-2-2",
-  "firebase-service.js?v=v2-beta-6-15-2-2",
+  "styles.css?v=v2-beta-6-15-1-2-2",
+  "app.js?v=v2-beta-6-15-1-2-2",
+  "data-service.js?v=v2-beta-6-15-1-2-2",
+  "firebase-service.js?v=v2-beta-6-15-1-2-2",
   "firebase-service.js?v=v2-beta-5",
   "admin.html",
   "admin.js",
