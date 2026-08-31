@@ -76,6 +76,7 @@ function render(){
  bind(); window.scrollTo({top:0,behavior:'smooth'});
 }
 function bind(){
+ bindCapturedExperience();
  document.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>{state.route=b.dataset.go;render()});
  document.querySelectorAll('[data-modal]').forEach(b=>b.onclick=()=>showModal(b.dataset.modal));
  document.querySelectorAll('[data-map]').forEach(b=>b.onclick=()=>window.open('https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(b.dataset.map),'_blank'));
@@ -1197,6 +1198,21 @@ function diaryView(){return `<section class="diary-page-hero"><span class="eyebr
 <section class="section"><div class="section-head"><h2>Curiosidade do destino</h2></div><div class="diary-curiosity"><span>💡</span><p>A Ribeira é uma das áreas mais antigas do Porto e integra a zona histórica classificada como Patrimônio Mundial.</p></div></section>
 <section class="section"><div class="section-head"><h2>Frase do guia</h2></div><blockquote class="diary-quote">“Hoje vocês não conheceram apenas o Porto — começaram a criar a história que vão contar quando voltarem.”</blockquote></section>
 <section class="section"><button class="btn btn-primary btn-block" data-go="memories">Ver fotos e vídeos do dia</button></section>`}
+
+function localCapturedMoments(){
+ try{return (JSON.parse(localStorage.getItem('ipa615')||'{}').moments||[])}catch(e){return[]}
+}
+function capturedExperience(){
+ const ms=localCapturedMoments(); if(!ms.length)return '';
+ return `<section class="section captured615"><div class="section-head"><div><span class="eyebrow">📷 MOMENTOS REGISTRADOS</span><h2>Suas memórias da viagem</h2></div><span class="chip green">${ms.length} momentos</span></div>
+ <div class="captured615grid">${ms.map(m=>`<article>${m.media?(String(m.type).startsWith('video')?`<video src="${m.media}" controls playsinline></video>`:`<img src="${m.media}">`):`<div class="captured615ph">📷<small>${m.name}</small></div>`}<div class="captured615copy">${m.featured?'<span>❤️ Destaque</span>':''}<b>${m.caption||'Momento da viagem'}</b><small>${new Date(m.date).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}</small></div></article>`).join('')}</div></section>
+ <section class="section movie615"><div class="section-head"><div><span class="eyebrow">🎬 FILME DA VIAGEM</span><h2>Seu filme já começou</h2></div><span class="chip orange">${ms.length} cenas</span></div>
+ <div class="movie615stage">${ms.map((m,i)=>`<div class="movie615scene ${i===0?'active':''}">${m.media?(String(m.type).startsWith('video')?`<video src="${m.media}" muted playsinline></video>`:`<img src="${m.media}">`):'<div class="movie615ph">📷</div>'}<div><b>${m.caption||'Momento da viagem'}</b></div></div>`).join('')}</div>
+ <div class="movie615controls"><button data-play615>▶ Assistir meu filme</button><span data-progress615>1 / ${ms.length}</span></div></section>`;
+}
+function bindCapturedExperience(){
+ document.querySelectorAll('[data-play615]').forEach(btn=>{let box=btn.closest('.movie615'),sc=[...box.querySelectorAll('.movie615scene')],p=box.querySelector('[data-progress615]'),i=0,t=null;btn.onclick=()=>{if(t){clearInterval(t);t=null;btn.textContent='▶ Continuar';return}btn.textContent='⏸ Pausar';t=setInterval(()=>{sc[i].classList.remove('active');i=(i+1)%sc.length;sc[i].classList.add('active');let v=sc[i].querySelector('video');if(v)try{v.currentTime=0;v.play()}catch(e){}p.textContent=`${i+1} / ${sc.length}`},3000)}})
+}
 function memoriesView(){
  const t=activeTrip();if(!t)return `<section class="section"><h2>Viagem não encontrada</h2></section>`;
  const days=(t.itinerary||[]).sort((a,b)=>Number(a.day)-Number(b.day)),country=tripCountry(t),flag=countryFlag(country);
@@ -1207,7 +1223,7 @@ function memoriesView(){
  <section class="section"><div class="section-head"><div><span class="eyebrow">LINHA DO TEMPO</span><h2>A viagem, dia por dia</h2></div></div><div class="album-days">${dayCards||'<p>O diário começará quando o roteiro for cadastrado.</p>'}</div></section>
  <section class="section"><div class="section-head"><div><span class="eyebrow">MOMENTOS SUGERIDOS</span><h2>Crie uma memória agora</h2></div></div><div class="memory-prompt-grid">${[['🥂','Hora do brinde'],['👨‍👩‍👧','Nossa turma'],['🍽️','Sabor inesquecível'],['🌅','A vista do dia'],['😂','Momento espontâneo'],['❤️','Meu favorito']].map(x=>`<button data-memory-prompt="${x[1]}"><span>${x[0]}</span><b>${x[1]}</b><small>${tripDestination(t)}</small></button>`).join('')}</div></section>
  <section class="section"><div class="section-head"><h2>Suas fotos e vídeos</h2></div><div class="live-memory-grid">${memories.map(m=>m.type==='video'?`<div class="live-memory"><video src="${m.src||m.url}" controls playsinline></video><b>${m.prompt||'Vídeo'}</b></div>`:`<div class="live-memory"><img src="${m.src||m.url}" alt=""><b>${m.prompt||'Memória'}</b></div>`).join('')||`<div class="empty-memory"><span>📷</span><h3>Seu álbum começa aqui</h3><button class="btn btn-primary" id="addPhoto">Adicionar foto ou vídeo</button></div>`}</div></section>
- ${tripModule('movie')?`<section class="section"><div class="memory-building-card"><span>🎬</span><div><b>Filme da viagem</b><p>${memories.length>=3?'Já temos material para a retrospectiva.':'Adicione pelo menos 3 memórias para começar a retrospectiva.'}</p></div><button class="btn btn-light" data-memory-movie>Assistir prévia</button></div></section>`:''}`;
+ ${tripModule('movie')?`<section class="section"><div class="memory-building-card"><span>🎬</span><div><b>Filme da viagem</b><p>${memories.length>=3?'Já temos material para a retrospectiva.':'Adicione pelo menos 3 memórias para começar a retrospectiva.'}</p></div><button class="btn btn-light" data-memory-movie>Assistir prévia</button></div></section>`:''}${capturedExperience()}`;
 }
 async function handlePhotos(e){
  const t=activeTrip(),prompt=localStorage.getItem('ipa-memory-prompt')||'Memória da viagem';
