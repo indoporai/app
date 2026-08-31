@@ -4,7 +4,7 @@ function rating(b){let key=b.dataset.journeyRate||'local',s=db(),cur=s.ratings?.
 const paint=()=>{o.querySelectorAll('[data-s]').forEach(x=>x.classList.toggle('on',+x.dataset.s<=v));o.querySelector('.b615score').textContent=v?v+'/5':'Selecione uma nota'};
 o.querySelectorAll('[data-s]').forEach(x=>{let f=e=>{e.preventDefault();e.stopPropagation();v=+x.dataset.s;paint()};x.addEventListener('pointerup',f);x.addEventListener('click',f)});paint();
 o.querySelector('.b615save').onclick=()=>{if(!v)return alert('Selecione uma nota');s=db();s.ratings||={};s.ratings[key]={rating:v,note:o.querySelector('textarea').value,date:new Date().toISOString()};save(s);try{let p=key.split('|');if(window.IPAData?.saveJourneyPlace&&p.length>2)IPAData.saveJourneyPlace(p[0],p[1],p[2],s.ratings[key])}catch{}o.remove()} }
-function moment(b){let key=b.dataset.moment,o=modal(`<h2>📷 Registrar momento</h2><p>Essa mídia alimentará Memórias, Álbum e Filme.</p>
+function moment(b){let key=b.dataset.moment,o=modal(`<h2>📷 Registrar momento</h2><p>Essa mídia alimentará Memórias, Álbum, Linha do Tempo e Filme.</p>
 <div class="b615mediachoices">
 <label class="b615up">📸 Tirar foto<input class="b615camera" type="file" accept="image/*" capture="environment"></label>
 <label class="b615up">🖼️ Escolher da galeria<input class="b615gallery" type="file" accept="image/*,video/*" multiple></label>
@@ -13,7 +13,38 @@ function moment(b){let key=b.dataset.moment,o=modal(`<h2>📷 Registrar momento<
 const pick=e=>{files=[...e.target.files];let p=o.querySelector('.b615prev');p.innerHTML='';files.slice(0,8).forEach(f=>{let u=URL.createObjectURL(f),el=document.createElement(f.type.startsWith('video')?'video':'img');el.src=u;if(el.tagName==='VIDEO')el.controls=true;p.appendChild(el)})};
 o.querySelector('.b615camera').onchange=pick;o.querySelector('.b615gallery').onchange=pick;
 const dataURL=f=>new Promise((ok,no)=>{let r=new FileReader();r.onload=()=>ok(r.result);r.onerror=no;r.readAsDataURL(f)});
-o.querySelector('.b615ms').onclick=async()=>{if(!files.length)return alert('Escolha uma foto ou vídeo');let s=db();s.moments||=[];for(const f of files){let media='';try{if(f.type.startsWith('image/')&&f.size<4500000)media=await dataURL(f);else if(f.type.startsWith('video/')&&f.size<2000000)media=await dataURL(f)}catch(e){}s.moments.push({id:'m-'+Date.now()+'-'+Math.random().toString(36).slice(2,6),place:key,name:f.name,type:f.type,media,caption:o.querySelector('.b615cap').value,featured:o.querySelector('.b615fav').checked,date:new Date().toISOString()})}try{save(s)}catch(e){return alert('A mídia ficou grande demais para salvar. Tente uma foto menor.')}o.remove();alert('Momento registrado e enviado para Memórias ✓');try{render()}catch(e){}} }
+o.querySelector('.b615ms').onclick=async()=>{
+ if(!files.length)return alert('Escolha uma foto ou vídeo');
+ const t=typeof activeTrip==='function'?activeTrip():null;
+ const parts=String(key||'').split('|');
+ const day=Number(parts[1]||((typeof state!=='undefined'&&state.tripDay)||1));
+ const placeId=parts[2]||'';
+ const placeName=decodeURIComponent(b.dataset.placeName||'Momento da viagem');
+ const caption=o.querySelector('.b615cap').value.trim();
+ const featured=o.querySelector('.b615fav').checked;
+ let local=db();local.moments||=[];
+ for(const f of files){
+   const type=f.type.startsWith('video/')?'video':'image';
+   let src='',path='';
+   try{
+     if(window.IPAFirebase?.uploadMemory && t?.clientId){
+       const up=await window.IPAFirebase.uploadMemory(f,t.clientId,t.id);
+       src=up?.url||''; path=up?.path||'';
+     }else{
+       src=await dataURL(f);
+     }
+   }catch(err){
+     try{src=await dataURL(f)}catch(e){}
+   }
+   const memory={tripId:t?.id||'',clientId:t?.clientId||'',prompt:caption||placeName,type,src,url:src,path,name:f.name,day,placeId,placeName,featured};
+   try{window.IPAData?.addMemory(memory)}catch(e){console.warn('Memória local pendente',e)}
+   local.moments.push({id:'m-'+Date.now()+'-'+Math.random().toString(36).slice(2,8),tripId:t?.id||'',place:key,placeId,placeName,name:f.name,type:f.type,media:src,caption,featured,date:new Date().toISOString()});
+ }
+ try{save(local)}catch(e){console.warn('Cache local da mídia não coube; memória principal foi preservada',e)}
+ if(window.IPAFirebase?.user && window.IPAFirebase?.syncNow){try{await window.IPAFirebase.syncNow()}catch(e){console.warn('Sincronização pendente',e)}}
+ o.remove();alert(`${files.length} momento${files.length>1?'s':''} salvo${files.length>1?'s':''} em Memórias ✓`);
+ try{render()}catch(e){}
+} }
 async function fetchSmartPlaces(q){
  try{
   const r=await fetch('/api/places/search?q='+encodeURIComponent(q));

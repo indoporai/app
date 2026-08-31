@@ -1087,6 +1087,10 @@ function prospectView(){return `<section class="prospect-premium">
 ${plansSalesBlock()}
 <section class="section"><div class="instagram-showcase"><div class="instagram-mark">◎</div><div><span class="eyebrow">Conheça nossa comunidade</span><h2>Uma comunidade com mais de 21 mil apaixonados por viagens.</h2><p>Roteiros, dicas e experiências reais para inspirar sua próxima história.</p><b>@indo.por.ai.com.a.gente</b></div><button class="btn btn-primary" id="instagramBtn">Abrir Instagram</button></div></section>
 <section class="section"><div class="prospect-proof"><span>❤️</span><div><span class="eyebrow">Indo por Aí</span><h3>Não vendemos apenas um destino.</h3><p>Acompanhamos a história antes, durante e depois da viagem.</p></div></div></section>`}
+function journeyInlineStars(tripId,dayNo,placeId){
+ const d=ipaDB(),k=[tripId,dayNo,placeId].join(':'),v=Number(d?.journeyPlaces?.[k]?.rating||0);
+ return `<span class="journey-inline-stars" aria-label="${v?`Avaliação ${v} de 5`:'Ainda não avaliado'}">${[1,2,3,4,5].map(n=>`<span class="${n<=v?'on':''}">★</span>`).join('')}</span>`;
+}
 function duringView(){
  const t=activeTrip();
  if(!t)return `<section class="section"><h2>Viagem não encontrada</h2><p>Não há uma viagem ativa para este cliente.</p></section>`;
@@ -1098,7 +1102,7 @@ function duringView(){
  const country=tripCountry(t),flag=countryFlag(country),route=googleMapsRouteUrl(day,t);
  return `<section class="hero during-personalized-hero"><span class="eyebrow">Durante a viagem</span><h1>${tripDestination(t)} ${flag}</h1><p>${t.name} · Dia ${day.day}${day.title?` · ${day.title}`:''}</p><div class="hero-actions">${route?`<button class="btn btn-light" data-external-route="${route}">Abrir rota</button>`:''}${tripModule('concierge')?`<button class="btn btn-light" data-concierge>👑 Concierge</button>`:''}${tripModule('live')?`<button class="btn btn-primary" id="realLiveBtn">🔴 Live</button>`:''}</div></section>
  ${modeCard()}
- <section class="section"><div class="section-head"><div><span class="eyebrow">Roteiro real</span><h2>${day.title||`Dia ${day.day}`}</h2></div><span class="chip">${places.length} locais</span></div><div class="during-place-list">${places.map((p,i)=>`<div class="during-place-card"><div class="during-place-number">${i+1}</div><div><small>${p.time||'Horário livre'}</small><b>${p.name}</b><p>${p.address||p.note||'Programado no roteiro'}</p><div class="during-place-actions"><button data-map="${(p.address||p.name)+', '+country}">Mapa</button><button class="${(ipaDB().journeyPlaces?.[[t.id,day.day,p.id||i].join(':')]?.checked)?'checked':''}" data-journey-check="${t.id}|${day.day}|${p.id||i}">${(ipaDB().journeyPlaces?.[[t.id,day.day,p.id||i].join(':')]?.checked)?'✓ Feito':'✓ Check'}</button><button data-journey-rate="${t.id}|${day.day}|${p.id||i}" data-place-name="${encodeURIComponent(p.name)}">★ Avaliar</button></div></div></div>`).join('')||'<p>Nenhum local cadastrado para este dia.</p>'}</div></section>
+ <section class="section"><div class="section-head"><div><span class="eyebrow">Roteiro real</span><h2>${day.title||`Dia ${day.day}`}</h2></div><span class="chip">${places.length} locais</span></div><div class="during-place-list">${places.map((p,i)=>`<div class="during-place-card"><div class="during-place-number">${i+1}</div><div><small>${p.time||'Horário livre'}</small><div class="during-place-title"><b>${p.name}</b>${journeyInlineStars(t.id,day.day,p.id||i)}</div><p>${p.address||p.note||'Programado no roteiro'}</p><div class="during-place-actions"><button data-map="${(p.address||p.name)+', '+country}">Mapa</button><button class="${(ipaDB().journeyPlaces?.[[t.id,day.day,p.id||i].join(':')]?.checked)?'checked':''}" data-journey-check="${t.id}|${day.day}|${p.id||i}">${(ipaDB().journeyPlaces?.[[t.id,day.day,p.id||i].join(':')]?.checked)?'✓ Feito':'✓ Check'}</button><button data-journey-rate="${t.id}|${day.day}|${p.id||i}" data-place-name="${encodeURIComponent(p.name)}">★ Avaliar</button></div></div></div>`).join('')||'<p>Nenhum local cadastrado para este dia.</p>'}</div></section>
  <section class="section"><div class="section-head"><h2>Dias da viagem</h2></div><div class="day-strip">${days.map(x=>`<button class="day-pill ${Number(x.day)===Number(day.day)?'active':''}" data-day="${x.day}"><small>Dia</small><strong>${x.day}</strong></button>`).join('')}</div></section>`;
 }
 function afterView(){
@@ -1203,7 +1207,15 @@ function localCapturedMoments(){
  try{return (JSON.parse(localStorage.getItem('ipa615')||'{}').moments||[])}catch(e){return[]}
 }
 function capturedExperience(){
- const ms=localCapturedMoments(); if(!ms.length)return '';
+ const t=activeTrip();
+ const core=(ipaDB().memories||[]).filter(m=>m.tripId===t?.id).map(m=>({
+   ...m,
+   media:m.src||m.url||m.media||'',
+   caption:m.prompt||m.caption||'Momento da viagem',
+   date:m.createdAt||m.date||new Date().toISOString(),
+   type:m.type==='video'?'video/mp4':'image/jpeg'
+ }));
+ const ms=core.length?core:localCapturedMoments(); if(!ms.length)return '';
  return `<section class="section captured615"><div class="section-head"><div><span class="eyebrow">📷 MOMENTOS REGISTRADOS</span><h2>Suas memórias da viagem</h2></div><span class="chip green">${ms.length} momentos</span></div>
  <div class="captured615grid">${ms.map(m=>`<article>${m.media?(String(m.type).startsWith('video')?`<video src="${m.media}" controls playsinline></video>`:`<img src="${m.media}">`):`<div class="captured615ph">📷<small>${m.name}</small></div>`}<div class="captured615copy">${m.featured?'<span>❤️ Destaque</span>':''}<b>${m.caption||'Momento da viagem'}</b><small>${new Date(m.date).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}</small></div></article>`).join('')}</div></section>
  <section class="section movie615"><div class="section-head"><div><span class="eyebrow">🎬 FILME DA VIAGEM</span><h2>Seu filme já começou</h2></div><span class="chip orange">${ms.length} cenas</span></div>
@@ -1223,7 +1235,7 @@ function memoriesView(){
  <section class="section"><div class="section-head"><div><span class="eyebrow">LINHA DO TEMPO</span><h2>A viagem, dia por dia</h2></div></div><div class="album-days">${dayCards||'<p>O diário começará quando o roteiro for cadastrado.</p>'}</div></section>
  <section class="section"><div class="section-head"><div><span class="eyebrow">MOMENTOS SUGERIDOS</span><h2>Crie uma memória agora</h2></div></div><div class="memory-prompt-grid">${[['🥂','Hora do brinde'],['👨‍👩‍👧','Nossa turma'],['🍽️','Sabor inesquecível'],['🌅','A vista do dia'],['😂','Momento espontâneo'],['❤️','Meu favorito']].map(x=>`<button data-memory-prompt="${x[1]}"><span>${x[0]}</span><b>${x[1]}</b><small>${tripDestination(t)}</small></button>`).join('')}</div></section>
  <section class="section"><div class="section-head"><h2>Suas fotos e vídeos</h2></div><div class="live-memory-grid">${memories.map(m=>m.type==='video'?`<div class="live-memory"><video src="${m.src||m.url}" controls playsinline></video><b>${m.prompt||'Vídeo'}</b></div>`:`<div class="live-memory"><img src="${m.src||m.url}" alt=""><b>${m.prompt||'Memória'}</b></div>`).join('')||`<div class="empty-memory"><span>📷</span><h3>Seu álbum começa aqui</h3><button class="btn btn-primary" id="addPhoto">Adicionar foto ou vídeo</button></div>`}</div></section>
- ${tripModule('movie')?`<section class="section"><div class="memory-building-card"><span>🎬</span><div><b>Filme da viagem</b><p>${memories.length>=3?'Já temos material para a retrospectiva.':'Adicione pelo menos 3 memórias para começar a retrospectiva.'}</p></div><button class="btn btn-light" data-memory-movie>Assistir prévia</button></div></section>`:''}${capturedExperience()}`;
+ ${tripModule('movie')?`<section class="section"><div class="memory-building-card"><span>🎬</span><div><b>Filme da viagem</b><p>${memories.length?'Já temos material para a retrospectiva.':'Registre seu primeiro momento para começar a retrospectiva.'}</p></div><button class="btn btn-light" data-memory-movie>Assistir prévia</button></div></section>`:''}${capturedExperience()}`;
 }
 async function handlePhotos(e){
  const t=activeTrip(),prompt=localStorage.getItem('ipa-memory-prompt')||'Memória da viagem';
