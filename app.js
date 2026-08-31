@@ -243,7 +243,7 @@ function bind(){
      showJourneyRating(tripId,dayNo,placeId,placeName);
    };
  });
- document.querySelectorAll('[data-memory-movie]').forEach(btn=>btn.onclick=()=>{const t=activeTrip(),m=(ipaDB().memories||[]).filter(x=>x.tripId===t?.id);showModal(`<span class="eyebrow">FILME DA VIAGEM</span><h2>${t?.name||'Sua viagem'}</h2><p>${m.length?`Selecionamos ${m.length} memórias para sua retrospectiva.`:'Adicione fotos e vídeos para criar a retrospectiva.'}</p><div class="movie-preview-strip">${m.slice(0,6).map(x=>x.type==='video'?`<video src="${x.src||x.url}" muted playsinline></video>`:`<img src="${x.src||x.url}">`).join('')}</div><small>A montagem automática completa será gerada a partir das memórias salvas.</small>`)});
+ document.querySelectorAll('[data-memory-movie]').forEach(btn=>btn.onclick=()=>openTravelMovie());
  document.querySelectorAll('[data-memory-prompt]').forEach(btn=>btn.onclick=()=>{
    localStorage.setItem('ipa-memory-prompt',btn.dataset.memoryPrompt||'Memória da viagem');
    photoInput.click();
@@ -1439,7 +1439,7 @@ function capturedExperience(){
  <div class="captured615grid">${ms.map(m=>`<article>${m.media?(String(m.type).startsWith('video')?`<video src="${m.media}" controls playsinline></video>`:`<img src="${m.media}">`):`<div class="captured615ph">📷<small>${m.name}</small></div>`}<div class="captured615copy">${m.featured?'<span>❤️ Destaque</span>':''}<b>${m.caption||'Momento da viagem'}</b><small>${new Date(m.date).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}</small></div></article>`).join('')}</div></section>
  <section class="section movie615"><div class="section-head"><div><span class="eyebrow">🎬 FILME DA VIAGEM</span><h2>Seu filme já começou</h2></div><span class="chip orange">${ms.length} cenas</span></div>
  <div class="movie615stage">${ms.map((m,i)=>`<div class="movie615scene ${i===0?'active':''}">${m.media?(String(m.type).startsWith('video')?`<video src="${m.media}" muted playsinline></video>`:`<img src="${m.media}">`):'<div class="movie615ph">📷</div>'}<div><b>${m.caption||'Momento da viagem'}</b></div></div>`).join('')}</div>
- <div class="movie615controls"><button data-play615>▶ Assistir meu filme</button><span data-progress615>1 / ${ms.length}</span></div></section>`;
+ <div class="movie615controls"><button data-memory-movie>▶ Assistir Filme 2.0</button><span data-progress615>1 / ${ms.length}</span></div></section>`;
 }
 function bindCapturedExperience(){
  document.querySelectorAll('[data-play615]').forEach(btn=>{let box=btn.closest('.movie615'),sc=[...box.querySelectorAll('.movie615scene')],p=box.querySelector('[data-progress615]'),i=0,t=null;btn.onclick=()=>{if(t){clearInterval(t);t=null;btn.textContent='▶ Continuar';return}btn.textContent='⏸ Pausar';t=setInterval(()=>{sc[i].classList.remove('active');i=(i+1)%sc.length;sc[i].classList.add('active');let v=sc[i].querySelector('video');if(v)try{v.currentTime=0;v.play()}catch(e){}p.textContent=`${i+1} / ${sc.length}`},3000)}})
@@ -1590,9 +1590,81 @@ if(!(window.IPAFirebase?.isEmailSignInLink?.())){
 }
 
 
+function ipaMovieMemories(t){
+ const raw=(ipaDB().memories||[]).filter(m=>m.tripId===t?.id);
+ return raw.map((m,i)=>({
+   ...m,
+   media:m.url||m.src||m.remote||m.media||'',
+   caption:m.prompt||m.caption||m.placeName||'Momento da viagem',
+   placeName:m.placeName||m.place||'',
+   participantName:m.participantName||'',
+   featured:!!m.featured,
+   day:Number(m.day||1),
+   date:m.createdAt||m.date||'',
+   isVideo:m.type==='video'||String(m.type||'').startsWith('video')
+ })).filter(m=>m.media).sort((a,b)=>{
+   if(a.featured!==b.featured)return a.featured?-1:1;
+   if(a.day!==b.day)return a.day-b.day;
+   return String(a.date).localeCompare(String(b.date));
+ });
+}
+function ipaMovieDates(t){
+ const f=v=>{if(!v)return'';try{return new Date(v+'T12:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'short',year:'numeric'})}catch(e){return v}};
+ return [f(t?.startDate),f(t?.endDate)].filter(Boolean).join(' — ');
+}
+function ipaMovieTravelers(t){
+ const names=(t?.participants||[]).map(p=>p.name).filter(Boolean);
+ return names.length?names.join(' · '):'Uma história para guardar';
+}
 function openTravelMovie(){
- showModal(`<div class="fake-movie-player"><div class="fake-movie-screen"><div class="movie-scene"><span>PORTUGAL 2026</span><strong>Uma história Indo por Aí</strong></div><button class="fake-play-button" id="fakePlayButton">▶</button><div class="fake-progress"><span id="fakeMovieProgress"></span></div></div><div class="fake-movie-details"><h2>Seu filme da viagem</h2><p id="fakeMovieText">Abertura cinematográfica · mapa animado · melhores momentos · créditos finais.</p><div class="movie-chapters"><span>00:00 Porto</span><span>00:42 Douro</span><span>01:28 Lisboa</span><span>02:18 Créditos</span></div></div></div>`);
- setTimeout(()=>{const btn=document.querySelector('#fakePlayButton');const bar=document.querySelector('#fakeMovieProgress');const text=document.querySelector('#fakeMovieText');if(btn)btn.onclick=()=>{btn.textContent='❚❚';if(bar)bar.style.width='78%';if(text)text.textContent='Montando uma prévia com as memórias reais desta viagem.';setTimeout(()=>{if(btn)btn.textContent='▶';},3500);};},0);
+ const t=activeTrip();if(!t)return;
+ const memories=ipaMovieMemories(t);
+ if(!memories.length){showModal(`<div class="movie2-empty"><span>🎬</span><h2>Seu filme começa com a primeira memória</h2><p>Registre uma foto ou vídeo durante a viagem e ela entrará automaticamente aqui.</p><button class="btn btn-primary" onclick="modal.close();state.route='today';state.mode='during';render()">Ir para o Durante</button></div>`);return}
+ const dest=tripDestination(t),dates=ipaMovieDates(t),travelers=ipaMovieTravelers(t);
+ const scenes=[
+   {kind:'intro',caption:dest,sub:dates||t.name||'Sua viagem'},
+   ...memories,
+   {kind:'outro',caption:`${dest} · ${new Date().getFullYear()}`,sub:'Uma história Indo por Aí'}
+ ];
+ showModal(`<div class="movie2-shell">
+   <div class="movie2-screen" data-movie2-screen>
+     <div class="movie2-scene active movie2-intro" data-movie2-scene="0"><div class="movie2-overlay"><span>INDO POR AÍ APRESENTA</span><h2>${ipaEscape(dest)}</h2><p>${ipaEscape(dates||travelers)}</p></div></div>
+     ${memories.map((m,i)=>`<div class="movie2-scene ${m.featured?'featured':''}" data-movie2-scene="${i+1}">
+       ${m.isVideo?`<video src="${m.media}" muted playsinline preload="metadata"></video>`:`<img src="${m.media}" alt="">`}
+       <div class="movie2-overlay movie2-caption">${m.featured?'<span>❤️ DESTAQUE DA VIAGEM</span>':`<span>DIA ${m.day}</span>`}<h3>${ipaEscape(m.placeName||m.caption)}</h3><p>${ipaEscape(m.placeName&&m.caption!==m.placeName?m.caption:'')}${m.participantName?`<small>Registrado por ${ipaEscape(m.participantName)}</small>`:''}</p></div>
+     </div>`).join('')}
+     <div class="movie2-scene movie2-outro" data-movie2-scene="${scenes.length-1}"><div class="movie2-overlay"><span>MEMÓRIAS DE ${ipaEscape(travelers)}</span><h2>${ipaEscape(dest)}</h2><p>Uma história Indo por Aí</p></div></div>
+     <button class="movie2-mainplay" data-movie2-play>▶</button>
+     <div class="movie2-progress"><i data-movie2-progress></i></div>
+   </div>
+   <div class="movie2-meta"><div><span class="eyebrow">🎬 FILME 2.0</span><h2>${ipaEscape(t.name||dest)}</h2><p>${memories.length} memória${memories.length>1?'s':''} · ${memories.filter(x=>x.featured).length} destaque${memories.filter(x=>x.featured).length!==1?'s':''}</p></div>
+   <div class="movie2-controls"><button data-movie2-prev>‹</button><button class="primary" data-movie2-play>▶ Assistir</button><button data-movie2-next>›</button></div></div>
+   <div class="movie2-chapters">${[...new Set(memories.map(m=>m.day))].map(d=>`<span>Dia ${d}</span>`).join('')}<span>Créditos</span></div>
+ </div>`);
+ setTimeout(()=>ipaBindMovie2(scenes),30);
+}
+function ipaBindMovie2(scenes){
+ const root=document.querySelector('.movie2-shell');if(!root)return;
+ const els=[...root.querySelectorAll('[data-movie2-scene]')],bar=root.querySelector('[data-movie2-progress]');
+ const plays=[...root.querySelectorAll('[data-movie2-play]')];
+ let i=0,timer=null,playing=false;
+ const stopVideo=()=>els.forEach(x=>{const v=x.querySelector('video');if(v){try{v.pause()}catch(e){}}});
+ const paint=()=>{
+   stopVideo();els.forEach((x,n)=>x.classList.toggle('active',n===i));
+   if(bar)bar.style.width=`${((i+1)/els.length)*100}%`;
+   const v=els[i]?.querySelector('video');if(v&&playing){try{v.currentTime=0;v.play()}catch(e){}}
+   plays.forEach(b=>b.textContent=playing?'⏸ Pausar':'▶ Assistir');
+ };
+ const schedule=()=>{
+   clearTimeout(timer);if(!playing)return;
+   const v=els[i]?.querySelector('video');
+   const ms=v&&Number.isFinite(v.duration)?Math.min(Math.max(v.duration*1000,2500),8000):(i===0||i===els.length-1?3500:4000);
+   timer=setTimeout(()=>{if(i>=els.length-1){playing=false;i=0;paint();return}i++;paint();schedule()},ms);
+ };
+ plays.forEach(b=>b.onclick=()=>{playing=!playing;paint();schedule()});
+ root.querySelector('[data-movie2-next]').onclick=()=>{i=(i+1)%els.length;paint();schedule()};
+ root.querySelector('[data-movie2-prev]').onclick=()=>{i=(i-1+els.length)%els.length;paint();schedule()};
+ paint();
 }
 function showMemoryDay(title){
  showModal(`<div class="memory-day-modal"><span class="eyebrow">Álbum de lembranças</span><h2>${title}</h2><div class="memory-modal-grid"><div>📸<small>Foto favorita</small></div><div>🎥<small>Vídeo do dia</small></div><div>📍<small>Mapa visitado</small></div><div>❤️<small>Momento salvo</small></div></div><p>Esta é uma demonstração visual. Na versão real, as fotos, vídeos, locais, avaliações e mensagens daquele dia aparecerão aqui automaticamente.</p></div>`);
@@ -1648,12 +1720,13 @@ function showJourneyRating(tripId,dayNo,placeId,placeName){
         if(!chosen){toast('Selecione de 1 a 5 estrelas');return}
         const note=document.querySelector('#journeyRatingNote')?.value.trim()||'';
         IPAData.saveJourneyPlace(tripId,dayNo,placeId,{rating:chosen,note});
-        if(window.IPAFirebase?.user && window.IPAFirebase?.syncNow){
-          try{await window.IPAFirebase.syncNow()}catch(e){console.warn('Avaliação salva localmente; sincronização pendente',e)}
-        }
         toast(`Avaliação ${chosen}★ salva ✓`);
         modal.close();
         render();
+        // UI atualiza imediatamente; Firebase sincroniza sem bloquear a tela.
+        if(window.IPAFirebase?.user && window.IPAFirebase?.syncNow){
+          window.IPAFirebase.syncNow().catch(e=>console.warn('Avaliação salva localmente; sincronização pendente',e));
+        }
       };
     }
   },40);
