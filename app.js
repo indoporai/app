@@ -439,6 +439,40 @@ function bind(){
    }},0);
  });
 
+
+ document.querySelectorAll('[data-smart-filter]').forEach(b=>b.onclick=()=>loadSmartTips(b.dataset.smartFilter));
+ bindSmartTipActions();
+ if(state.route==='explore')setTimeout(()=>loadSmartTips('cafe restaurant attraction'),50);
+ document.querySelectorAll('[data-climate-explore]').forEach(b=>b.onclick=()=>{
+   state.route='explore';render();
+   const q=decodeURIComponent(b.dataset.climateExplore||'');
+   setTimeout(()=>loadSmartTips(q),100);
+ });
+ document.querySelectorAll('[data-admin-add-participant]').forEach(b=>b.onclick=()=>{
+   const tripId=b.dataset.adminAddParticipant;
+   showModal(`<span class="eyebrow">PARTICIPANTE</span><h2>Adicionar viajante</h2>
+   <label>Nome</label><input id="partName" class="v2-concierge-input" placeholder="Nome completo">
+   <label>E-mail</label><input id="partEmail" class="v2-concierge-input" placeholder="email@exemplo.com">
+   <label>Assento</label><input id="partSeat" class="v2-concierge-input" placeholder="Ex.: 18A">
+   <label class="participant-minor-check"><input id="partMinor" type="checkbox"> Menor vinculado ao responsável (sem login próprio)</label>
+   <button id="saveParticipant" class="btn btn-primary btn-block">Adicionar participante</button>`);
+   setTimeout(()=>document.querySelector('#saveParticipant').onclick=async()=>{
+     const d=adminData(),t=d.trips.find(x=>x.id===tripId);if(!t)return;
+     const name=document.querySelector('#partName').value.trim();if(!name)return toast('Informe o nome');
+     const list=[...(t.participants||[])];
+     list.push({id:'part-'+Date.now(),name,email:document.querySelector('#partEmail').value.trim().toLowerCase(),seat:document.querySelector('#partSeat').value.trim(),minor:document.querySelector('#partMinor').checked,status:'pending'});
+     IPAData.updateTrip(tripId,{participants:list});
+     if(window.IPAFirebase?.user)await window.IPAFirebase.syncNow();
+     toast('Participante adicionado ✓');modal.close();view.innerHTML=adminTripEditor(tripId);bind();
+   },0);
+ });
+ document.querySelectorAll('[data-admin-save-flight]').forEach(b=>b.onclick=async()=>{
+   const flight={};document.querySelectorAll('[data-flight-field]').forEach(x=>flight[x.dataset.flightField]=x.value.trim());
+   IPAData.updateTrip(b.dataset.adminSaveFlight,{flight});
+   if(window.IPAFirebase?.user)await window.IPAFirebase.syncNow();
+   toast('Dados do voo atualizados ✓');view.innerHTML=adminTripEditor(b.dataset.adminSaveFlight);bind();
+ });
+
  document.querySelectorAll('[data-admin-document]').forEach(b=>b.onclick=()=>{
    const tripId=b.dataset.adminDocument,clientId=b.dataset.clientId;
    showModal(`<span class="eyebrow">CARTEIRA DA VIAGEM</span><h2>Novo documento</h2><label>Tipo</label><select id="docType" class="v2-concierge-input"><option>Passagem aérea</option><option>Hotel</option><option>Ingresso</option><option>Voucher</option><option>Seguro viagem</option><option>Transfer</option><option>Outro</option></select><label>Título</label><input id="docTitle" class="v2-concierge-input" placeholder="Ex.: Voo GRU → CDG"><label>Data</label><input id="docDate" type="date" class="v2-concierge-input"><label>Horário</label><input id="docTime" type="time" class="v2-concierge-input"><div class="doc-row"><input id="docTerminal" class="v2-concierge-input" placeholder="Terminal"><input id="docGate" class="v2-concierge-input" placeholder="Portão"></div><label>Localizador / reserva</label><input id="docLocator" class="v2-concierge-input"><label>Arquivo</label><input id="docFile" type="file" class="v2-concierge-input" accept="application/pdf,image/*"><button id="saveTripDocument" class="btn btn-primary btn-block">Salvar documento</button>`);
@@ -858,6 +892,54 @@ function paymentsView(){
  <section class="section"><div class="section-head"><h2>Suas cobranças</h2><span class="chip">${payments.length} lançamento(s)</span></div><div class="payment-list">${payments.map(p=>`<button class="payment-row" data-payment="${p.id}"><div class="payment-status ${p.status==='Pago'?'paid':'pending'}">${p.status==='Pago'?'✓':'!'}</div><div><span class="eyebrow">${p.trip||t?.name||''}</span><h3>${p.title}</h3><p>${p.description}</p><small>Vencimento ${p.dueDate?new Date(p.dueDate+'T12:00:00').toLocaleDateString('pt-BR'):'-'}</small></div><div class="payment-row-value"><strong>${brl(p.amount)}</strong><span class="${p.status==='Pago'?'paid-text':'pending-text'}">${p.status}</span></div></button>`).join('')||'<div class="empty-payment-state"><span>💳</span><b>Nenhuma cobrança pendente</b><small>Quando o Indo por Aí enviar uma cobrança, ela aparecerá aqui.</small></div>'}</div></section>`;
 }
 
+
+function climateForTrip(t){
+ const dest=tripDestination(t), country=tripCountry(t);
+ const k=(dest+" "+country).toLowerCase();
+ if(k.includes("madrid")||k.includes("espan")){
+   return [
+    ["🎬","Filme / série","La Casa de Papel","Entre no clima espanhol antes da viagem."],
+    ["🎵","Playlist","Madrid & Spanish vibes","Flamenco, pop espanhol e músicas para a viagem."],
+    ["📚","Livro","Histórias de Madrid","Leitura leve para conhecer a cidade antes de chegar."],
+    ["🗣️","Expressão local","¿Qué tal?","Uma forma comum e descontraída de perguntar como estão as coisas."],
+    ["🍽️","Prato típico","Bocadillo de calamares","Clássico madrilenho para procurar durante o passeio."],
+    ["💡","Curiosidade","Madrid vive até tarde","Jantares e programas noturnos normalmente começam mais tarde."]
+   ];
+ }
+ if(k.includes("porto")||k.includes("portugal")){
+   return [
+    ["🎬","Filme / série","Porto em cena","Escolha um filme ambientado em Portugal para entrar no clima."],
+    ["🎵","Playlist","Portugal para viajar","Fado contemporâneo, pop e sons portugueses."],
+    ["📚","Livro","Histórias do Porto","Uma leitura sobre a cidade, o Douro e suas tradições."],
+    ["🗣️","Expressão local","Está tudo?","Uma saudação informal que você pode ouvir por lá."],
+    ["🍽️","Prato típico","Francesinha","Um dos sabores mais conhecidos do Porto."],
+    ["💡","Curiosidade","O Douro dita o ritmo","A cidade e o vinho do Porto estão profundamente ligados ao rio."]
+   ];
+ }
+ return [
+  ["🎬","Filme / série",dest+" em cena","Uma sugestão para entrar no clima do destino."],
+  ["🎵","Playlist","Sons de "+dest,"Uma trilha para começar a viagem antes do embarque."],
+  ["📚","Livro","Descobrindo "+dest,"Uma leitura leve sobre cultura e histórias locais."],
+  ["🗣️","Expressão local","Fale como um local","Aprenda algumas expressões úteis antes de chegar."],
+  ["🍽️","Prato típico","Sabores de "+dest,"Descubra um prato para experimentar durante a viagem."],
+  ["💡","Curiosidade","Você sabia?","Uma curiosidade cultural para começar a explorar o destino."]
+ ];
+}
+function climateSection(t){
+ const dest=tripDestination(t),cards=climateForTrip(t);
+ return `<section class="section climate-section"><div class="section-head"><div><span class="eyebrow">✨ ENTRE NO CLIMA</span><h2>${dest} começa antes do embarque</h2></div></div><div class="climate-grid">${cards.map((x,i)=>`<article><span>${x[0]}</span><small>${x[1]}</small><b>${x[2]}</b><p>${x[3]}</p>${i===4?`<button data-climate-explore="${encodeURIComponent(x[2])}">📍 Ver no Explorar</button>`:''}</article>`).join('')}</div></section>`;
+}
+function flightWalletSection(t,d){
+ const flight=t?.flight||{};
+ const docs=(d?.tripDocuments||[]).filter(x=>x.tripId===t?.id&&x.type==='Passagem aérea');
+ if(!Object.keys(flight).length&&!docs.length)return "";
+ const f=Object.keys(flight).length?flight:(docs[0]||{});
+ return `<section class="section"><div class="section-head"><div><span class="eyebrow">✈️ SEU VOO</span><h2>Cartão de embarque inteligente</h2></div><span class="chip green">Dados do ADM</span></div>
+ <div class="smart-flight-card"><div class="flight-top"><div><small>${f.airline||'Companhia'}</small><b>${f.flightNumber||f.title||'Voo'}</b></div><strong>${f.date?new Date(f.date+'T12:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'}):'--/--'}</strong></div>
+ <div class="flight-route"><div><small>ORIGEM</small><b>${f.origin||'---'}</b></div><span>✈</span><div><small>DESTINO</small><b>${f.destination||tripDestination(t)}</b></div></div>
+ <div class="flight-details"><div><small>HORÁRIO</small><b>${f.time||'--:--'}</b></div><div><small>TERMINAL</small><b>${f.terminal||'-'}</b></div><div><small>PORTÃO</small><b>${f.gate||'-'}</b></div><div><small>ASSENTO</small><b>${f.seat||'-'}</b></div></div>
+ ${f.notes?`<p>${f.notes}</p>`:''}</div></section>`;
+}
 function beforeView(){
  const d=ipaDB(),t=activeTrip();
  const country=tripCountry(t)||"sua próxima viagem",flag=countryFlag(country),dest=tripDestination(t);
@@ -884,6 +966,8 @@ ${tripModule('payments')?`<section class="section"><button class="payment-alert-
 ${(tripModule('preboardingSupport')||tripModule('bookingSupport')||tripModule('exchange')||tripModule('community'))?`<section class="section"><div class="section-head"><div><span class="eyebrow">Serviços do seu pacote</span><h2>Incluídos na sua experiência</h2></div></div><div class="native-service-grid">${tripModule('preboardingSupport')?`<div><span>🧭</span><b>Suporte pré-embarque</b><small>Orientação antes da viagem</small></div>`:''}${tripModule('bookingSupport')?`<div><span>🏨</span><b>Hotel & passagens</b><small>Apoio nas compras e reservas</small></div>`:''}${tripModule('exchange')?`<div><span>💱</span><b>Exchange</b><small>Câmbio disponível no pacote</small></div>`:''}${tripModule('community')?`<div><span>💬</span><b>Comunidade</b><small>Comunicação durante a viagem</small></div>`:''}</div></section>`:''}
 ${(ipaDB().tripDocuments||[]).filter(x=>x.tripId===t.id).length?`<section class="section"><div class="section-head"><div><span class="eyebrow">CARTEIRA DA VIAGEM</span><h2>Seus documentos</h2></div></div><div class="travel-wallet">${(ipaDB().tripDocuments||[]).filter(x=>x.tripId===t.id).map(x=>`<div><span>${x.type==='Passagem aérea'?'✈️':'📄'}</span><div><b>${x.title}</b><small>${[x.date,x.time,x.terminal&&('Terminal '+x.terminal),x.gate&&('Portão '+x.gate),x.locator&&('Localizador '+x.locator)].filter(Boolean).join(' · ')}</small></div>${x.url?`<button data-external-route="${x.url}">Abrir</button>`:''}</div>`).join('')}</div></section>`:''}
 ${(ipaDB().recommendations||[]).filter(x=>x.tripId===t.id).length?`<section class="section"><div class="section-head"><div><span class="eyebrow">INDO POR AÍ NETWORK</span><h2>Recomendados para você</h2></div></div><div class="network-client-grid">${(ipaDB().recommendations||[]).filter(x=>x.tripId===t.id).slice(0,6).map(x=>`<div><span>💡</span><b>${x.name}</b><small>${x.category||'Dica'} · ${x.address||tripDestination(t)}</small><p>${x.smartTip||'Selecionado pela rede Indo por Aí.'}</p><button data-map="${x.address||x.name}">Maps ↗</button></div>`).join('')}</div></section>`:''}
+${flightWalletSection(t,d)}
+${climateSection(t)}
 ${benefitsPersonalized()}`}
 
 function adminData(){const d=ipaDB()||{};d.clients=Array.isArray(d.clients)?d.clients:[];d.trips=Array.isArray(d.trips)?d.trips:[];d.payments=Array.isArray(d.payments)?d.payments:[];d.benefits=Array.isArray(d.benefits)?d.benefits:[];d.itineraryTemplates=Array.isArray(d.itineraryTemplates)?d.itineraryTemplates:[];return d}
@@ -928,6 +1012,15 @@ function adminTripEditor(id){
  <div class="ipa-admin-days">${(t.itinerary||[]).sort((a,b)=>a.day-b.day).map(day=>`<div class="admin-day-expanded"><div class="admin-day-title"><strong>${day.day}</strong><span><b>${day.title}</b><small>${day.date||''}</small></span><button class="admin-add-place-btn" data-admin-add-place="${t.id}:${day.day}">+ Lugar / dica</button></div><div class="admin-place-list">${normalizedPlaces(day).map((p,i)=>`<div><span>${i+1}</span><div><b>${p.time?`${p.time} · `:''}${p.category||'📍'} ${p.name}</b><small>${p.address||p.note||''}</small>${p.smartTip?`<em>💡 ${p.smartTip}</em>`:''}</div>${p.mapsUrl?`<button data-external-route="${p.mapsUrl}">Maps ↗</button>`:''}</div>`).join('')||'<small>Nenhum local neste dia.</small>'}</div></div>`).join('')||'<p>Comece adicionando o primeiro dia.</p>'}</div>
  <div class="network-tip-list">${(d.recommendations||[]).filter(r=>r.tripId===t.id).map(r=>`<div><span>💡</span><div><b>${r.category||'Dica'} · ${r.name}</b><small>${r.address||''}</small><em>${r.smartTip||'Indo por Aí recomenda'}</em></div></div>`).join('')||'<small>Nenhuma dica extra cadastrada.</small>'}</div></section>
  <section class="ipa-admin-panel"><div class="section-head"><div><span class="eyebrow">ANTES · CARTEIRA DA VIAGEM</span><h2>Documentos do cliente</h2></div><button class="btn btn-light" data-admin-document="${t.id}" data-client-id="${t.clientId}">+ Documento</button></div><p>Passagens, hotel, vouchers, seguro, ingressos e transfer. O ADM cadastra e o cliente consulta no Antes.</p><div class="admin-doc-list">${(d.tripDocuments||[]).filter(x=>x.tripId===t.id).map(x=>`<div><span>${x.type==='Passagem aérea'?'✈️':'📄'}</span><div><b>${x.title}</b><small>${[x.date,x.time,x.terminal&&('Terminal '+x.terminal),x.gate&&('Portão '+x.gate)].filter(Boolean).join(' · ')}</small></div>${x.url?`<button data-external-route="${x.url}">Abrir</button>`:''}</div>`).join('')||'<small>Nenhum documento cadastrado.</small>'}</div></section>
+
+ <section class="ipa-admin-panel"><div class="section-head"><div><span class="eyebrow">👥 PARTICIPANTES</span><h2>Quem vai nessa viagem?</h2></div><button class="btn btn-light" data-admin-add-participant="${t.id}">+ Participante</button></div>
+ <p>Cada viajante pode ter login próprio. O roteiro é compartilhado; assento, memórias, avaliações e progresso são individuais.</p>
+ <div class="participant-list">${(t.participants||[]).map((p,i)=>`<div><span>${p.minor?'🧒':'👤'}</span><div><b>${p.name}</b><small>${p.email||'Vinculado ao responsável'} · ${p.seat?`Assento ${p.seat} · `:''}${p.status==='accepted'?'✓ Aceito':'⏳ Pendente'}</small></div></div>`).join('')||'<small>Nenhum acompanhante cadastrado ainda.</small>'}</div></section>
+ <section class="ipa-admin-panel"><div class="section-head"><div><span class="eyebrow">✈️ DADOS DO VOO</span><h2>Informação controlada pelo ADM</h2></div><span class="chip">Sem API externa</span></div>
+ <p>Estes dados aparecem no cartão de voo do cliente. O assento geral pode ser substituído pelo assento individual do participante.</p>
+ <div class="flight-admin-grid">${[['airline','Companhia'],['flightNumber','Número do voo'],['date','Data'],['origin','Origem'],['destination','Destino'],['time','Horário'],['terminal','Terminal'],['gate','Portão'],['seat','Assento']].map(([k,l])=>`<label>${l}<input data-flight-field="${k}" value="${t.flight?.[k]||''}" ${k==='date'?'type="date"':k==='time'?'type="time"':''}></label>`).join('')}</div>
+ <label>Observações<textarea data-flight-field="notes" placeholder="Ex.: apresentação no portão 1h antes">${t.flight?.notes||''}</textarea></label>
+ <button class="btn btn-primary" data-admin-save-flight="${t.id}">Salvar dados do voo</button></section>
  <div class="admin-publish-actions">
  <button class="btn btn-primary btn-block" data-admin-publish="${t.id}">${t.published?'✓ Viagem publicada':'🚀 Publicar viagem'}</button>
  <button class="btn btn-light btn-block" data-admin-charge-trip="${t.id}" data-charge-client="${t.clientId}">💳 Enviar cobrança para este cliente</button>
@@ -1051,9 +1144,46 @@ function exploreView(){
  const day=days.find(x=>Number(x.day)===dayNumber)||{day:1,title:"Roteiro",places:[]};
  const places=normalizedPlaces(day);
  const route=googleMapsRouteUrl(day,t);
- return `<section class="section" style="margin-top:0"><div class="section-head"><div><span class="eyebrow">Mapa do roteiro</span><h2>${day.title}</h2></div><span class="chip">${places.length} pontos</span></div></section>
- <section class="section"><div class="dynamic-route-map"><div class="map-grid"></div><svg class="dynamic-route-line" viewBox="0 0 400 500"><path d="M70 60 C150 90, 285 100, 315 180 S130 270, 95 355 S250 400, 320 450" fill="none" stroke="#147ce5" stroke-width="5" stroke-linecap="round" stroke-dasharray="8 9"/></svg>${places.slice(0,6).map((p,i)=>`<button class="dynamic-pin pin-${i+1}" data-map="${(p.address||p.name)+', '+tripCountry(t)}"><span>${i+1}</span><small>${p.name}</small></button>`).join('')}<div class="dynamic-map-caption">Rota criada a partir do roteiro cadastrado no ADM.</div></div></section>
- <section class="section"><div class="section-head"><div><span class="eyebrow">Rota completa</span><h2>Locais do Dia ${day.day}</h2></div></div><div class="route-summary dynamic-route-summary"><div class="route-line"></div>${places.map((p,i)=>`<div class="route-stop"><span>${i+1}</span><div><b>${p.name}</b><small>${p.time||''}${p.address?` · ${p.address}`:''}</small></div></div>`).join('')}</div>${route?`<button class="btn btn-primary btn-block" data-external-route="${route}">Abrir todos no Google Maps</button>`:''}</section>`;
+ const admTips=(ipaDB().recommendations||[]).filter(r=>r.tripId===t.id);
+ return `<section class="section explore-intro" style="margin-top:0"><div class="section-head"><div><span class="eyebrow">EXPLORAR</span><h2>Seu roteiro + descobertas inteligentes ✨</h2><p>O roteiro oficial continua intacto. Aqui entram sugestões fora dele.</p></div></div></section>
+ <section class="section"><div class="section-head"><div><span class="eyebrow">MAPA DO ROTEIRO</span><h2>${day.title}</h2></div><span class="chip">${places.length} pontos</span></div>
+ <div class="dynamic-route-map"><div class="map-grid"></div><svg class="dynamic-route-line" viewBox="0 0 400 500"><path d="M70 60 C150 90, 285 100, 315 180 S130 270, 95 355 S250 400, 320 450" fill="none" stroke="#147ce5" stroke-width="5" stroke-linecap="round" stroke-dasharray="8 9"/></svg>${places.slice(0,6).map((p,i)=>`<button class="dynamic-pin pin-${i+1}" data-map="${(p.address||p.name)+', '+tripCountry(t)}"><span>${String.fromCharCode(65+i)}</span><small>${p.name}</small></button>`).join('')}<div class="dynamic-map-caption">A/B/C/D = roteiro oficial definido pelo ADM.</div></div></section>
+ <section class="section smart-discovery-section"><div class="section-head"><div><span class="eyebrow">✨ DICAS INTELIGENTES</span><h2>O que vale descobrir fora da rota?</h2></div><span class="chip orange">${tripDestination(t)}</span></div>
+ <div class="smart-filter-row"><button data-smart-filter="cafe">☕ Cafés</button><button data-smart-filter="restaurant">🍽️ Restaurantes</button><button data-smart-filter="bar">🍸 Bares</button><button data-smart-filter="shopping">🛍️ Compras</button><button data-smart-filter="tourist attraction">📸 Surpreenda-me</button></div>
+ <div id="smartTipsResults" class="smart-tips-results"><div class="smart-loading"><span>✨</span><div><b>Buscando sugestões para ${tripDestination(t)}…</b><small>Selecionamos lugares fora do roteiro do dia.</small></div></div></div></section>
+ ${admTips.length?`<section class="section"><div class="section-head"><div><span class="eyebrow">CURADORIA INDO POR AÍ</span><h2>Dicas cadastradas pelo ADM</h2></div></div><div class="smart-tips-results">${admTips.slice(0,6).map(p=>smartTipCard(p,t,places)).join('')}</div></section>`:''}
+ <section class="section"><div class="section-head"><div><span class="eyebrow">ROTA COMPLETA</span><h2>Locais do Dia ${day.day}</h2></div></div><div class="route-summary dynamic-route-summary"><div class="route-line"></div>${places.map((p,i)=>`<div class="route-stop"><span>${String.fromCharCode(65+i)}</span><div><b>${p.name}</b><small>${p.time||''}${p.address?` · ${p.address}`:''}</small></div></div>`).join('')}</div>${route?`<button class="btn btn-primary btn-block" data-external-route="${route}">Abrir rota oficial no Google Maps</button>`:''}</section>`;
+}
+function smartTipCard(p,t,official){
+ const officialNames=(official||[]).map(x=>(x.name||'').toLowerCase());
+ const dup=officialNames.includes(String(p.name||'').toLowerCase());
+ if(dup)return "";
+ const why=p.smartTip||`Boa avaliação e combina com uma descoberta em ${tripDestination(t)}.`;
+ return `<article class="smart-tip-card"><div class="smart-tip-icon">✨</div><div class="smart-tip-copy"><div class="smart-tip-title"><b>${p.name||'Sugestão'}</b>${p.rating?`<span>⭐ ${p.rating}</span>`:''}</div><small>${p.address||tripDestination(t)}</small><p><strong>Por que recomendamos:</strong> ${why}</p><div class="smart-tip-actions">${p.mapsUrl?`<button data-external-route="${p.mapsUrl}">Mapa</button>`:`<button data-map="${(p.address||p.name)+', '+tripCountry(t)}">Mapa</button>`}<button class="primary" data-add-smart-route="${encodeURIComponent(p.name||'Lugar')}">+ Adicionar à minha rota</button></div></div></article>`;
+}
+async function loadSmartTips(category){
+ const t=activeTrip(); if(!t)return;
+ const days=(t.itinerary||[]),day=days.find(x=>Number(x.day)===Number(state.tripDay))||days[0]||{places:[]},official=normalizedPlaces(day);
+ const box=document.querySelector('#smartTipsResults'); if(!box)return;
+ box.innerHTML='<div class="smart-loading"><span>✨</span><div><b>Procurando boas ideias…</b><small>Google Places + contexto do seu destino</small></div></div>';
+ try{
+  const url='/api/places/search?q='+encodeURIComponent(category||'cafe restaurant attraction')+'&destination='+encodeURIComponent(tripDestination(t)+', '+tripCountry(t));
+  const r=await fetch(url,{cache:'no-store'}),j=await r.json();
+  if(!r.ok||!j.ok)throw new Error(j.error||'Não foi possível consultar o Google Places');
+  const clean=(j.places||[]).filter(p=>!official.some(x=>String(x.name||'').toLowerCase()===String(p.name||'').toLowerCase()));
+  box.innerHTML=clean.length?clean.map(p=>smartTipCard(p,t,official)).join(''):`<div class="smart-empty">Não encontrei sugestões diferentes do roteiro nesta categoria. Tente outra.</div>`;
+  bindSmartTipActions();
+ }catch(e){box.innerHTML=`<div class="smart-empty"><b>Dicas inteligentes indisponíveis agora.</b><small>${e.message||''}</small></div>`}
+}
+function bindSmartTipActions(){
+ document.querySelectorAll('[data-add-smart-route]').forEach(b=>b.onclick=()=>{
+  const t=activeTrip(),name=decodeURIComponent(b.dataset.addSmartRoute||'Lugar');
+  const key='ipa-personal-route-'+(t?.id||'trip');
+  const list=JSON.parse(localStorage.getItem(key)||'[]');
+  if(!list.includes(name))list.push(name);
+  localStorage.setItem(key,JSON.stringify(list));
+  toast(`${name} adicionado à sua rota pessoal ✓`);
+ });
 }
 function communityView(){return `<section class="section" style="margin-top:0"><div class="section-head"><div><span class="eyebrow">${activeTrip()?.name||'Sua viagem'} · comunidade</span><h2>Grupo da viagem</h2></div><button id="liveBtn">🔴 Iniciar live</button></div><div class="card"><div class="people"><div class="person"><i>RF</i><small>Renato</small></div><div class="person"><i>MS</i><small>Marina</small></div><div class="person"><i>CS</i><small>Carlos</small></div><div class="person"><i>JS</i><small>Julia</small></div><div class="person"><i>+8</i><small>Mais</small></div></div></div></section><section class="section"><div class="message guide"><b>📢 Aviso do guia</b><br>Amanhã sairemos às 8h30. O ponto de encontro será na recepção do hotel.<small>09:30</small></div><div class="chat">${state.messages.map(m=>`<div class="message ${m.type==='me'?'me':m.type==='guide'?'guide':''}"><b>${m.name}</b><br>${m.text}<small>${m.time}</small></div>`).join('')}</div><div class="composer"><input id="messageInput" placeholder="Digite uma mensagem..."/><button class="btn btn-purple" id="sendMessage">➤</button></div></section>`}
 function diaryView(){return `<section class="diary-page-hero"><span class="eyebrow">Diário da viagem</span><h1>08 de setembro · Porto</h1><p>Um dia cheio de descobertas, sabores e histórias em família.</p><div class="diary-page-metrics"><span>🚶 8,6 km</span><span>✅ 5 experiências</span><span>📸 36 lembranças</span></div></section>
