@@ -1259,9 +1259,19 @@ function journeyInlineStars(tripId,dayNo,placeId){
 function ipaPaintJourneyStarsNow(tripId,dayNo,placeId,rating){
  const value=Math.max(0,Math.min(5,Number(rating||0)));
  const stars=`${'★'.repeat(value)}${'☆'.repeat(5-value)}`;
- document.querySelectorAll(`[data-journey-stars="${CSS.escape(String(tripId))}:${CSS.escape(String(dayNo))}:${CSS.escape(String(placeId))}"]`).forEach(el=>{
-   el.textContent=stars;
-   el.setAttribute('aria-label',`${value} de 5 estrelas`);
+ const key=[tripId,dayNo,placeId].join(':');
+ document.querySelectorAll('[data-journey-stars]').forEach(el=>{
+   if(el.getAttribute('data-journey-stars')===key){
+     el.textContent=stars;
+     el.setAttribute('aria-label',`${value} de 5 estrelas`);
+   }
+ });
+ document.querySelectorAll('[data-journey-title]').forEach(box=>{
+   if(box.getAttribute('data-journey-title')===key){
+     let el=box.querySelector('.journey-inline-stars');
+     if(!el){el=document.createElement('span');el.className='journey-inline-stars';el.setAttribute('data-journey-stars',key);box.appendChild(el)}
+     el.textContent=stars;el.setAttribute('aria-label',`${value} de 5 estrelas`);
+   }
  });
 }
 
@@ -1281,7 +1291,7 @@ function duringView(){
  const country=tripCountry(t),flag=countryFlag(country),route=googleMapsRouteUrl(day,t);
  return `<section class="hero during-personalized-hero"><span class="eyebrow">Durante a viagem</span><h1>${tripDestination(t)} ${flag}</h1><p>${t.name} · Dia ${day.day}${day.title?` · ${day.title}`:''}</p><div class="hero-actions">${route?`<button class="btn btn-light" data-external-route="${route}">Abrir rota</button>`:''}${tripModule('concierge')?`<button class="btn btn-light" data-concierge>👑 Concierge</button>`:''}${tripModule('live')?`<button class="btn btn-primary" id="realLiveBtn">🔴 Live</button>`:''}</div></section>
  ${modeCard()}
- <section class="section"><div class="section-head"><div><span class="eyebrow">Roteiro real</span><h2>${day.title||`Dia ${day.day}`}</h2></div><span class="chip">${places.length} locais</span></div><div class="during-place-list">${places.map((p,i)=>`<div class="during-place-card ${p.personal?'during-place-personal':''}"><div class="during-place-number">${i+1}</div><div><small>${p.time||'Horário livre'}</small><div class="during-place-title"><b>${p.name}</b>${journeyInlineStars(t.id,day.day,p.id||i)}</div><p>${p.address||p.note||'Programado no roteiro'}</p><div class="during-place-actions"><button data-map="${(p.address||p.name)+', '+country}">Mapa</button><button class="${(ipaDB().journeyPlaces?.[[t.id,day.day,p.id||i].join(':')]?.checked)?'checked':''}" data-journey-check="${t.id}|${day.day}|${p.id||i}">${(ipaDB().journeyPlaces?.[[t.id,day.day,p.id||i].join(':')]?.checked)?'✓ Feito':'✓ Check'}</button><button data-journey-rate="${t.id}|${day.day}|${p.id||i}" data-place-name="${encodeURIComponent(p.name)}">★ Avaliar</button></div></div></div>`).join('')||'<p>Nenhum local cadastrado para este dia.</p>'}</div></section>
+ <section class="section"><div class="section-head"><div><span class="eyebrow">Roteiro real</span><h2>${day.title||`Dia ${day.day}`}</h2></div><span class="chip">${places.length} locais</span></div><div class="during-place-list">${places.map((p,i)=>`<div class="during-place-card ${p.personal?'during-place-personal':''}"><div class="during-place-number">${i+1}</div><div><small>${p.time||'Horário livre'}</small><div class="during-place-title" data-journey-title="${ipaEscape([t.id,day.day,p.id||i].join(':'))}"><b>${p.name}</b>${journeyInlineStars(t.id,day.day,p.id||i)}</div><p>${p.address||p.note||'Programado no roteiro'}</p><div class="during-place-actions"><button data-map="${(p.address||p.name)+', '+country}">Mapa</button><button class="${(ipaDB().journeyPlaces?.[[t.id,day.day,p.id||i].join(':')]?.checked)?'checked':''}" data-journey-check="${t.id}|${day.day}|${p.id||i}">${(ipaDB().journeyPlaces?.[[t.id,day.day,p.id||i].join(':')]?.checked)?'✓ Feito':'✓ Check'}</button><button data-journey-rate="${t.id}|${day.day}|${p.id||i}" data-place-name="${encodeURIComponent(p.name)}">★ Avaliar</button></div></div></div>`).join('')||'<p>Nenhum local cadastrado para este dia.</p>'}</div></section>
  <section class="section"><div class="section-head"><h2>Dias da viagem</h2></div><div class="day-strip">${days.map(x=>`<button class="day-pill ${Number(x.day)===Number(day.day)?'active':''}" data-day="${x.day}"><small>Dia</small><strong>${x.day}</strong></button>`).join('')}</div></section>`;
 }
 function afterView(){
@@ -1461,8 +1471,16 @@ function memoriesView(){
  const days=(t.itinerary||[]).sort((a,b)=>Number(a.day)-Number(b.day)),country=tripCountry(t),flag=countryFlag(country);
  const memories=(ipaDB().memories||[]).filter(m=>m.tripId===t.id);
  const jp=ipaDB().journeyPlaces||{};
- const dayCards=days.map(day=>{const places=normalizedPlaces(day),done=places.filter((p,i)=>jp[[t.id,day.day,p.id||i].join(':')]?.checked).length,dayMem=memories.filter(m=>Number(m.day||0)===Number(day.day));return `<button class="album-day" data-memory-day="${encodeURIComponent(day.title)}"><div class="album-day-cover">📍</div><div><span>Dia ${day.day}</span><h3>${day.title}</h3><p>${done}/${places.length} lugares visitados · ${dayMem.length} memórias</p><small>${day.date||tripDestination(t)}</small></div><b>›</b></button>`}).join('');
- return `<section class="album-hero"><span class="eyebrow">DIÁRIO AUTOMÁTICO · ${flag} ${country}</span><h1>${t.name}</h1><p>Seu diário cresce com checks, avaliações, fotos e vídeos desta viagem.</p><div class="album-stats"><span>📸 ${memories.filter(m=>m.type==='image').length} fotos</span><span>🎥 ${memories.filter(m=>m.type==='video').length} vídeos</span><span>📍 ${days.flatMap(d=>normalizedPlaces(d)).length} lugares</span></div></section>
+ const dayCards=days.map(day=>{
+   const official=normalizedPlaces(day);
+   const personal=ipaGetPersonalRoute(t,day.day).map((p,i)=>({id:p.id||p.placeId||`personal-${i}`,name:p.name||'Descoberta',personal:true}));
+   const places=[...official,...personal];
+   const done=places.filter((p,i)=>jp[[t.id,day.day,p.id||i].join(':')]?.checked).length;
+   const dayMem=memories.filter(m=>Number(m.day||0)===Number(day.day));
+   const discoveryCount=personal.length;
+   return `<button class="album-day" data-memory-day="${encodeURIComponent(day.title)}"><div class="album-day-cover">📍</div><div><span>Dia ${day.day}</span><h3>${day.title}</h3><p>${done}/${places.length} lugares visitados · ${dayMem.length} memórias${discoveryCount?` · ✨ ${discoveryCount} descoberta${discoveryCount>1?'s':''}`:''}</p><small>${day.date||tripDestination(t)}</small></div><b>›</b></button>`
+ }).join('');
+ return `<section class="album-hero"><span class="eyebrow">DIÁRIO AUTOMÁTICO · ${flag} ${country}</span><h1>${t.name}</h1><p>Seu diário cresce com checks, avaliações, fotos e vídeos desta viagem.</p><div class="album-stats"><span>📸 ${memories.filter(m=>m.type==='image').length} fotos</span><span>🎥 ${memories.filter(m=>m.type==='video').length} vídeos</span><span>📍 ${days.reduce((sum,d)=>sum+normalizedPlaces(d).length+ipaGetPersonalRoute(t,d.day).length,0)} lugares</span></div></section>
  <section class="section"><div class="section-head"><div><span class="eyebrow">LINHA DO TEMPO</span><h2>A viagem, dia por dia</h2></div></div><div class="album-days">${dayCards||'<p>O diário começará quando o roteiro for cadastrado.</p>'}</div></section>
  <section class="section"><div class="section-head"><div><span class="eyebrow">MOMENTOS SUGERIDOS</span><h2>Crie uma memória agora</h2></div></div><div class="memory-prompt-grid">${[['🥂','Hora do brinde'],['👨‍👩‍👧','Nossa turma'],['🍽️','Sabor inesquecível'],['🌅','A vista do dia'],['😂','Momento espontâneo'],['❤️','Meu favorito']].map(x=>`<button data-memory-prompt="${x[1]}"><span>${x[0]}</span><b>${x[1]}</b><small>${tripDestination(t)}</small></button>`).join('')}</div></section>
  <section class="section"><div class="section-head"><h2>Suas fotos e vídeos</h2></div><div class="live-memory-grid">${memories.map(m=>m.type==='video'?`<div class="live-memory"><video src="${m.src||m.url}" controls playsinline></video><b>${m.prompt||'Vídeo'}</b></div>`:`<div class="live-memory"><img src="${m.src||m.url}" alt=""><b>${m.prompt||'Memória'}</b></div>`).join('')||`<div class="empty-memory"><span>📷</span><h3>Seu álbum começa aqui</h3><button class="btn btn-primary" id="addPhoto">Adicionar foto ou vídeo</button></div>`}</div></section>
@@ -1733,11 +1751,13 @@ function showJourneyRating(tripId,dayNo,placeId,placeName){
         const note=document.querySelector('#journeyRatingNote')?.value.trim()||'';
         IPAData.saveJourneyPlace(tripId,dayNo,placeId,{rating:chosen,note});
         // Atualização visual síncrona: não depende do Firebase nem de trocar de tela.
-        ipaPaintJourneyStarsNow(tripId,dayNo,placeId,chosen);
         toast(`Avaliação ${chosen}★ salva ✓`);
         modal.close();
         render();
-        // UI atualiza imediatamente; Firebase sincroniza sem bloquear a tela.
+        // Reaplica no DOM já renderizado, inclusive se o modal disparar ciclo de UI.
+        requestAnimationFrame(()=>ipaPaintJourneyStarsNow(tripId,dayNo,placeId,chosen));
+        setTimeout(()=>ipaPaintJourneyStarsNow(tripId,dayNo,placeId,chosen),80);
+        // Firebase sincroniza sem bloquear a tela.
         if(window.IPAFirebase?.user && window.IPAFirebase?.syncNow){
           window.IPAFirebase.syncNow().catch(e=>console.warn('Avaliação salva localmente; sincronização pendente',e));
         }
