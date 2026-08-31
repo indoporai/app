@@ -1250,9 +1250,21 @@ ${plansSalesBlock()}
 <section class="section"><div class="instagram-showcase"><div class="instagram-mark">◎</div><div><span class="eyebrow">Conheça nossa comunidade</span><h2>Uma comunidade com mais de 21 mil apaixonados por viagens.</h2><p>Roteiros, dicas e experiências reais para inspirar sua próxima história.</p><b>@indo.por.ai.com.a.gente</b></div><button class="btn btn-primary" id="instagramBtn">Abrir Instagram</button></div></section>
 <section class="section"><div class="prospect-proof"><span>❤️</span><div><span class="eyebrow">Indo por Aí</span><h3>Não vendemos apenas um destino.</h3><p>Acompanhamos a história antes, durante e depois da viagem.</p></div></div></section>`}
 function journeyInlineStars(tripId,dayNo,placeId){
- const d=ipaDB(),k=[tripId,dayNo,placeId].join(':'),v=Number(d?.journeyPlaces?.[k]?.rating||0);
- return `<span class="journey-inline-stars" aria-label="${v?`Avaliação ${v} de 5`:'Ainda não avaliado'}">${[1,2,3,4,5].map(n=>`<span class="${n<=v?'on':''}">★</span>`).join('')}</span>`;
+ const r=Number(ipaDB().journeyPlaces?.[[tripId,dayNo,placeId].join(':')]?.rating||0);
+ const stars=`${'★'.repeat(r)}${'☆'.repeat(5-r)}`;
+ const key=`${tripId}:${dayNo}:${placeId}`;
+ return `<span class="journey-inline-stars" data-journey-stars="${ipaEscape(key)}" aria-label="${r} de 5 estrelas">${stars}</span>`;
 }
+
+function ipaPaintJourneyStarsNow(tripId,dayNo,placeId,rating){
+ const value=Math.max(0,Math.min(5,Number(rating||0)));
+ const stars=`${'★'.repeat(value)}${'☆'.repeat(5-value)}`;
+ document.querySelectorAll(`[data-journey-stars="${CSS.escape(String(tripId))}:${CSS.escape(String(dayNo))}:${CSS.escape(String(placeId))}"]`).forEach(el=>{
+   el.textContent=stars;
+   el.setAttribute('aria-label',`${value} de 5 estrelas`);
+ });
+}
+
 function duringView(){
  const t=activeTrip();
  if(!t)return `${ipaParticipantBadge(t)}<section class="section"><h2>Viagem não encontrada</h2><p>Não há uma viagem ativa para este cliente.</p></section>`;
@@ -1658,7 +1670,7 @@ function ipaBindMovie2(scenes){
  const schedule=()=>{
    clearTimeout(timer);if(!playing)return;
    const v=els[i]?.querySelector('video');
-   const ms=v&&Number.isFinite(v.duration)?Math.min(Math.max(v.duration*1000,2500),8000):(i===0||i===els.length-1?3500:4000);
+   const ms=v&&Number.isFinite(v.duration)?Math.min(Math.max(v.duration*1000,1800),4500):(i===0||i===els.length-1?1800:2200);
    timer=setTimeout(()=>{if(i>=els.length-1){playing=false;i=0;paint();return}i++;paint();schedule()},ms);
  };
  plays.forEach(b=>b.onclick=()=>{playing=!playing;paint();schedule()});
@@ -1720,6 +1732,8 @@ function showJourneyRating(tripId,dayNo,placeId,placeName){
         if(!chosen){toast('Selecione de 1 a 5 estrelas');return}
         const note=document.querySelector('#journeyRatingNote')?.value.trim()||'';
         IPAData.saveJourneyPlace(tripId,dayNo,placeId,{rating:chosen,note});
+        // Atualização visual síncrona: não depende do Firebase nem de trocar de tela.
+        ipaPaintJourneyStarsNow(tripId,dayNo,placeId,chosen);
         toast(`Avaliação ${chosen}★ salva ✓`);
         modal.close();
         render();
