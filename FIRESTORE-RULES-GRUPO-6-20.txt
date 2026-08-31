@@ -1,0 +1,11 @@
+// Adicione dentro de match /databases/{database}/documents {
+match /tripMessages/{messageId} {
+  allow read: if request.auth != null;
+  allow create: if request.auth != null
+    && request.resource.data.tripId is string
+    && request.resource.data.text is string
+    && request.resource.data.text.size() > 0
+    && request.resource.data.text.size() <= 2000
+    && request.resource.data.userUid == request.auth.uid;
+  allow update, delete: if false;
+}

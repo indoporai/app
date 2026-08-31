@@ -1,4 +1,4 @@
-const CACHE = "indo-por-ai-v2-beta-6-17-1-1-2-2-1-2-2-1";
+const CACHE = "indo-por-ai-v2-beta-6-19";
 const CORE = [
   "./",
   "index.html",

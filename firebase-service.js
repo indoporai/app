@@ -20,7 +20,10 @@ import {
   serverTimestamp,
   query,
   where,
-  limit
+  limit,
+  addDoc,
+  orderBy,
+  onSnapshot
 } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-firestore.js";
 import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-storage.js";
 
@@ -490,6 +493,22 @@ onAuthStateChanged(auth,async user=>{
 });
 
 window.IPAFirebase = {
+  listenTripMessages(tripId,onChange,onError){
+    if(!tripId)return ()=>{};
+    const q=query(collection(firestore,"tripMessages"),where("tripId","==",tripId),orderBy("createdAt","asc"),limit(200));
+    return onSnapshot(q,snap=>onChange&&onChange(snap.docs.map(d=>({id:d.id,...d.data()}))),err=>{console.error("Trip messages listener",err);onError&&onError(err)});
+  },
+  async sendTripMessage({tripId,text,participantId="",participantName=""}){
+    if(!currentUser)throw new Error("Faça login para enviar mensagens.");
+    const clean=String(text||"").trim();
+    if(!tripId||!clean)throw new Error("Mensagem inválida.");
+    const ref=await addDoc(collection(firestore,"tripMessages"),{
+      tripId,text:clean.slice(0,2000),participantId,
+      participantName:participantName||currentUser.displayName||currentUser.email||"Viajante",
+      userUid:currentUser.uid,userEmail:currentUser.email||"",createdAt:serverTimestamp()
+    });
+    return ref.id;
+  },
   async uploadMemory(file,clientId,tripId){
     if(!currentUser)throw new Error("Faça login para enviar a memória.");
     const safe=(file.name||"arquivo").replace(/[^a-zA-Z0-9._-]/g,"_");
