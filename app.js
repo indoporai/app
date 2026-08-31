@@ -195,6 +195,14 @@ window.ipaCurrentClientId=ipaCurrentClientId;
 window.ipaUploadMemoryFile=ipaUploadMemoryFile;
 window.ipaPersistMemoryMeta=ipaPersistMemoryMeta;
 function bind(){
+ document.querySelectorAll('[data-remove-smart-route]').forEach(b=>b.onclick=()=>{
+  const t=activeTrip();if(!t)return;
+  const dayNo=Number(state.tripDay||1),id=decodeURIComponent(b.dataset.removeSmartRoute||''),list=ipaGetPersonalRoute(t,dayNo);
+  ipaSavePersonalRoute(t,dayNo,list.filter(x=>String(x.id||x.name)!==id));
+  toast('Local removido da sua rota pessoal');
+  render();
+ });
+
  document.querySelectorAll('[data-group-form]').forEach(form=>{form.onsubmit=async e=>{e.preventDefault();const input=form.querySelector('[data-group-input]'),text=input?.value?.trim();if(!text)return;input.value='';await ipaSendCurrentGroupMessage(text)}});
  if(state.route==='community'&&!state.live)setTimeout(()=>{ipaStartGroupListener();const box=document.querySelector('[data-group-messages]');if(box)box.scrollTop=box.scrollHeight},0);
 
@@ -1252,11 +1260,16 @@ function duringView(){
  const todayISO=new Date().toISOString().slice(0,10);
  const day=days.find(x=>x.date===todayISO)||days.find(x=>Number(x.day)===Number(state.tripDay))||days[0]||{day:1,title:'Seu dia',places:[]};
  state.tripDay=Number(day.day||1);
- const places=normalizedPlaces(day);
+ const officialPlaces=normalizedPlaces(day);
+ const personalPlaces=ipaGetPersonalRoute(t,day.day).map((p,i)=>({
+   id:p.id||`personal-${i}`,name:p.name||'Descoberta',address:p.address||'',time:p.time||'',
+   note:p.note||'✨ Adicionado por você nas Dicas Inteligentes',personal:true,placeId:p.placeId||p.id||''
+ }));
+ const places=[...officialPlaces,...personalPlaces];
  const country=tripCountry(t),flag=countryFlag(country),route=googleMapsRouteUrl(day,t);
  return `<section class="hero during-personalized-hero"><span class="eyebrow">Durante a viagem</span><h1>${tripDestination(t)} ${flag}</h1><p>${t.name} · Dia ${day.day}${day.title?` · ${day.title}`:''}</p><div class="hero-actions">${route?`<button class="btn btn-light" data-external-route="${route}">Abrir rota</button>`:''}${tripModule('concierge')?`<button class="btn btn-light" data-concierge>👑 Concierge</button>`:''}${tripModule('live')?`<button class="btn btn-primary" id="realLiveBtn">🔴 Live</button>`:''}</div></section>
  ${modeCard()}
- <section class="section"><div class="section-head"><div><span class="eyebrow">Roteiro real</span><h2>${day.title||`Dia ${day.day}`}</h2></div><span class="chip">${places.length} locais</span></div><div class="during-place-list">${places.map((p,i)=>`<div class="during-place-card"><div class="during-place-number">${i+1}</div><div><small>${p.time||'Horário livre'}</small><div class="during-place-title"><b>${p.name}</b>${journeyInlineStars(t.id,day.day,p.id||i)}</div><p>${p.address||p.note||'Programado no roteiro'}</p><div class="during-place-actions"><button data-map="${(p.address||p.name)+', '+country}">Mapa</button><button class="${(ipaDB().journeyPlaces?.[[t.id,day.day,p.id||i].join(':')]?.checked)?'checked':''}" data-journey-check="${t.id}|${day.day}|${p.id||i}">${(ipaDB().journeyPlaces?.[[t.id,day.day,p.id||i].join(':')]?.checked)?'✓ Feito':'✓ Check'}</button><button data-journey-rate="${t.id}|${day.day}|${p.id||i}" data-place-name="${encodeURIComponent(p.name)}">★ Avaliar</button></div></div></div>`).join('')||'<p>Nenhum local cadastrado para este dia.</p>'}</div></section>
+ <section class="section"><div class="section-head"><div><span class="eyebrow">Roteiro real</span><h2>${day.title||`Dia ${day.day}`}</h2></div><span class="chip">${places.length} locais</span></div><div class="during-place-list">${places.map((p,i)=>`<div class="during-place-card ${p.personal?'during-place-personal':''}"><div class="during-place-number">${i+1}</div><div><small>${p.time||'Horário livre'}</small><div class="during-place-title"><b>${p.name}</b>${journeyInlineStars(t.id,day.day,p.id||i)}</div><p>${p.address||p.note||'Programado no roteiro'}</p><div class="during-place-actions"><button data-map="${(p.address||p.name)+', '+country}">Mapa</button><button class="${(ipaDB().journeyPlaces?.[[t.id,day.day,p.id||i].join(':')]?.checked)?'checked':''}" data-journey-check="${t.id}|${day.day}|${p.id||i}">${(ipaDB().journeyPlaces?.[[t.id,day.day,p.id||i].join(':')]?.checked)?'✓ Feito':'✓ Check'}</button><button data-journey-rate="${t.id}|${day.day}|${p.id||i}" data-place-name="${encodeURIComponent(p.name)}">★ Avaliar</button></div></div></div>`).join('')||'<p>Nenhum local cadastrado para este dia.</p>'}</div></section>
  <section class="section"><div class="section-head"><h2>Dias da viagem</h2></div><div class="day-strip">${days.map(x=>`<button class="day-pill ${Number(x.day)===Number(day.day)?'active':''}" data-day="${x.day}"><small>Dia</small><strong>${x.day}</strong></button>`).join('')}</div></section>`;
 }
 function afterView(){
@@ -1287,13 +1300,43 @@ function tripView(){
  const days=(t.itinerary||[]).sort((a,b)=>Number(a.day)-Number(b.day));
  const dayNumber=state.tripDay&&days.some(x=>Number(x.day)===Number(state.tripDay))?Number(state.tripDay):Number(days[0]?.day||1);
  const day=days.find(x=>Number(x.day)===dayNumber)||{day:1,title:"Roteiro em preparação",places:[]};
- const places=normalizedPlaces(day);
+ const officialPlaces=normalizedPlaces(day);
+ const personalPlaces=ipaGetPersonalRoute(t,day.day).map((p,i)=>({id:p.id||`personal-${i}`,name:p.name||'Descoberta',address:p.address||'',note:'✨ Adicionado por você',personal:true}));
+ const places=[...officialPlaces,...personalPlaces];
  const country=tripCountry(t),flag=countryFlag(country);
- const rows=places.map((p,index)=>`<div class="itinerary-item dynamic-itinerary-item"><span class="itinerary-time">${p.time||'--:--'}</span><span class="itinerary-line"><i></i></span><span class="itinerary-icon">${index===0?'📍':'✨'}</span><span class="itinerary-copy"><b>${p.name}</b><small>${p.address||p.note||'Detalhes no roteiro'}</small></span><button class="mini-map-open" data-map="${(p.address||p.name)+', '+country}">↗</button></div>`).join('');
+ const rows=places.map((p,index)=>`<div class="itinerary-item dynamic-itinerary-item"><span class="itinerary-time">${p.time||'--:--'}</span><span class="itinerary-line"><i></i></span><span class="itinerary-icon">${p.personal?'✨':(index===0?'📍':'•')}</span><span class="itinerary-copy"><b>${p.name}${p.personal?' · <em class="personal-route-inline">Sua descoberta</em>':''}</b><small>${p.address||p.note||'Detalhes no roteiro'}</small></span><button class="mini-map-open" data-map="${(p.address||p.name)+', '+country}">↗</button></div>`).join('');
  const route=googleMapsRouteUrl(day,t);
  return `<section class="hero personalized-trip-hero"><span class="eyebrow">Minha viagem</span><h1>${t.name} ${flag}</h1><p>${tripDestination(t)}, ${country} · ${days.length} dias de roteiro</p><div class="hero-actions">${route?`<button class="btn btn-light" data-external-route="${route}">Abrir rota no Google Maps</button>`:''}<button class="btn btn-primary" data-go="explore">Ver mapa do dia</button></div></section>
  <section class="section itinerary-days"><div class="day-strip">${days.map(x=>`<button class="day-pill ${Number(x.day)===dayNumber?'active':''}" data-day="${x.day}"><small>Dia</small><strong>${x.day}</strong></button>`).join('')}</div></section>
  <section class="section"><div class="section-head"><div><span class="eyebrow">Roteiro do dia</span><h2>${day.title}</h2></div><span class="chip">${places.length} locais</span></div><div class="itinerary-list">${rows||'<p>Nenhum local cadastrado neste dia.</p>'}</div></section>`;
+}
+
+function ipaPersonalRouteKey(t,dayNo){
+ return `ipa-personal-route-${t?.id||'trip'}-day-${Number(dayNo||1)}`;
+}
+function ipaGetPersonalRoute(t,dayNo){
+ try{
+  const raw=JSON.parse(localStorage.getItem(ipaPersonalRouteKey(t,dayNo))||'[]');
+  return Array.isArray(raw)?raw.map(x=>typeof x==='string'?{name:x}:x):[];
+ }catch(e){return []}
+}
+function ipaSavePersonalRoute(t,dayNo,list){
+ localStorage.setItem(ipaPersonalRouteKey(t,dayNo),JSON.stringify(list||[]));
+}
+function ipaPersonalMapsUrl(official,personal,t){
+ const all=[...(official||[]),...(personal||[])].filter(p=>p?.name||p?.address);
+ if(!all.length)return "";
+ const q=p=>p.placeId?`place_id:${p.placeId}`:(p.address||`${p.name}, ${tripDestination(t)}, ${tripCountry(t)}`);
+ if(all.length===1)return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q(all[0]))}`;
+ const first=q(all[0]),last=q(all[all.length-1]),middle=all.slice(1,-1).map(q).join("|");
+ return `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(first)}&destination=${encodeURIComponent(last)}${middle?`&waypoints=${encodeURIComponent(middle)}`:''}&travelmode=walking`;
+}
+function ipaPersonalRouteBlock(t,day,official){
+ const personal=ipaGetPersonalRoute(t,day.day);
+ if(!personal.length)return `<div class="personal-route-empty"><span>✨</span><div><b>Sua rota pessoal ainda não tem descobertas</b><small>Adicione uma Dica Inteligente e ela aparecerá aqui.</small></div></div>`;
+ const base=(official||[]).length;
+ return `<div class="personal-route-added"><div class="personal-route-title"><span>✨ Adicionados por você</span><small>${personal.length} descoberta${personal.length>1?'s':''}</small></div>
+ ${personal.map((p,i)=>`<div class="route-stop personal-stop"><span>${String.fromCharCode(65+base+i)}</span><div><b>${ipaEscape(p.name||'Lugar')}</b><small>${ipaEscape(p.address||'Dica inteligente')} · rota pessoal</small></div><button class="personal-route-remove" data-remove-smart-route="${encodeURIComponent(p.id||p.name||String(i))}" aria-label="Remover">×</button></div>`).join('')}</div>`;
 }
 function exploreView(){
  const t=activeTrip();
@@ -1303,22 +1346,31 @@ function exploreView(){
  const day=days.find(x=>Number(x.day)===dayNumber)||{day:1,title:"Roteiro",places:[]};
  const places=normalizedPlaces(day);
  const route=googleMapsRouteUrl(day,t);
+ const personal=ipaGetPersonalRoute(t,day.day);
+ const completeRoute=ipaPersonalMapsUrl(places,personal,t);
  const admTips=(ipaDB().recommendations||[]).filter(r=>r.tripId===t.id);
- return `<section class="section explore-intro" style="margin-top:0"><div class="section-head"><div><span class="eyebrow">EXPLORAR</span><h2>Seu roteiro + descobertas inteligentes ✨</h2><p>O roteiro oficial continua intacto. Aqui entram sugestões fora dele.</p></div></div></section>
- <section class="section"><div class="section-head"><div><span class="eyebrow">MAPA DO ROTEIRO</span><h2>${day.title}</h2></div><span class="chip">${places.length} pontos</span></div>
- <div class="dynamic-route-map"><div class="map-grid"></div><svg class="dynamic-route-line" viewBox="0 0 400 500"><path d="M70 60 C150 90, 285 100, 315 180 S130 270, 95 355 S250 400, 320 450" fill="none" stroke="#147ce5" stroke-width="5" stroke-linecap="round" stroke-dasharray="8 9"/></svg>${places.slice(0,6).map((p,i)=>`<button class="dynamic-pin pin-${i+1}" data-map="${(p.address||p.name)+', '+tripCountry(t)}"><span>${String.fromCharCode(65+i)}</span><small>${p.name}</small></button>`).join('')}<div class="dynamic-map-caption">A/B/C/D = roteiro oficial definido pelo ADM.</div></div></section>
+ const totalPoints=places.length+personal.length;
+ return `<section class="section explore-intro" style="margin-top:0"><div class="section-head"><div><span class="eyebrow">EXPLORAR</span><h2>Seu roteiro + descobertas inteligentes ✨</h2><p>O roteiro oficial continua intacto. As descobertas entram na sua rota pessoal.</p></div></div></section>
+ <section class="section"><div class="section-head"><div><span class="eyebrow">MAPA DO ROTEIRO</span><h2>${day.title}</h2></div><span class="chip">${totalPoints} pontos</span></div>
+ <div class="dynamic-route-map"><div class="map-grid"></div><svg class="dynamic-route-line" viewBox="0 0 400 500"><path d="M70 60 C150 90, 285 100, 315 180 S130 270, 95 355 S250 400, 320 450" fill="none" stroke="#147ce5" stroke-width="5" stroke-linecap="round" stroke-dasharray="8 9"/></svg>
+ ${places.slice(0,6).map((p,i)=>`<button class="dynamic-pin pin-${i+1}" data-map="${(p.address||p.name)+', '+tripCountry(t)}"><span>${String.fromCharCode(65+i)}</span><small>${p.name}</small></button>`).join('')}
+ ${personal.slice(0,2).map((p,i)=>`<button class="dynamic-pin personal-pin" style="left:${i?72:28}%;top:${i?64:79}%" data-map="${(p.address||p.name)+', '+tripCountry(t)}"><span>${String.fromCharCode(65+places.length+i)}</span><small>✨ ${ipaEscape(p.name)}</small></button>`).join('')}
+ <div class="dynamic-map-caption">A/B/C/D = roteiro oficial · ✨ = descobertas adicionadas por você.</div></div></section>
  <section class="section smart-discovery-section"><div class="section-head"><div><span class="eyebrow">✨ DICAS INTELIGENTES</span><h2>O que vale descobrir fora da rota?</h2></div><span class="chip orange">${tripDestination(t)}</span></div>
  <div class="smart-filter-row"><button data-smart-filter="cafe">☕ Cafés</button><button data-smart-filter="restaurant">🍽️ Restaurantes</button><button data-smart-filter="bar">🍸 Bares</button><button data-smart-filter="shopping">🛍️ Compras</button><button data-smart-filter="tourist attraction">📸 Surpreenda-me</button></div>
  <div id="smartTipsResults" class="smart-tips-results"><div class="smart-loading"><span>✨</span><div><b>Buscando sugestões para ${tripDestination(t)}…</b><small>Selecionamos lugares fora do roteiro do dia.</small></div></div></div></section>
  ${admTips.length?`<section class="section"><div class="section-head"><div><span class="eyebrow">CURADORIA INDO POR AÍ</span><h2>Dicas cadastradas pelo ADM</h2></div></div><div class="smart-tips-results">${admTips.slice(0,6).map(p=>smartTipCard(p,t,places)).join('')}</div></section>`:''}
- <section class="section"><div class="section-head"><div><span class="eyebrow">ROTA COMPLETA</span><h2>Locais do Dia ${day.day}</h2></div></div><div class="route-summary dynamic-route-summary"><div class="route-line"></div>${places.map((p,i)=>`<div class="route-stop"><span>${String.fromCharCode(65+i)}</span><div><b>${p.name}</b><small>${p.time||''}${p.address?` · ${p.address}`:''}</small></div></div>`).join('')}</div>${route?`<button class="btn btn-primary btn-block" data-external-route="${route}">Abrir rota oficial no Google Maps</button>`:''}</section>`;
+ <section class="section"><div class="section-head"><div><span class="eyebrow">ROTA COMPLETA</span><h2>Locais do Dia ${day.day}</h2></div><span class="chip">${totalPoints} pontos</span></div>
+ <div class="route-summary dynamic-route-summary"><div class="route-line"></div>${places.map((p,i)=>`<div class="route-stop"><span>${String.fromCharCode(65+i)}</span><div><b>${p.name}</b><small>${p.time||''}${p.address?` · ${p.address}`:''} · roteiro oficial</small></div></div>`).join('')}${ipaPersonalRouteBlock(t,day,places)}</div>
+ <div class="personal-route-actions">${route?`<button class="btn btn-secondary btn-block" data-external-route="${route}">Abrir rota oficial</button>`:''}${completeRoute&&personal.length?`<button class="btn btn-primary btn-block" data-external-route="${completeRoute}">Abrir minha rota completa no Google Maps</button>`:''}</div></section>`;
 }
 function smartTipCard(p,t,official){
  const officialNames=(official||[]).map(x=>(x.name||'').toLowerCase());
  const dup=officialNames.includes(String(p.name||'').toLowerCase());
  if(dup)return "";
  const why=p.smartTip||`Boa avaliação e combina com uma descoberta em ${tripDestination(t)}.`;
- return `<article class="smart-tip-card"><div class="smart-tip-icon">✨</div><div class="smart-tip-copy"><div class="smart-tip-title"><b>${p.name||'Sugestão'}</b>${p.rating?`<span>⭐ ${p.rating}</span>`:''}</div><small>${p.address||tripDestination(t)}</small><p><strong>Por que recomendamos:</strong> ${why}</p><div class="smart-tip-actions">${p.mapsUrl?`<button data-external-route="${p.mapsUrl}">Mapa</button>`:`<button data-map="${(p.address||p.name)+', '+tripCountry(t)}">Mapa</button>`}<button class="primary" data-add-smart-route="${encodeURIComponent(p.name||'Lugar')}">+ Adicionar à minha rota</button></div></div></article>`;
+ const payload=encodeURIComponent(JSON.stringify({id:p.id||'',name:p.name||'Lugar',address:p.address||'',placeId:p.id||p.placeId||'',mapsUrl:p.mapsUrl||'',rating:p.rating||'',category:p.category||''}));
+ return `<article class="smart-tip-card"><div class="smart-tip-icon">✨</div><div class="smart-tip-copy"><div class="smart-tip-title"><b>${p.name||'Sugestão'}</b>${p.rating?`<span>⭐ ${p.rating}</span>`:''}</div><small>${p.address||tripDestination(t)}</small><p><strong>Por que recomendamos:</strong> ${why}</p><div class="smart-tip-actions">${p.mapsUrl?`<button data-external-route="${p.mapsUrl}">Mapa</button>`:`<button data-map="${(p.address||p.name)+', '+tripCountry(t)}">Mapa</button>`}<button class="primary" data-add-smart-route="${payload}">+ Adicionar à minha rota</button></div></div></article>`;
 }
 async function loadSmartTips(category){
  const t=activeTrip(); if(!t)return;
@@ -1336,12 +1388,25 @@ async function loadSmartTips(category){
 }
 function bindSmartTipActions(){
  document.querySelectorAll('[data-add-smart-route]').forEach(b=>b.onclick=()=>{
-  const t=activeTrip(),name=decodeURIComponent(b.dataset.addSmartRoute||'Lugar');
-  const key='ipa-personal-route-'+(t?.id||'trip');
-  const list=JSON.parse(localStorage.getItem(key)||'[]');
-  if(!list.includes(name))list.push(name);
-  localStorage.setItem(key,JSON.stringify(list));
-  toast(`${name} adicionado à sua rota pessoal ✓`);
+  const t=activeTrip();if(!t)return;
+  let p={name:'Lugar'};
+  try{p=JSON.parse(decodeURIComponent(b.dataset.addSmartRoute||''))}catch(e){p={name:decodeURIComponent(b.dataset.addSmartRoute||'Lugar')}}
+  const dayNo=Number(state.tripDay||1),list=ipaGetPersonalRoute(t,dayNo);
+  const exists=list.some(x=>(x.id&&p.id&&x.id===p.id)||String(x.name||'').toLowerCase()===String(p.name||'').toLowerCase());
+  if(!exists)list.push({...p,addedAt:new Date().toISOString()});
+  ipaSavePersonalRoute(t,dayNo,list);
+  toast(`${p.name} adicionado ao seu roteiro ✓`);
+  state.route='today';
+  state.mode='during';
+  render();
+ });
+ document.querySelectorAll('[data-remove-smart-route]').forEach(b=>b.onclick=()=>{
+  const t=activeTrip();if(!t)return;
+  const dayNo=Number(state.tripDay||1),id=decodeURIComponent(b.dataset.removeSmartRoute||''),list=ipaGetPersonalRoute(t,dayNo);
+  const next=list.filter(x=>String(x.id||x.name)!==id);
+  ipaSavePersonalRoute(t,dayNo,next);
+  toast('Local removido da sua rota pessoal');
+  render();
  });
 }
 function communityView(){return `<section class="section" style="margin-top:0"><div class="section-head"><div><span class="eyebrow">${activeTrip()?.name||'Sua viagem'} · comunidade</span><h2>Grupo da viagem</h2></div><button id="liveBtn">🔴 Iniciar live</button></div><div class="card"><div class="people"><div class="person"><i>RF</i><small>Renato</small></div><div class="person"><i>MS</i><small>Marina</small></div><div class="person"><i>CS</i><small>Carlos</small></div><div class="person"><i>JS</i><small>Julia</small></div><div class="person"><i>+8</i><small>Mais</small></div></div></div></section><section class="section"><div class="message guide"><b>📢 Aviso do guia</b><br>Amanhã sairemos às 8h30. O ponto de encontro será na recepção do hotel.<small>09:30</small></div><div class="chat">${state.messages.map(m=>`<div class="message ${m.type==='me'?'me':m.type==='guide'?'guide':''}"><b>${m.name}</b><br>${m.text}<small>${m.time}</small></div>`).join('')}</div><div class="composer"><input id="messageInput" placeholder="Digite uma mensagem..."/><button class="btn btn-purple" id="sendMessage">➤</button></div></section>`}
