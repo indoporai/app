@@ -190,6 +190,10 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
 
+    if (url.pathname === "/api/maps/browser-key" && request.method === "GET") {
+      if(!env.GOOGLE_MAPS_BROWSER_KEY)return json({ok:false,error:"GOOGLE_MAPS_BROWSER_KEY não configurada."},500);
+      return json({ok:true,key:env.GOOGLE_MAPS_BROWSER_KEY});
+    }
     if (url.pathname === "/api/contact/whatsapp" && request.method === "GET") return whatsappContact(env);
     if (url.pathname === "/api/places/search" && request.method === "GET") return googlePlaceSearch(request,env);
     if (url.pathname === "/api/live/create" && request.method === "POST") return createLiveRoom(env);

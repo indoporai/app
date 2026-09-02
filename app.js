@@ -195,6 +195,7 @@ window.ipaCurrentClientId=ipaCurrentClientId;
 window.ipaUploadMemoryFile=ipaUploadMemoryFile;
 window.ipaPersistMemoryMeta=ipaPersistMemoryMeta;
 function bind(){
+ setTimeout(()=>ipaInitRealMap(),60);
  document.querySelectorAll('[data-remove-smart-route]').forEach(b=>b.onclick=()=>{
   const t=activeTrip();if(!t)return;
   const dayNo=Number(state.tripDay||1),id=decodeURIComponent(b.dataset.removeSmartRoute||''),list=ipaGetPersonalRoute(t,dayNo);
@@ -1273,8 +1274,67 @@ function ipaPaintJourneyStarsNow(tripId,dayNo,placeId,rating){
      el.textContent=stars;el.setAttribute('aria-label',`${value} de 5 estrelas`);
    }
  });
+
+ document.querySelectorAll('[data-journey-rate]').forEach(btn=>{
+   if(btn.getAttribute('data-journey-rate')===[tripId,dayNo,placeId].join('|'))btn.textContent=stars;
+ });
 }
 
+
+let ipaMapsPromise=null;
+async function ipaLoadGoogleMaps(){
+ if(window.google?.maps)return window.google.maps;
+ if(ipaMapsPromise)return ipaMapsPromise;
+ ipaMapsPromise=(async()=>{
+   const r=await fetch('/api/maps/browser-key',{cache:'no-store'});
+   const j=await r.json();if(!r.ok||!j.key)throw new Error(j.error||'Chave do mapa indisponível');
+   await new Promise((resolve,reject)=>{
+     const sc=document.createElement('script');
+     sc.src=`https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(j.key)}&v=weekly`;
+     sc.async=true;sc.defer=true;sc.onload=resolve;sc.onerror=()=>reject(new Error('Não foi possível carregar Google Maps'));
+     document.head.appendChild(sc);
+   });
+   return window.google.maps;
+ })();
+ return ipaMapsPromise;
+}
+async function ipaGeocodeMapPlace(maps,p,country){
+ const geocoder=new maps.Geocoder();
+ const query=[p.address||p.name,country].filter(Boolean).join(', ');
+ return new Promise(resolve=>geocoder.geocode({address:query},(results,status)=>resolve(status==='OK'?results?.[0]?.geometry?.location:null)));
+}
+async function ipaInitRealMap(){
+ const el=document.querySelector('#ipaRealMap');if(!el)return;
+ const t=activeTrip();if(!t)return;
+ const days=(t.itinerary||[]).sort((a,b)=>Number(a.day)-Number(b.day));
+ const day=days.find(x=>Number(x.day)===Number(state.tripDay))||days[0];if(!day)return;
+ const official=normalizedPlaces(day).map((p,i)=>({...p,_kind:'official',_label:String.fromCharCode(65+i)}));
+ const personal=ipaGetPersonalRoute(t,day.day).map((p,i)=>({...p,_kind:'personal',_label:'✨',id:p.id||p.placeId||`personal-${i}`}));
+ const places=[...official,...personal],country=tripCountry(t);
+ try{
+   const maps=await ipaLoadGoogleMaps();
+   const map=new maps.Map(el,{zoom:13,mapTypeControl:false,streetViewControl:false,fullscreenControl:true,gestureHandling:'cooperative'});
+   const bounds=new maps.LatLngBounds(),located=[];
+   for(const p of places){
+     const pos=await ipaGeocodeMapPlace(maps,p,country);if(!pos)continue;
+     located.push({...p,pos});bounds.extend(pos);
+     const marker=new maps.Marker({map,position:pos,label:p._kind==='official'?{text:p._label,color:'#fff',fontWeight:'800'}:undefined,title:p.name});
+     if(p._kind==='personal')marker.setIcon({path:maps.SymbolPath.CIRCLE,scale:11,fillColor:'#ff8a3d',fillOpacity:1,strokeColor:'#fff',strokeWeight:3});
+     const info=new maps.InfoWindow({content:`<div class="ipa-map-info"><b>${ipaEscape(p.name||'Local')}</b><small>${p._kind==='personal'?'✨ Sua descoberta':'Roteiro oficial'}</small><p>${ipaEscape(p.address||p.note||'')}</p><a target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent((p.address||p.name)+', '+country)}">Navegar</a></div>`});
+     marker.addListener('click',()=>info.open({map,anchor:marker}));
+   }
+   if(!located.length){el.innerHTML='<div class="ipa-map-empty">Não consegui localizar os pontos deste dia.</div>';return}
+   map.fitBounds(bounds,55);
+   // Traçado visual do roteiro oficial na ordem A → B → C → D.
+   const officialLocated=located.filter(x=>x._kind==='official');
+   if(officialLocated.length>1)new maps.Polyline({map,path:officialLocated.map(x=>x.pos),geodesic:true,strokeOpacity:.82,strokeWeight:4});
+   // Localização atual, se o viajante autorizar.
+   if(navigator.geolocation)navigator.geolocation.getCurrentPosition(pos=>{
+     const here={lat:pos.coords.latitude,lng:pos.coords.longitude};
+     new maps.Marker({map,position:here,title:'Você está aqui',icon:{path:maps.SymbolPath.CIRCLE,scale:8,fillColor:'#1976d2',fillOpacity:1,strokeColor:'#fff',strokeWeight:3}});
+   },()=>{}, {enableHighAccuracy:true,timeout:5000,maximumAge:60000});
+ }catch(e){console.error(e);el.innerHTML=`<div class="ipa-map-empty"><b>Mapa indisponível</b><small>${ipaEscape(e.message||'Tente novamente.')}</small></div>`}
+}
 function duringView(){
  const t=activeTrip();
  if(!t)return `${ipaParticipantBadge(t)}<section class="section"><h2>Viagem não encontrada</h2><p>Não há uma viagem ativa para este cliente.</p></section>`;
@@ -1291,7 +1351,8 @@ function duringView(){
  const country=tripCountry(t),flag=countryFlag(country),route=googleMapsRouteUrl(day,t);
  return `<section class="hero during-personalized-hero"><span class="eyebrow">Durante a viagem</span><h1>${tripDestination(t)} ${flag}</h1><p>${t.name} · Dia ${day.day}${day.title?` · ${day.title}`:''}</p><div class="hero-actions">${route?`<button class="btn btn-light" data-external-route="${route}">Abrir rota</button>`:''}${tripModule('concierge')?`<button class="btn btn-light" data-concierge>👑 Concierge</button>`:''}${tripModule('live')?`<button class="btn btn-primary" id="realLiveBtn">🔴 Live</button>`:''}</div></section>
  ${modeCard()}
- <section class="section"><div class="section-head"><div><span class="eyebrow">Roteiro real</span><h2>${day.title||`Dia ${day.day}`}</h2></div><span class="chip">${places.length} locais</span></div><div class="during-place-list">${places.map((p,i)=>`<div class="during-place-card ${p.personal?'during-place-personal':''}"><div class="during-place-number">${i+1}</div><div><small>${p.time||'Horário livre'}</small><div class="during-place-title" data-journey-title="${ipaEscape([t.id,day.day,p.id||i].join(':'))}"><b>${p.name}</b>${journeyInlineStars(t.id,day.day,p.id||i)}</div><p>${p.address||p.note||'Programado no roteiro'}</p><div class="during-place-actions"><button data-map="${(p.address||p.name)+', '+country}">Mapa</button><button class="${(ipaDB().journeyPlaces?.[[t.id,day.day,p.id||i].join(':')]?.checked)?'checked':''}" data-journey-check="${t.id}|${day.day}|${p.id||i}">${(ipaDB().journeyPlaces?.[[t.id,day.day,p.id||i].join(':')]?.checked)?'✓ Feito':'✓ Check'}</button><button data-journey-rate="${t.id}|${day.day}|${p.id||i}" data-place-name="${encodeURIComponent(p.name)}">★ Avaliar</button></div></div></div>`).join('')||'<p>Nenhum local cadastrado para este dia.</p>'}</div></section>
+ <section class="section"><div class="section-head"><div><span class="eyebrow">Roteiro real</span><h2>${day.title||`Dia ${day.day}`}</h2></div><span class="chip">${places.length} locais</span></div><div class="during-place-list">${places.map((p,i)=>`<div class="during-place-card ${p.personal?'during-place-personal':''}"><div class="during-place-number">${i+1}</div><div><small>${p.time||'Horário livre'}</small><div class="during-place-title" data-journey-title="${ipaEscape([t.id,day.day,p.id||i].join(':'))}"><b>${p.name}</b>${journeyInlineStars(t.id,day.day,p.id||i)}</div><p>${p.address||p.note||'Programado no roteiro'}</p><div class="during-place-actions"><button data-map="${(p.address||p.name)+', '+country}">Mapa</button><button class="${(ipaDB().journeyPlaces?.[[t.id,day.day,p.id||i].join(':')]?.checked)?'checked':''}" data-journey-check="${t.id}|${day.day}|${p.id||i}">${(ipaDB().journeyPlaces?.[[t.id,day.day,p.id||i].join(':')]?.checked)?'✓ Feito':'✓ Check'}</button><button data-journey-rate="${t.id}|${day.day}|${p.id||i}" data-place-name="${encodeURIComponent(p.name)}">${(()=>{const rr=Number(ipaDB().journeyPlaces?.[[t.id,day.day,p.id||i].join(':')]?.rating||0);return rr?`${'★'.repeat(rr)}${'☆'.repeat(5-rr)}`:'★ Avaliar'})()}</button></div></div></div>`).join('')||'<p>Nenhum local cadastrado para este dia.</p>'}</div></section>
+ <section class="section ipa-real-map-section"><div class="section-head"><div><span class="eyebrow">MAPA DO DIA</span><h2>Seu roteiro no mapa</h2></div><span class="chip">A → B → C${places.length>3?' → D':''}</span></div><div id="ipaRealMap" class="ipa-real-map"><div class="ipa-map-loading">🗺️ Carregando mapa...</div></div><div class="ipa-map-legend"><span><i class="official"></i> Roteiro oficial</span><span><i class="personal"></i> Dica adicionada</span><span><i class="current"></i> Você</span></div></section>
  <section class="section"><div class="section-head"><h2>Dias da viagem</h2></div><div class="day-strip">${days.map(x=>`<button class="day-pill ${Number(x.day)===Number(day.day)?'active':''}" data-day="${x.day}"><small>Dia</small><strong>${x.day}</strong></button>`).join('')}</div></section>`;
 }
 function afterView(){

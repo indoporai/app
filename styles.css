@@ -507,3 +507,11 @@ body{min-height:100vh}.app-shell{width:min(100%,520px);min-height:100vh;margin:a
 /* 6.21.1 — Filme mais ágil + avaliação visual imediata */
 .movie2-scene{transition:opacity .38s ease,transform 2.2s ease}
 .journey-inline-stars{display:inline-flex;margin-left:7px;color:#f5a623;font-size:13px;letter-spacing:1px;vertical-align:middle;white-space:nowrap}
+
+/* Beta 6.22 — mapa real */
+.ipa-real-map{height:390px;border-radius:22px;overflow:hidden;background:#eef5f4;box-shadow:0 8px 30px rgba(0,0,0,.06)}
+.ipa-map-loading,.ipa-map-empty{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:#617273}
+.ipa-map-legend{display:flex;gap:14px;flex-wrap:wrap;padding:10px 4px;font-size:10px;font-weight:700;color:#667}
+.ipa-map-legend span{display:flex;align-items:center;gap:5px}.ipa-map-legend i{width:10px;height:10px;border-radius:50%;display:inline-block;background:#087f87}.ipa-map-legend i.personal{background:#ff8a3d}.ipa-map-legend i.current{background:#1976d2}
+.ipa-map-info{max-width:220px}.ipa-map-info b,.ipa-map-info small{display:block}.ipa-map-info small{margin-top:3px;color:#718080}.ipa-map-info p{font-size:11px}.ipa-map-info a{font-weight:800;text-decoration:none}
+@media(max-width:620px){.ipa-real-map{height:330px;border-radius:16px}}
