@@ -1325,6 +1325,12 @@ async function ipaInitRealMap(){
    }
    if(!located.length){el.innerHTML='<div class="ipa-map-empty">Não consegui localizar os pontos deste dia.</div>';return}
    map.fitBounds(bounds,55);
+   // Evita superzoom quando os pontos estão muito próximos ou existe apenas um ponto válido.
+   maps.event.addListenerOnce(map,'bounds_changed',()=>{
+     const currentZoom=map.getZoom();
+     if(currentZoom>15)map.setZoom(15);
+     if(currentZoom<11)map.setZoom(11);
+   });
    // Traçado visual do roteiro oficial na ordem A → B → C → D.
    const officialLocated=located.filter(x=>x._kind==='official');
    if(officialLocated.length>1)new maps.Polyline({map,path:officialLocated.map(x=>x.pos),geodesic:true,strokeOpacity:.82,strokeWeight:4});
