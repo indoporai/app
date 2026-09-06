@@ -517,3 +517,12 @@ body{min-height:100vh}.app-shell{width:min(100%,520px);min-height:100vh;margin:a
 @media(max-width:620px){.ipa-real-map{height:330px;border-radius:16px}}
 /* Beta 6.23 — Item 6: rota real + mapa real no Explorar */
 .ipa-route-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:9px 4px 2px}.ipa-route-meta span{background:#eef6f5;border-radius:999px;padding:7px 10px;font-size:11px;font-weight:900;color:#174b50}.ipa-route-meta small{font-size:10px;color:#718080}
+
+/* Beta 6.24 — Roteiro Pro: adição incremental, sem alterar estrutura base */
+.route-pro-details{margin:12px 0;border:1px solid rgba(20,35,55,.12);border-radius:14px;padding:0 12px;background:#fff}
+.route-pro-details summary{cursor:pointer;font-weight:800;padding:14px 2px}
+.route-pro-details[open] summary{margin-bottom:4px}
+.route-pro-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.route-pro-check{display:flex!important;align-items:center;gap:8px;min-height:44px}
+.route-pro-check input{width:auto!important}
+@media(max-width:640px){.route-pro-grid{grid-template-columns:1fr}}
