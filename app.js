@@ -195,7 +195,7 @@ window.ipaCurrentClientId=ipaCurrentClientId;
 window.ipaUploadMemoryFile=ipaUploadMemoryFile;
 window.ipaPersistMemoryMeta=ipaPersistMemoryMeta;
 function bind(){
- setTimeout(()=>ipaInitRealMap(),60);
+ setTimeout(()=>{ipaInitRealMap();ipaInitExploreRealMap();},60);
  document.querySelectorAll('[data-remove-smart-route]').forEach(b=>b.onclick=()=>{
   const t=activeTrip();if(!t)return;
   const dayNo=Number(state.tripDay||1),id=decodeURIComponent(b.dataset.removeSmartRoute||''),list=ipaGetPersonalRoute(t,dayNo);
@@ -1303,6 +1303,48 @@ async function ipaGeocodeMapPlace(maps,p,country){
  const query=[p.address||p.name,country].filter(Boolean).join(', ');
  return new Promise(resolve=>geocoder.geocode({address:query},(results,status)=>resolve(status==='OK'?results?.[0]?.geometry?.location:null)));
 }
+function ipaLatLngLiteral(pos){return {lat:Number(typeof pos.lat==='function'?pos.lat():pos.lat),lng:Number(typeof pos.lng==='function'?pos.lng():pos.lng)}}
+function ipaDecodePolyline(encoded){
+ let index=0,lat=0,lng=0,coordinates=[];
+ while(index<encoded.length){let b,shift=0,result=0;do{b=encoded.charCodeAt(index++)-63;result|=(b&0x1f)<<shift;shift+=5}while(b>=0x20);lat+=(result&1)?~(result>>1):(result>>1);shift=0;result=0;do{b=encoded.charCodeAt(index++)-63;result|=(b&0x1f)<<shift;shift+=5}while(b>=0x20);lng+=(result&1)?~(result>>1):(result>>1);coordinates.push({lat:lat/1e5,lng:lng/1e5})}
+ return coordinates;
+}
+function ipaRouteMeta(el,distanceMeters,duration){
+ const host=el.closest('.ipa-real-map-section')||el.parentElement;if(!host)return;
+ let meta=host.querySelector('.ipa-route-meta');if(!meta){meta=document.createElement('div');meta.className='ipa-route-meta';el.insertAdjacentElement('afterend',meta)}
+ const km=(Number(distanceMeters||0)/1000).toFixed(Number(distanceMeters||0)>=10000?0:1).replace('.',',');
+ const sec=Number(String(duration||'0s').replace('s',''))||0,mins=Math.max(1,Math.round(sec/60));
+ meta.innerHTML=`<span>🚗 ${km} km</span><span>⏱️ ${mins} min</span><small>Estimativa da rota oficial</small>`;
+}
+async function ipaDrawRoadRoute(maps,map,positions,el){
+ try{
+  const points=positions.map(ipaLatLngLiteral);
+  const r=await fetch('/api/routes/compute',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({points})});
+  const j=await r.json();if(!r.ok||!j.ok||!j.encodedPolyline)throw new Error(j.error||'Rota indisponível');
+  new maps.Polyline({map,path:ipaDecodePolyline(j.encodedPolyline),geodesic:false,strokeOpacity:.9,strokeWeight:5});
+  ipaRouteMeta(el,j.distanceMeters,j.duration);
+ }catch(e){
+  console.warn('Routes API: usando traçado visual de contingência',e);
+  new maps.Polyline({map,path:positions,geodesic:true,strokeOpacity:.72,strokeWeight:4});
+ }
+}
+async function ipaInitExploreRealMap(){
+ const el=document.querySelector('#ipaExploreRealMap');if(!el)return;
+ const t=activeTrip();if(!t)return;
+ const days=(t.itinerary||[]).sort((a,b)=>Number(a.day)-Number(b.day));
+ const day=days.find(x=>Number(x.day)===Number(state.tripDay))||days[0];if(!day)return;
+ const official=normalizedPlaces(day).map((p,i)=>({...p,_kind:'official',_label:String.fromCharCode(65+i)}));
+ const personal=ipaGetPersonalRoute(t,day.day).map((p,i)=>({...p,_kind:'personal',_label:'✨',id:p.id||p.placeId||`personal-${i}`}));
+ const places=[...official,...personal],country=tripCountry(t);
+ try{
+  const maps=await ipaLoadGoogleMaps(),map=new maps.Map(el,{zoom:13,mapTypeControl:false,streetViewControl:false,fullscreenControl:true,gestureHandling:'cooperative'}),bounds=new maps.LatLngBounds(),located=[];
+  for(const p of places){const pos=await ipaGeocodeMapPlace(maps,p,country);if(!pos)continue;located.push({...p,pos});bounds.extend(pos);const marker=new maps.Marker({map,position:pos,label:p._kind==='official'?{text:p._label,color:'#fff',fontWeight:'800'}:undefined,title:p.name});if(p._kind==='personal')marker.setIcon({path:maps.SymbolPath.CIRCLE,scale:11,fillColor:'#ff8a3d',fillOpacity:1,strokeColor:'#fff',strokeWeight:3});const info=new maps.InfoWindow({content:`<div class="ipa-map-info"><b>${ipaEscape(p.name||'Local')}</b><small>${p._kind==='personal'?'✨ Sua descoberta':'Roteiro oficial'}</small><p>${ipaEscape(p.address||p.note||'')}</p></div>`});marker.addListener('click',()=>info.open({map,anchor:marker}))}
+  if(!located.length){el.innerHTML='<div class="ipa-map-empty">Não consegui localizar os pontos deste dia.</div>';return}
+  map.fitBounds(bounds,55);maps.event.addListenerOnce(map,'bounds_changed',()=>{const z=map.getZoom();if(z>15)map.setZoom(15);if(z<11)map.setZoom(11)});
+  const officialLocated=located.filter(x=>x._kind==='official');if(officialLocated.length>1)await ipaDrawRoadRoute(maps,map,officialLocated.map(x=>x.pos),el);
+  if(navigator.geolocation)navigator.geolocation.getCurrentPosition(pos=>new maps.Marker({map,position:{lat:pos.coords.latitude,lng:pos.coords.longitude},title:'Você está aqui',icon:{path:maps.SymbolPath.CIRCLE,scale:8,fillColor:'#1976d2',fillOpacity:1,strokeColor:'#fff',strokeWeight:3}}),()=>{}, {enableHighAccuracy:true,timeout:5000,maximumAge:60000});
+ }catch(e){console.error(e);el.innerHTML=`<div class="ipa-map-empty"><b>Mapa indisponível</b><small>${ipaEscape(e.message||'Tente novamente.')}</small></div>`}
+}
 async function ipaInitRealMap(){
  const el=document.querySelector('#ipaRealMap');if(!el)return;
  const t=activeTrip();if(!t)return;
@@ -1331,9 +1373,9 @@ async function ipaInitRealMap(){
      if(currentZoom>15)map.setZoom(15);
      if(currentZoom<11)map.setZoom(11);
    });
-   // Traçado visual do roteiro oficial na ordem A → B → C → D.
+   // Rota real pelas ruas na ordem oficial A → B → C → D.
    const officialLocated=located.filter(x=>x._kind==='official');
-   if(officialLocated.length>1)new maps.Polyline({map,path:officialLocated.map(x=>x.pos),geodesic:true,strokeOpacity:.82,strokeWeight:4});
+   if(officialLocated.length>1)await ipaDrawRoadRoute(maps,map,officialLocated.map(x=>x.pos),el);
    // Localização atual, se o viajante autorizar.
    if(navigator.geolocation)navigator.geolocation.getCurrentPosition(pos=>{
      const here={lat:pos.coords.latitude,lng:pos.coords.longitude};
@@ -1440,11 +1482,8 @@ function exploreView(){
  const admTips=(ipaDB().recommendations||[]).filter(r=>r.tripId===t.id);
  const totalPoints=places.length+personal.length;
  return `<section class="section explore-intro" style="margin-top:0"><div class="section-head"><div><span class="eyebrow">EXPLORAR</span><h2>Seu roteiro + descobertas inteligentes ✨</h2><p>O roteiro oficial continua intacto. As descobertas entram na sua rota pessoal.</p></div></div></section>
- <section class="section"><div class="section-head"><div><span class="eyebrow">MAPA DO ROTEIRO</span><h2>${day.title}</h2></div><span class="chip">${totalPoints} pontos</span></div>
- <div class="dynamic-route-map"><div class="map-grid"></div><svg class="dynamic-route-line" viewBox="0 0 400 500"><path d="M70 60 C150 90, 285 100, 315 180 S130 270, 95 355 S250 400, 320 450" fill="none" stroke="#147ce5" stroke-width="5" stroke-linecap="round" stroke-dasharray="8 9"/></svg>
- ${places.slice(0,6).map((p,i)=>`<button class="dynamic-pin pin-${i+1}" data-map="${(p.address||p.name)+', '+tripCountry(t)}"><span>${String.fromCharCode(65+i)}</span><small>${p.name}</small></button>`).join('')}
- ${personal.slice(0,2).map((p,i)=>`<button class="dynamic-pin personal-pin" style="left:${i?72:28}%;top:${i?64:79}%" data-map="${(p.address||p.name)+', '+tripCountry(t)}"><span>${String.fromCharCode(65+places.length+i)}</span><small>✨ ${ipaEscape(p.name)}</small></button>`).join('')}
- <div class="dynamic-map-caption">A/B/C/D = roteiro oficial · ✨ = descobertas adicionadas por você.</div></div></section>
+ <section class="section ipa-real-map-section"><div class="section-head"><div><span class="eyebrow">MAPA DO ROTEIRO</span><h2>${day.title}</h2></div><span class="chip">${totalPoints} pontos</span></div>
+ <div id="ipaExploreRealMap" class="ipa-real-map"><div class="ipa-map-loading">🗺️ Carregando mapa...</div></div><div class="ipa-map-legend"><span><i class="official"></i> Roteiro oficial</span><span><i class="personal"></i> Dica adicionada</span><span><i class="current"></i> Você</span></div></section>
  <section class="section smart-discovery-section"><div class="section-head"><div><span class="eyebrow">✨ DICAS INTELIGENTES</span><h2>O que vale descobrir fora da rota?</h2></div><span class="chip orange">${tripDestination(t)}</span></div>
  <div class="smart-filter-row"><button data-smart-filter="cafe">☕ Cafés</button><button data-smart-filter="restaurant">🍽️ Restaurantes</button><button data-smart-filter="bar">🍸 Bares</button><button data-smart-filter="shopping">🛍️ Compras</button><button data-smart-filter="tourist attraction">📸 Surpreenda-me</button></div>
  <div id="smartTipsResults" class="smart-tips-results"><div class="smart-loading"><span>✨</span><div><b>Buscando sugestões para ${tripDestination(t)}…</b><small>Selecionamos lugares fora do roteiro do dia.</small></div></div></div></section>
@@ -1818,12 +1857,11 @@ function showJourneyRating(tripId,dayNo,placeId,placeName){
         const note=document.querySelector('#journeyRatingNote')?.value.trim()||'';
         IPAData.saveJourneyPlace(tripId,dayNo,placeId,{rating:chosen,note});
         // Atualização visual síncrona: não depende do Firebase nem de trocar de tela.
+        // Atualiza o card que já está no DOM antes de fechar o modal. Não depende de render nem do Firebase.
+        ipaPaintJourneyStarsNow(tripId,dayNo,placeId,chosen);
         toast(`Avaliação ${chosen}★ salva ✓`);
         modal.close();
-        render();
-        // Reaplica no DOM já renderizado, inclusive se o modal disparar ciclo de UI.
         requestAnimationFrame(()=>ipaPaintJourneyStarsNow(tripId,dayNo,placeId,chosen));
-        setTimeout(()=>ipaPaintJourneyStarsNow(tripId,dayNo,placeId,chosen),80);
         // Firebase sincroniza sem bloquear a tela.
         if(window.IPAFirebase?.user && window.IPAFirebase?.syncNow){
           window.IPAFirebase.syncNow().catch(e=>console.warn('Avaliação salva localmente; sincronização pendente',e));

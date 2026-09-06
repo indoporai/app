@@ -179,6 +179,19 @@ async function googlePlaceSearch(request,env){
 }
 
 
+async function computeRoadRoute(request,env){
+ const key=env.GOOGLE_MAPS_API_KEY;if(!key)return json({ok:false,error:"GOOGLE_MAPS_API_KEY não configurada"},500);
+ let b={};try{b=await request.json()}catch{return json({ok:false,error:"JSON inválido"},400)}
+ const points=Array.isArray(b.points)?b.points.filter(p=>Number.isFinite(Number(p.lat))&&Number.isFinite(Number(p.lng))).slice(0,25):[];
+ if(points.length<2)return json({ok:false,error:"A rota precisa de pelo menos 2 pontos"},400);
+ const waypoint=p=>({location:{latLng:{latitude:Number(p.lat),longitude:Number(p.lng)}}});
+ const payload={origin:waypoint(points[0]),destination:waypoint(points[points.length-1]),intermediates:points.slice(1,-1).map(waypoint),travelMode:"DRIVE",routingPreference:"TRAFFIC_AWARE",languageCode:"pt-BR",units:"METRIC"};
+ const r=await fetch("https://routes.googleapis.com/directions/v2:computeRoutes",{method:"POST",headers:{"Content-Type":"application/json","X-Goog-Api-Key":key,"X-Goog-FieldMask":"routes.distanceMeters,routes.duration,routes.polyline.encodedPolyline"},body:JSON.stringify(payload)});
+ const body=await r.json().catch(()=>({}));if(!r.ok)return json({ok:false,error:body?.error?.message||"Erro Routes API"},r.status);
+ const route=body.routes?.[0];if(!route)return json({ok:false,error:"Nenhuma rota encontrada"},404);
+ return json({ok:true,distanceMeters:route.distanceMeters||0,duration:route.duration||"",encodedPolyline:route.polyline?.encodedPolyline||""});
+}
+
 function whatsappContact(env){
   const raw=String(env.WHATSAPP_NUMBER||"").replace(/\D/g,"");
   if(!raw)return json({ok:false,error:"WHATSAPP_NUMBER não configurado no Cloudflare."},500);
@@ -196,6 +209,7 @@ export default {
     }
     if (url.pathname === "/api/contact/whatsapp" && request.method === "GET") return whatsappContact(env);
     if (url.pathname === "/api/places/search" && request.method === "GET") return googlePlaceSearch(request,env);
+    if (url.pathname === "/api/routes/compute" && request.method === "POST") return computeRoadRoute(request,env);
     if (url.pathname === "/api/live/create" && request.method === "POST") return createLiveRoom(env);
     if (url.pathname === "/api/live/join" && request.method === "POST") return joinLiveRoom(request,env);
 
