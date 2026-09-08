@@ -37,6 +37,8 @@ const IPA_DEFAULT_DATA = {
     Elite:["Tudo do Signature","Concierge durante a viagem","Suporte em tempo real","Experiências premium","Live e grupo","Acesso full à plataforma"],
     Groups:["Experiência para grandes grupos","Avisos do guia","Lista de presença","Subgrupos","Live","Álbum e filme compartilhados"]
   },
+  placeCatalog:[],
+  travelLeads:[],
   benefits:[
     {id:"exchange",enabled:true,title:"Indo por Aí Exchange",partner:"C6 Bank",sponsorLabel:"Parceiro Oficial",cta:"Ativar benefício"},
     {id:"esim",enabled:true,title:"Internet Internacional",partner:"Airalo",sponsorLabel:"Benefício exclusivo",cta:"Ativar eSIM"},
@@ -147,6 +149,8 @@ window.IPAData={
  addMemory(memory){const d=readData();d.memories=d.memories||[];memory.id=memory.id||("mem-"+Date.now()+"-"+Math.random().toString(36).slice(2,6));memory.createdAt=memory.createdAt||new Date().toISOString();d.memories.unshift(memory);writeData(d);return memory},
  createConciergeRequest(req){const d=readData();d.conciergeRequests=d.conciergeRequests||[];req.id=req.id||("conc-"+Date.now());req.status=req.status||"Enviado";req.createdAt=new Date().toISOString();d.conciergeRequests.unshift(req);writeData(d);return req},
  addRecommendation(rec){const d=readData();d.recommendations=d.recommendations||[];rec.id=rec.id||("rec-"+Date.now());rec.createdAt=new Date().toISOString();d.recommendations.unshift(rec);writeData(d);return rec},
+ addCatalogPlace(place){const d=readData();d.placeCatalog=d.placeCatalog||[];place.id=place.id||("catalog-"+Date.now());place.createdAt=new Date().toISOString();d.placeCatalog.unshift(place);writeData(d);return place},
+ addTravelLead(lead){const d=readData();d.travelLeads=d.travelLeads||[];lead.id=lead.id||("lead-"+Date.now());lead.createdAt=new Date().toISOString();d.travelLeads.unshift(lead);writeData(d);return lead},
  createPaymentPlan(plan){const d=readData();d.paymentPlans=d.paymentPlans||[];plan.id=plan.id||("plan-"+Date.now());plan.installments=Math.max(1,Number(plan.installments)||1);plan.createdAt=new Date().toISOString();d.paymentPlans.unshift(plan);const total=Number(plan.totalAmount)||0;const base=Math.floor((total/plan.installments)*100)/100;const start=new Date((plan.firstDueDate||new Date().toISOString().slice(0,10))+"T12:00:00");for(let i=1;i<=plan.installments;i++){const due=new Date(start);due.setMonth(start.getMonth()+i-1);const amount=i===plan.installments?Math.round((total-base*(plan.installments-1))*100)/100:base;d.payments.unshift({id:"pay-"+Date.now()+"-"+i,paymentPlanId:plan.id,installmentNumber:i,installmentTotal:plan.installments,clientId:plan.clientId,clientName:plan.clientName,tripId:plan.tripId,trip:plan.trip,title:`${i}ª parcela · ${plan.title||"Viagem"}`,description:plan.description||"",amount,dueDate:due.toISOString().slice(0,10),methods:plan.methods||["PIX"],status:"Pendente",createdAt:new Date().toISOString().slice(0,10),paidAt:null})}writeData(d);return plan},
  addTripDocument(docu){const d=readData();d.tripDocuments=d.tripDocuments||[];docu.id=docu.id||("doc-"+Date.now());docu.createdAt=new Date().toISOString();d.tripDocuments.unshift(docu);writeData(d);return docu},
  createPayment(payment){const d=readData();payment.id=payment.id||("pay-"+Date.now());payment.status=payment.status||"Pendente";payment.createdAt=new Date().toISOString().slice(0,10);payment.paidAt=null;d.payments.unshift(payment);writeData(d);return payment},

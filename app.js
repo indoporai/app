@@ -196,6 +196,17 @@ window.ipaUploadMemoryFile=ipaUploadMemoryFile;
 window.ipaPersistMemoryMeta=ipaPersistMemoryMeta;
 function bind(){
  setTimeout(()=>{ipaInitRealMap();ipaInitExploreRealMap();},60);
+ document.querySelectorAll('[data-admin-new-place]').forEach(b=>b.onclick=()=>showModal(`<span class="eyebrow">BANCO DE LUGARES</span><h2>Novo lugar</h2>
+ <div class="planner-grid"><label>Nome<input id="catalogName" class="v2-concierge-input" placeholder="Ex.: Torre Eiffel"></label><label>Categoria<select id="catalogCategory" class="v2-concierge-input"><option>Atração</option><option>Gastronomia</option><option>Museu</option><option>Natureza</option><option>Compras</option><option>Experiência</option><option>Vida noturna</option><option>Outro</option></select></label><label>Cidade<input id="catalogCity" class="v2-concierge-input"></label><label>País<input id="catalogCountry" class="v2-concierge-input"></label></div>
+ <label>Endereço / referência Google<input id="catalogAddress" class="v2-concierge-input"></label>
+ <div class="planner-grid"><label>Custo por pessoa<input id="catalogCost" type="number" min="0" step=".01" class="v2-concierge-input"></label><label>Moeda<select id="catalogCurrency" class="v2-concierge-input"><option>EUR</option><option>BRL</option><option>USD</option></select></label><label>Duração (min)<input id="catalogDuration" type="number" min="15" step="15" value="120" class="v2-concierge-input"></label><label>Prioridade<select id="catalogPriority" class="v2-concierge-input"><option>Recomendado</option><option>Imperdível</option><option>Opcional</option></select></label></div>
+ <label>Interesses relacionados</label><div class="planner-interests" id="catalogInterests">${IPA_INTERESTS.map(x=>`<label><input type="checkbox" value="${x}"> ${x}</label>`).join('')}</div>
+ <div class="planner-grid"><label class="route-pro-check"><input id="catalogKids" type="checkbox" checked> 👶 Bom com crianças</label><label>Reserva<select id="catalogReservation" class="v2-concierge-input"><option>Não exige</option><option>Recomendada</option><option>Obrigatória</option></select></label></div>
+ <label>Dica Indo por Aí<textarea id="catalogTip" class="rating-text" placeholder="O que torna esse lugar especial?"></textarea></label>
+ <button id="saveCatalogPlace" class="btn btn-primary btn-block">Salvar no Banco de Lugares</button>`));
+ setTimeout(()=>{const s=document.querySelector('#saveCatalogPlace');if(s)s.onclick=async()=>{const v=id=>document.querySelector(id)?.value?.trim?.()||'';const name=v('#catalogName');if(!name){toast('Informe o nome do lugar');return}const interests=[...document.querySelectorAll('#catalogInterests input:checked')].map(x=>x.value);IPAData.addCatalogPlace({name,category:v('#catalogCategory'),city:v('#catalogCity'),country:v('#catalogCountry'),address:v('#catalogAddress'),cost:Number(v('#catalogCost')||0),currency:v('#catalogCurrency'),durationMinutes:Number(v('#catalogDuration')||120),priority:v('#catalogPriority'),interests,kidsFriendly:!!document.querySelector('#catalogKids')?.checked,reservation:v('#catalogReservation'),tip:v('#catalogTip')});if(window.IPAFirebase?.user)await window.IPAFirebase.syncNow();toast('Lugar salvo na curadoria ✓');modal.close();adminSection='places';render()}},0);
+ const openPlanner=document.querySelector('#openTravelPlanner');if(openPlanner)openPlanner.onclick=()=>{showModal(ipaPlannerForm());setTimeout(()=>{const g=document.querySelector('#generatePlannerRoute');if(g)g.onclick=()=>{const interests=[...document.querySelectorAll('.planner-interests input:checked')].map(x=>x.value),input={destination:document.querySelector('#plannerDestination').value.trim(),days:Number(document.querySelector('#plannerDays').value||1),adults:Number(document.querySelector('#plannerAdults').value||1),children:Number(document.querySelector('#plannerChildren').value||0),budget:Number(document.querySelector('#plannerBudget').value||0),currency:document.querySelector('#plannerCurrency').value,pace:document.querySelector('#plannerPace').value,interests};if(!input.destination){toast('Informe o destino');return}const result=ipaGenerateCuratedRoute(input);IPAData.addTravelLead({...input,resultSummary:{count:result.count,estimatedCost:result.spent}});document.querySelector('#plannerResult').innerHTML=ipaPlannerResultHtml(result,input);const w=document.querySelector('#plannerWhatsApp');if(w)w.onclick=async()=>{try{const r=await fetch('/api/contact/whatsapp',{cache:'no-store'}),j=await r.json();if(!r.ok||!j.ok)throw new Error(j.error||'WhatsApp não configurado');window.location.href=j.url}catch(e){toast(e.message||'Não foi possível abrir o WhatsApp')}}}},0)};
+
  document.querySelectorAll('[data-remove-smart-route]').forEach(b=>b.onclick=()=>{
   const t=activeTrip();if(!t)return;
   const dayNo=Number(state.tripDay||1),id=decodeURIComponent(b.dataset.removeSmartRoute||''),list=ipaGetPersonalRoute(t,dayNo);
@@ -538,28 +549,9 @@ function bind(){
    <div id="placeSuggestions" class="place-suggestions"><small>Comece digitando. Com GOOGLE_MAPS_API_KEY, o endereço será sugerido automaticamente.</small></div>
    <label>Categoria</label><select id="routePlaceCategory" class="v2-concierge-input"><option>🏛️ Atração</option><option>☕ Cafeteria</option><option>🍽️ Restaurante</option><option>🛍️ Loja</option><option>🌳 Parque</option><option>🏨 Hotel</option><option>🎟️ Experiência</option><option>📍 Outro</option></select>
    <label>Endereço</label><input id="routePlaceAddress" class="v2-concierge-input" placeholder="Preenchido pela busca ou manualmente">
-   <div class="route-pro-grid"><label>Horário início<input id="routePlaceTime" type="time" class="v2-concierge-input"></label><label>Horário término<input id="routePlaceEndTime" type="time" class="v2-concierge-input"></label></div>
-   <details class="route-pro-details" open><summary>Detalhes da experiência</summary>
-     <label>O que vamos fazer aqui?</label><textarea id="routePlaceDescription" class="rating-text" placeholder="Descrição curta que o cliente verá no roteiro"></textarea>
-     <label>Dica Indo por Aí</label><textarea id="routePlaceTip" class="rating-text" placeholder="Melhor horário, o que pedir, curiosidade, ponto para foto..."></textarea>
-     <div class="route-pro-grid"><label>Prioridade<select id="routePlacePriority" class="v2-concierge-input"><option>Recomendado</option><option>Imperdível</option><option>Opcional</option></select></label><label>Duração prevista (min)<input id="routePlaceDuration" type="number" min="0" step="5" class="v2-concierge-input" placeholder="90"></label></div>
-     <label class="route-pro-check"><input id="routePlaceHighlight" type="checkbox"> ✨ Destaque Indo por Aí</label>
-   </details>
-   <details class="route-pro-details"><summary>Logística</summary>
-     <div class="route-pro-grid"><label>Deslocamento<select id="routePlaceTransport" class="v2-concierge-input"><option value="">Não informar</option><option>A pé</option><option>Carro / táxi</option><option>Metrô</option><option>Trem</option><option>Ônibus</option><option>Bicicleta</option><option>Transfer</option></select></label><label>Ponto de encontro<input id="routePlaceMeeting" class="v2-concierge-input" placeholder="Ex.: entrada principal"></label></div>
-     <label>Observação operacional</label><input id="routePlaceNote" class="v2-concierge-input" maxlength="180" placeholder="Antecedência, acesso, orientação ao guia...">
-   </details>
-   <details class="route-pro-details"><summary>Reserva & custos</summary>
-     <div class="route-pro-grid"><label>Reserva<select id="routePlaceReservation" class="v2-concierge-input"><option value="">Não informar</option><option>Não exige</option><option>Obrigatória</option><option>Recomendada</option><option>Já reservada</option></select></label><label>Horário da reserva<input id="routePlaceReservationTime" type="time" class="v2-concierge-input"></label></div>
-     <div class="route-pro-grid"><label>Localizador / referência<input id="routePlaceReservationCode" class="v2-concierge-input"></label><label>Valor estimado<input id="routePlaceCost" class="v2-concierge-input" placeholder="Ex.: € 25"></label></div>
-     <label>Ingresso / custo<select id="routePlaceTicket" class="v2-concierge-input"><option value="">Não informar</option><option>Gratuito</option><option>Incluído no pacote</option><option>Compra por conta do cliente</option></select></label>
-   </details>
-   <details class="route-pro-details"><summary>Informações práticas & Plano B</summary>
-     <label>Plano B</label><input id="routePlacePlanB" class="v2-concierge-input" placeholder="Alternativa em caso de chuva, fechamento ou atraso">
-     <div class="route-pro-grid"><label class="route-pro-check"><input id="routePlaceKids" type="checkbox"> 👶 Bom com crianças</label><label class="route-pro-check"><input id="routePlaceAccessible" type="checkbox"> ♿ Acessível</label></div>
-     <label>Orientações práticas</label><input id="routePlacePractical" class="v2-concierge-input" placeholder="Dress code, documento, antecedência...">
-     <label>Link útil / ingresso</label><input id="routePlaceUsefulUrl" type="url" class="v2-concierge-input" placeholder="https://...">
-   </details>
+   <label>Horário</label><input id="routePlaceTime" type="time" class="v2-concierge-input">
+   <label>Dica inteligente</label><textarea id="routePlaceTip" class="rating-text" placeholder="Ex.: melhor horário, reserva, tempo sugerido, o que pedir..."></textarea>
+   <label>Observação operacional</label><input id="routePlaceNote" class="v2-concierge-input" maxlength="140" placeholder="Ingresso, reserva, ponto de encontro...">
    <input id="routePlaceId" type="hidden"><input id="routeMapsUrl" type="hidden">
    <div class="smart-place-actions"><button id="saveRoutePlace" class="btn btn-primary">+ Adicionar ao roteiro</button><button id="saveAsTip" class="btn btn-light">💡 Adicionar como dica</button></div>`);
    setTimeout(()=>{
@@ -577,9 +569,7 @@ function bind(){
        }catch(e){box.innerHTML='<small>Não foi possível buscar agora. Use o botão Maps.</small>'}
      },350)};
      document.querySelector('#openGoogleSearch').onclick=()=>window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q.value+' '+(trip?.destination||''))}`,'_blank');
-     const v=id=>document.querySelector(id)?.value?.trim?.()||'';
-     const ck=id=>!!document.querySelector(id)?.checked;
-     const collect=()=>({name:q.value.trim(),address:v('#routePlaceAddress'),time:v('#routePlaceTime'),endTime:v('#routePlaceEndTime'),note:v('#routePlaceNote'),placeId:v('#routePlaceId'),mapsUrl:v('#routeMapsUrl'),category:v('#routePlaceCategory'),smartTip:v('#routePlaceTip'),description:v('#routePlaceDescription'),priority:v('#routePlacePriority'),durationMinutes:Number(v('#routePlaceDuration')||0),highlight:ck('#routePlaceHighlight'),transport:v('#routePlaceTransport'),meetingPoint:v('#routePlaceMeeting'),reservation:v('#routePlaceReservation'),reservationTime:v('#routePlaceReservationTime'),reservationCode:v('#routePlaceReservationCode'),estimatedCost:v('#routePlaceCost'),ticketPolicy:v('#routePlaceTicket'),planB:v('#routePlacePlanB'),kidsFriendly:ck('#routePlaceKids'),accessible:ck('#routePlaceAccessible'),practicalInfo:v('#routePlacePractical'),usefulUrl:v('#routePlaceUsefulUrl')});
+     const collect=()=>({name:q.value.trim(),address:document.querySelector('#routePlaceAddress').value.trim(),time:document.querySelector('#routePlaceTime').value,note:document.querySelector('#routePlaceNote').value.trim(),placeId:document.querySelector('#routePlaceId').value,mapsUrl:document.querySelector('#routeMapsUrl').value,category:document.querySelector('#routePlaceCategory').value,smartTip:document.querySelector('#routePlaceTip').value.trim()});
      document.querySelector('#saveRoutePlace').onclick=async()=>{const p=collect();if(!p.name){toast('Informe o nome do local');return}IPAData.addItineraryPlace(tripId,Number(day),p);if(window.IPAFirebase?.user)await window.IPAFirebase.syncNow();toast('Local adicionado ao roteiro ✓');modal.close();view.innerHTML=adminTripEditor(tripId);bind()};
      document.querySelector('#saveAsTip').onclick=async()=>{const p=collect();if(!p.name){toast('Informe o nome do local');return}IPAData.addRecommendation({...p,tripId,clientId:trip?.clientId,day:Number(day),networkRecommended:true});if(window.IPAFirebase?.user)await window.IPAFirebase.syncNow();toast('Dica adicionada à viagem ✓');modal.close();view.innerHTML=adminTripEditor(tripId);bind()};
    },0);
@@ -1155,7 +1145,7 @@ ${flightWalletSection(t,d)}
 ${climateSection(t)}
 ${benefitsPersonalized()}`}
 
-function adminData(){const d=ipaDB()||{};d.clients=Array.isArray(d.clients)?d.clients:[];d.trips=Array.isArray(d.trips)?d.trips:[];d.payments=Array.isArray(d.payments)?d.payments:[];d.benefits=Array.isArray(d.benefits)?d.benefits:[];d.itineraryTemplates=Array.isArray(d.itineraryTemplates)?d.itineraryTemplates:[];return d}
+function adminData(){const d=ipaDB()||{};d.clients=Array.isArray(d.clients)?d.clients:[];d.trips=Array.isArray(d.trips)?d.trips:[];d.payments=Array.isArray(d.payments)?d.payments:[];d.benefits=Array.isArray(d.benefits)?d.benefits:[];d.itineraryTemplates=Array.isArray(d.itineraryTemplates)?d.itineraryTemplates:[];d.placeCatalog=Array.isArray(d.placeCatalog)?d.placeCatalog:[];d.travelLeads=Array.isArray(d.travelLeads)?d.travelLeads:[];return d}
 function adminMoney(v){return new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(Number(v||0))}
 function adminMetric(icon,label,value,sub=''){return `<div class="ipa-admin-metric"><span>${icon}</span><div><small>${label}</small><strong>${value}</strong><em>${sub}</em></div></div>`}
 function adminTripList(){const d=adminData();return `<div class="ipa-admin-trip-list">${d.trips.map(t=>{const c=d.clients.find(x=>x.id===t.clientId);return `<button data-admin-trip="${t.id}"><span>${countryFlag(tripCountry(t))}</span><div><b>${t.name}</b><small>${c?.name||'Cliente'} · ${t.destination}</small></div><em>${t.plan}</em><i>${t.published?'Publicado':t.status}</i><strong>›</strong></button>`}).join('')||'<p>Nenhuma viagem cadastrada.</p>'}</div>`}
@@ -1176,6 +1166,16 @@ function adminFinance(){
 }
 function adminPartners(){const d=adminData();return `<div class="ipa-admin-head"><div><span class="eyebrow">MONETIZAÇÃO</span><h1>Parceiros</h1><p>Escolha os benefícios ativos.</p></div></div><section class="ipa-admin-panel"><div class="ipa-admin-partners">${d.benefits.map(b=>`<label><div><b>${b.title}</b><small>${b.sponsorLabel} · ${b.partner}</small></div><input type="checkbox" data-admin-benefit="${b.id}" ${b.enabled?'checked':''}></label>`).join('')}</div></section>`}
 function adminLive(){return `<div class="ipa-admin-head"><div><span class="eyebrow">LIVE</span><h1>Central de transmissões</h1><p>Controle as transmissões por viagem.</p></div></div><section class="ipa-admin-panel ipa-admin-live"><span>🔴</span><h2>Live preparada</h2><p>Próxima integração: Daily + Cloudflare.</p></section>`}
+
+function ipaCatalogMoney(v,currency='EUR'){try{return new Intl.NumberFormat('pt-BR',{style:'currency',currency:currency||'EUR'}).format(Number(v||0))}catch(e){return `${currency} ${Number(v||0).toFixed(2)}`}}
+function adminPlaces(){
+ const d=adminData(), places=d.placeCatalog||[];
+ const cities=[...new Set(places.map(p=>p.city).filter(Boolean))];
+ return `<div class="ipa-admin-head"><div><span class="eyebrow">CURADORIA INDO POR AÍ</span><h1>Banco de Lugares</h1><p>Seu acervo é a fonte do gerador automático de roteiros.</p></div><button class="btn btn-primary" data-admin-new-place>+ Novo lugar</button></div>
+ <div class="catalog-summary"><div><strong>${places.length}</strong><small>lugares cadastrados</small></div><div><strong>${cities.length}</strong><small>destinos</small></div><div><strong>${places.filter(p=>Number(p.cost||0)===0).length}</strong><small>experiências gratuitas</small></div></div>
+ <section class="ipa-admin-panel"><div class="section-head"><div><span class="eyebrow">BASE DO ROTEIRO AUTOMÁTICO</span><h2>Experiências cadastradas</h2></div></div>
+ <div class="catalog-grid">${places.map(p=>`<article class="catalog-card"><div><span class="chip">${p.category||'Experiência'}</span>${p.priority==='Imperdível'?'<span class="chip orange">Imperdível</span>':''}</div><h3>${ipaEscape(p.name)}</h3><p>${ipaEscape([p.city,p.country].filter(Boolean).join(', '))}</p><div class="catalog-meta"><b>${ipaCatalogMoney(p.cost,p.currency)}</b><span>${Number(p.durationMinutes||120)} min</span></div><small>${(p.interests||[]).join(' · ')}</small>${p.tip?`<em>💡 ${ipaEscape(p.tip)}</em>`:''}</article>`).join('')||'<div class="smart-empty"><b>Seu banco ainda está vazio.</b><small>Cadastre os primeiros lugares para o app começar a montar roteiros personalizados.</small></div>'}</div></section>`;
+}
 function adminTemplates(){
  const d=adminData();
  return `<div class="ipa-admin-head"><div><span class="eyebrow">BIBLIOTECA</span><h1>Modelos de roteiro</h1><p>Crie roteiros reutilizáveis.</p></div><button class="btn btn-primary" data-admin-new-template>+ Novo roteiro</button></div><div class="ipa-admin-template-grid">${d.itineraryTemplates.map(t=>`<div><span>🗺️</span><small>${t.destination}</small><b>${t.name}</b><p>${t.description}</p><em>${t.days} dias</em></div>`).join('')}</div>`;
@@ -1194,7 +1194,7 @@ function adminTripEditor(id){
  <section class="ipa-admin-panel"><span class="eyebrow">EXPERIÊNCIA DO CLIENTE</span><h2>O que aparece no app</h2><div class="ipa-admin-module-grid">${Object.entries(labels).map(([k,v])=>`<label class="${t.modules?.[k]?'on':''}"><div><b>${v}</b><small>${t.modules?.[k]?'Visível':'Oculto'}</small></div><input type="checkbox" data-admin-module="${k}" ${t.modules?.[k]?'checked':''}></label>`).join('')}</div></section>
  <section class="ipa-admin-panel"><div class="section-head"><div><span class="eyebrow">ROTEIRO INTELIGENTE</span><h2>Dias, lugares e dicas</h2></div><button class="btn btn-light" data-admin-add-day="${t.id}">+ Adicionar dia</button></div>
  <div class="smart-route-banner"><span>✨</span><div><b>Dica Inteligente</b><small>Cadastre atrações, cafés, restaurantes, lojas e experiências. Use “Adicionar como dica” para recomendações fora do roteiro principal.</small></div></div>
- <div class="ipa-admin-days">${(t.itinerary||[]).sort((a,b)=>a.day-b.day).map(day=>`<div class="admin-day-expanded"><div class="admin-day-title"><strong>${day.day}</strong><span><b>${day.title}</b><small>${day.date||''}</small></span><button class="admin-add-place-btn" data-admin-add-place="${t.id}:${day.day}">+ Lugar / dica</button></div><div class="admin-place-list">${normalizedPlaces(day).map((p,i)=>`<div><span>${i+1}</span><div><b>${p.time?`${p.time}${p.endTime?`–${p.endTime}`:''} · `:''}${p.category||'📍'} ${p.name}${p.highlight?' · ✨':''}</b><small>${[p.address,p.priority,p.durationMinutes?`${p.durationMinutes} min`:''].filter(Boolean).join(' · ')||p.note||''}</small>${p.description?`<small>${p.description}</small>`:''}${p.smartTip?`<em>💡 ${p.smartTip}</em>`:''}</div>${p.mapsUrl?`<button data-external-route="${p.mapsUrl}">Maps ↗</button>`:''}</div>`).join('')||'<small>Nenhum local neste dia.</small>'}</div></div>`).join('')||'<p>Comece adicionando o primeiro dia.</p>'}</div>
+ <div class="ipa-admin-days">${(t.itinerary||[]).sort((a,b)=>a.day-b.day).map(day=>`<div class="admin-day-expanded"><div class="admin-day-title"><strong>${day.day}</strong><span><b>${day.title}</b><small>${day.date||''}</small></span><button class="admin-add-place-btn" data-admin-add-place="${t.id}:${day.day}">+ Lugar / dica</button></div><div class="admin-place-list">${normalizedPlaces(day).map((p,i)=>`<div><span>${i+1}</span><div><b>${p.time?`${p.time} · `:''}${p.category||'📍'} ${p.name}</b><small>${p.address||p.note||''}</small>${p.smartTip?`<em>💡 ${p.smartTip}</em>`:''}</div>${p.mapsUrl?`<button data-external-route="${p.mapsUrl}">Maps ↗</button>`:''}</div>`).join('')||'<small>Nenhum local neste dia.</small>'}</div></div>`).join('')||'<p>Comece adicionando o primeiro dia.</p>'}</div>
  <div class="network-tip-list">${(d.recommendations||[]).filter(r=>r.tripId===t.id).map(r=>`<div><span>💡</span><div><b>${r.category||'Dica'} · ${r.name}</b><small>${r.address||''}</small><em>${r.smartTip||'Indo por Aí recomenda'}</em></div></div>`).join('')||'<small>Nenhuma dica extra cadastrada.</small>'}</div></section>
  <section class="ipa-admin-panel"><div class="section-head"><div><span class="eyebrow">ANTES · CARTEIRA DA VIAGEM</span><h2>Documentos do cliente</h2></div><button class="btn btn-light" data-admin-document="${t.id}" data-client-id="${t.clientId}">+ Documento</button></div><p>Passagens, hotel, vouchers, seguro, ingressos e transfer. O ADM cadastra e o cliente consulta no Antes.</p><div class="admin-doc-list">${(d.tripDocuments||[]).filter(x=>x.tripId===t.id).map(x=>`<div><span>${x.type==='Passagem aérea'?'✈️':'📄'}</span><div><b>${x.title}</b><small>${[x.date,x.time,x.terminal&&('Terminal '+x.terminal),x.gate&&('Portão '+x.gate)].filter(Boolean).join(' · ')}</small></div>${x.url?`<button data-external-route="${x.url}">Abrir</button>`:''}</div>`).join('')||'<small>Nenhum documento cadastrado.</small>'}</div></section>
 
@@ -1254,19 +1254,45 @@ function adminCloudBadge(){
 function adminIntegratedView(){
  const service=window.IPAFirebase;
  if(!service?.user) return adminLoginView();
- const views={dashboard:adminDashboard,clients:adminClients,trips:adminTrips,templates:adminTemplates,finance:adminFinance,live:adminLive,partners:adminPartners};
+ const views={dashboard:adminDashboard,clients:adminClients,trips:adminTrips,places:adminPlaces,templates:adminTemplates,finance:adminFinance,live:adminLive,partners:adminPartners};
  return `<div class="ipa-admin-integrated">
    <div class="ipa-admin-bar">
     <div><b>Indo por Aí</b><small>BUSINESS</small></div>
     <div class="firebase-admin-actions">${adminCloudBadge()}<button data-firebase-sync>↻ Sincronizar</button><button data-firebase-logout>Sair</button><button data-admin-exit>← Voltar</button></div>
    </div>
-   <div class="ipa-admin-nav">${[['dashboard','⌂','Dashboard'],['clients','👤','Clientes'],['trips','✈️','Viagens'],['templates','🗺️','Roteiros'],['finance','💳','Financeiro'],['live','🔴','Live'],['partners','☆','Parceiros']].map(([k,i,l])=>`<button data-admin-section="${k}" class="${adminSection===k?'active':''}">${i}<span>${l}</span></button>`).join('')}</div>
+   <div class="ipa-admin-nav">${[['dashboard','⌂','Dashboard'],['clients','👤','Clientes'],['trips','✈️','Viagens'],['places','📍','Lugares'],['templates','🗺️','Roteiros'],['finance','💳','Financeiro'],['live','🔴','Live'],['partners','☆','Parceiros']].map(([k,i,l])=>`<button data-admin-section="${k}" class="${adminSection===k?'active':''}">${i}<span>${l}</span></button>`).join('')}</div>
    <div class="ipa-admin-content">${(views[adminSection]||adminDashboard)()}</div>
   </div>`;
 }
 
+
+const IPA_INTERESTS=['Gastronomia','Cultura','História','Natureza','Compras','Família','Vida noturna','Romance','Arte','Experiências'];
+function ipaPlannerForm(){
+ return `<span class="eyebrow">QUERO VIAJAR</span><h2>Vamos desenhar sua viagem?</h2><p>Preencha o essencial. A sugestão usa primeiro os lugares selecionados pela curadoria Indo por Aí.</p>
+ <div class="planner-grid"><label>Destino<input id="plannerDestination" class="v2-concierge-input" placeholder="Ex.: Porto"></label><label>Dias<input id="plannerDays" type="number" min="1" max="30" value="4" class="v2-concierge-input"></label><label>Adultos<input id="plannerAdults" type="number" min="1" value="2" class="v2-concierge-input"></label><label>Crianças<input id="plannerChildren" type="number" min="0" value="0" class="v2-concierge-input"></label></div>
+ <label>Quanto pretende gastar com passeios e experiências? <small>por pessoa, para toda a viagem</small></label><div class="planner-budget"><select id="plannerCurrency" class="v2-concierge-input"><option value="EUR">€ EUR</option><option value="BRL">R$ BRL</option><option value="USD">$ USD</option></select><input id="plannerBudget" type="number" min="0" step="10" class="v2-concierge-input" placeholder="500"></div>
+ <label>Seu ritmo</label><select id="plannerPace" class="v2-concierge-input"><option value="leve">Leve · 2 a 3 experiências/dia</option><option value="equilibrado" selected>Equilibrado · 3 a 4/dia</option><option value="intenso">Intenso · 4 a 5/dia</option></select>
+ <label>O que mais combina com você?</label><div class="planner-interests">${IPA_INTERESTS.map(x=>`<label><input type="checkbox" value="${x}"> ${x}</label>`).join('')}</div>
+ <button id="generatePlannerRoute" class="btn btn-primary btn-block">✨ Montar minha sugestão</button><div id="plannerResult"></div>`;
+}
+function ipaGenerateCuratedRoute(input){
+ const d=adminData(),dest=String(input.destination||'').trim().toLowerCase(), interests=input.interests||[];
+ let candidates=(d.placeCatalog||[]).filter(p=>!dest||`${p.city||''} ${p.destination||''} ${p.country||''}`.toLowerCase().includes(dest));
+ candidates=candidates.filter(p=>Number(input.children||0)===0||p.kidsFriendly!==false);
+ candidates=candidates.map(p=>{const tags=p.interests||[];const match=tags.filter(t=>interests.includes(t)).length;const pri=p.priority==='Imperdível'?5:p.priority==='Recomendado'?2:0;return {...p,_score:match*8+pri+(Number(p.cost||0)===0?1:0)}}).sort((a,b)=>b._score-a._score);
+ const perDay=input.pace==='leve'?3:input.pace==='intenso'?5:4, max=Number(input.days||1)*perDay, budget=Number(input.budget||0);
+ let spent=0,chosen=[];
+ for(const p of candidates){const c=Number(p.cost||0);if(chosen.length>=max)break;if(budget>0&&spent+c>budget)continue;chosen.push(p);spent+=c}
+ const days=Array.from({length:Number(input.days||1)},(_,i)=>({day:i+1,places:[]}));
+ chosen.forEach((p,i)=>days[i%days.length].places.push(p));
+ return {days,spent,budget,currency:input.currency||'EUR',count:chosen.length};
+}
+function ipaPlannerResultHtml(result,input){
+ if(!result.count)return `<div class="planner-empty"><b>Ainda não temos lugares suficientes para esse destino.</b><small>O ADM pode ampliar o Banco de Lugares e gerar uma nova combinação.</small></div>`;
+ return `<div class="planner-result"><div class="planner-result-head"><span>✨</span><div><small>SUGESTÃO INDO POR AÍ</small><h3>${ipaEscape(input.destination)} · ${input.days} dias</h3></div></div>${result.days.map(d=>`<div class="planner-day"><b>Dia ${d.day}</b>${d.places.map(p=>`<div><span>${p.category||'📍'}</span><p><strong>${ipaEscape(p.name)}</strong><small>${p.interests?.slice(0,2).join(' · ')||'Curadoria Indo por Aí'}</small></p><em>${ipaCatalogMoney(p.cost,p.currency||result.currency)}</em></div>`).join('')||'<small>Dia livre para explorar.</small>'}</div>`).join('')}<div class="planner-total"><span>Custo estimado por pessoa</span><strong>${ipaCatalogMoney(result.spent,result.currency)}</strong><small>${result.budget?`de ${ipaCatalogMoney(result.budget,result.currency)} informados`:''}</small></div><button id="plannerWhatsApp" class="btn btn-primary btn-block">Quero falar com o Indo por Aí</button></div>`;
+}
 function prospectView(){return `<section class="prospect-premium">
- <span class="eyebrow">Ainda não sou cliente</span><h1>Sua viagem começa antes do embarque.</h1><p>Roteiros, organização, acompanhamento e memórias em uma única experiência.</p><button class="btn btn-primary" id="whatsappProspectBtn">Quero viajar com o Indo por Aí</button>
+ <span class="eyebrow">Ainda não sou cliente</span><h1>Sua viagem começa antes do embarque.</h1><p>Conte como você gosta de viajar. O Indo por Aí cruza suas escolhas com nossa curadoria e monta uma primeira sugestão automaticamente.</p><button class="btn btn-primary" id="openTravelPlanner">Quero viajar com o Indo por Aí</button>
 </section>
 ${plansSalesBlock()}
 <section class="section"><div class="instagram-showcase"><div class="instagram-mark">◎</div><div><span class="eyebrow">Conheça nossa comunidade</span><h2>Uma comunidade com mais de 21 mil apaixonados por viagens.</h2><p>Roteiros, dicas e experiências reais para inspirar sua próxima história.</p><b>@indo.por.ai.com.a.gente</b></div><button class="btn btn-primary" id="instagramBtn">Abrir Instagram</button></div></section>

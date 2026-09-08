@@ -1,16 +1,12 @@
-# Beta 6.24 — Roteiro Pro
+# Beta 6.24 — Curadoria + Roteiro Automático
+Base direta: Beta 6.23.
 
-Base: Beta 6.23, preservando a estrutura visual aprovada/congelada.
+## Novo
+- ADM > Lugares: Banco de Lugares da curadoria Indo por Aí.
+- Cadastro com destino, categoria, custo por pessoa, moeda, duração, prioridade, interesses, crianças, reserva e dica.
+- “Quero viajar com o Indo por Aí” abre formulário de destino, dias, viajantes, orçamento, ritmo e preferências.
+- Gerador local cruza o formulário com o Banco de Lugares e monta uma sugestão por dias respeitando o orçamento informado.
+- Resultado mostra custo estimado por pessoa e permite seguir para WhatsApp.
+- Leads e lugares ficam no modelo de dados e entram no sync existente.
 
-## Cadastro ADM — Lugar / dica
-Mantidos os campos essenciais e adicionados blocos expansíveis:
-- Detalhes da experiência
-- Logística
-- Reserva & custos
-- Informações práticas & Plano B
-
-Novos dados: início/fim, descrição ao cliente, Dica Indo por Aí, prioridade,
-duração, destaque, transporte, ponto de encontro, reserva, localizador,
-valor, política de ingresso, Plano B, crianças, acessibilidade, orientações e link útil.
-
-Os campos extras são opcionais para não tornar o cadastro básico pesado.
+Observação: esta primeira versão do motor prioriza curadoria, interesses, prioridade e orçamento. Agrupamento geográfico/otimização de rota será a evolução seguinte, usando coordenadas/Places.
