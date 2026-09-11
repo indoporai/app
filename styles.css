@@ -524,3 +524,5 @@ body{min-height:100vh}.app-shell{width:min(100%,520px);min-height:100vh;margin:a
 
 /* Beta 6.24.1 catalog Google autofill */
 .selected-place{padding:10px 12px;border-radius:12px;background:rgba(20,120,90,.08);font-weight:700}.selected-place small{display:block;font-weight:400;opacity:.7;margin-top:3px}
+/* Beta 6.25 — montagem manual de roteiro a partir do Banco de Lugares */
+.route-builder-toolbar{margin:14px 0}.route-builder-toolbar small{display:block;margin-top:6px;opacity:.65}.template-place-picker{max-height:430px;overflow:auto;display:grid;gap:8px;margin:10px 0}.template-place-option{display:grid;grid-template-columns:auto 1fr 100px;gap:10px;align-items:center;border:1px solid rgba(20,35,55,.1);border-radius:14px;padding:10px;background:#fff}.template-place-option>input{width:auto}.template-place-option span small{display:block;opacity:.65;margin-top:3px}.template-place-option select{margin:0}.template-selection-summary{padding:12px 14px;background:rgba(20,35,55,.04);border-radius:12px;margin:10px 0 14px;font-weight:700}@media(max-width:680px){.template-place-option{grid-template-columns:auto 1fr}.template-place-option select{grid-column:2}}

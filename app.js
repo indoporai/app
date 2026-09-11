@@ -621,12 +621,20 @@ function bind(){
    },0);
  });
  document.querySelectorAll('[data-admin-new-template]').forEach(b=>b.onclick=()=>{
-   showModal(`<span class="eyebrow">BIBLIOTECA</span><h2>Novo modelo de roteiro</h2><label>Nome</label><input id="templateName" class="v2-concierge-input" placeholder="Ex.: Paris Essencial"><label>Destino</label><input id="templateDestination" class="v2-concierge-input" placeholder="Paris, França"><label>Descrição</label><input id="templateDescription" class="v2-concierge-input"><label>Dias</label><input id="templateDays" type="number" min="1" value="5" class="v2-concierge-input"><button id="saveTemplate" class="btn btn-primary btn-block">Salvar roteiro</button>`);
-   setTimeout(()=>{const save=document.querySelector('#saveTemplate');if(save)save.onclick=async()=>{
-     IPAData.createItineraryTemplate({name:document.querySelector('#templateName').value||'Novo roteiro',destination:document.querySelector('#templateDestination').value,description:document.querySelector('#templateDescription').value,days:Number(document.querySelector('#templateDays').value)});
-     if(window.IPAFirebase?.user)await window.IPAFirebase.syncNow();
-     toast('Modelo de roteiro salvo ✓');modal.close();adminSection='templates';render();
-   }},0);
+   const d=adminData(),places=d.placeCatalog||[];
+   showModal(`<span class="eyebrow">ROTEIRO CURADO</span><h2>Montar roteiro com meus lugares</h2>
+   <div class="planner-grid"><label>Nome do roteiro<input id="templateName" class="v2-concierge-input" placeholder="Ex.: Paris Essencial"></label><label>Destino<input id="templateDestination" class="v2-concierge-input" placeholder="Ex.: Paris"></label><label>Dias<input id="templateDays" type="number" min="1" max="30" value="3" class="v2-concierge-input"></label><label>Descrição<input id="templateDescription" class="v2-concierge-input" placeholder="Resumo do roteiro"></label></div>
+   <div class="route-builder-toolbar"><input id="templatePlaceFilter" class="v2-concierge-input" placeholder="Filtrar lugares cadastrados..."><small>Selecione os lugares e escolha em qual dia cada um entra.</small></div>
+   <div id="templatePlacePicker" class="template-place-picker">${places.map(p=>`<label class="template-place-option" data-template-place-search="${ipaEscape(`${p.name} ${p.city} ${p.country} ${(p.interests||[]).join(' ')}`.toLowerCase())}"><input type="checkbox" data-template-place="${ipaEscape(p.id)}"><span><b>${ipaEscape(p.name)}</b><small>${ipaEscape([p.city,p.country].filter(Boolean).join(', '))} · ${ipaCatalogMoney(p.cost,p.currency)} · ${Number(p.durationMinutes||120)} min</small></span><select data-template-day="${ipaEscape(p.id)}" class="v2-concierge-input">${Array.from({length:30},(_,i)=>`<option value="${i+1}">Dia ${i+1}</option>`).join('')}</select></label>`).join('')||'<div class="smart-empty"><b>Nenhum lugar cadastrado.</b><small>Cadastre lugares em ADM → Lugares antes de montar o roteiro.</small></div>'}</div>
+   <div id="templateSelectionSummary" class="template-selection-summary">0 lugares selecionados</div>
+   <button id="saveTemplate" class="btn btn-primary btn-block" ${places.length?'':'disabled'}>Salvar roteiro</button>`);
+   setTimeout(()=>{
+    const filter=document.querySelector('#templatePlaceFilter'),days=document.querySelector('#templateDays'),summary=document.querySelector('#templateSelectionSummary'),save=document.querySelector('#saveTemplate');
+    const refresh=()=>{const max=Math.max(1,Number(days?.value||1));document.querySelectorAll('[data-template-day]').forEach(sel=>{[...sel.options].forEach(o=>o.hidden=Number(o.value)>max);if(Number(sel.value)>max)sel.value=max});const selected=[...document.querySelectorAll('[data-template-place]:checked')];const total=selected.reduce((sum,x)=>{const p=places.find(y=>y.id===x.dataset.templatePlace);return sum+Number(p?.cost||0)},0);summary.textContent=`${selected.length} lugares selecionados · custo base ${selected.length?ipaCatalogMoney(total,places.find(p=>selected.some(x=>x.dataset.templatePlace===p.id))?.currency||'EUR'):ipaCatalogMoney(0,'EUR')} por pessoa`};
+    if(filter)filter.oninput=()=>{const q=filter.value.trim().toLowerCase();document.querySelectorAll('[data-template-place-search]').forEach(row=>row.style.display=!q||row.dataset.templatePlaceSearch.includes(q)?'grid':'none')};
+    if(days)days.oninput=refresh;document.querySelectorAll('[data-template-place]').forEach(x=>x.onchange=refresh);refresh();
+    if(save)save.onclick=async()=>{const name=document.querySelector('#templateName').value.trim(),destination=document.querySelector('#templateDestination').value.trim(),dayCount=Math.max(1,Number(days.value||1));if(!name)return toast('Informe o nome do roteiro');if(!destination)return toast('Informe o destino');const selected=[...document.querySelectorAll('[data-template-place]:checked')];if(!selected.length)return toast('Selecione pelo menos um lugar');const itinerary=Array.from({length:dayCount},(_,i)=>({day:i+1,title:`Dia ${i+1}`,places:[]}));selected.forEach(x=>{const place=places.find(p=>p.id===x.dataset.templatePlace);if(!place)return;const dayNo=Number(document.querySelector(`[data-template-day="${CSS.escape(place.id)}"]`)?.value||1);itinerary[dayNo-1].places.push({...place,id:'place-'+Date.now()+'-'+Math.random().toString(36).slice(2,6),catalogPlaceId:place.id})});save.disabled=true;save.textContent='Salvando...';IPAData.createItineraryTemplate({name,destination,description:document.querySelector('#templateDescription').value.trim(),days:dayCount,itinerary});try{if(window.IPAFirebase?.user)await window.IPAFirebase.syncNow()}catch(e){console.warn('Roteiro salvo localmente; sync pendente',e)}toast('Roteiro montado com sua curadoria ✓');modal.close();adminSection='templates';render()};
+   },0);
  });
 
 
@@ -1224,7 +1232,7 @@ function adminPlaces(){
 }
 function adminTemplates(){
  const d=adminData();
- return `<div class="ipa-admin-head"><div><span class="eyebrow">BIBLIOTECA</span><h1>Modelos de roteiro</h1><p>Crie roteiros reutilizáveis.</p></div><button class="btn btn-primary" data-admin-new-template>+ Novo roteiro</button></div><div class="ipa-admin-template-grid">${d.itineraryTemplates.map(t=>`<div><span>🗺️</span><small>${t.destination}</small><b>${t.name}</b><p>${t.description}</p><em>${t.days} dias</em></div>`).join('')}</div>`;
+ return `<div class="ipa-admin-head"><div><span class="eyebrow">BIBLIOTECA</span><h1>Modelos de roteiro</h1><p>Monte roteiros reutilizáveis selecionando lugares da sua curadoria.</p></div><button class="btn btn-primary" data-admin-new-template>+ Montar roteiro</button></div><div class="ipa-admin-template-grid">${d.itineraryTemplates.map(t=>`<div><span>🗺️</span><small>${t.destination}</small><b>${t.name}</b><p>${t.description}</p><em>${t.days} dias · ${(t.itinerary||[]).reduce((n,d)=>n+(d.places||[]).length,0)} lugares</em></div>`).join('')}</div>`;
 }
 function adminTripEditor(id){
  const d=adminData(),t=d.trips.find(x=>x.id===id);if(!t)return adminTrips();
