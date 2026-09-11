@@ -167,15 +167,21 @@ async function googlePlaceSearch(request,env){
   const text=[q,destination].filter(Boolean).join(", ");
   const r=await fetch("https://places.googleapis.com/v1/places:searchText",{
     method:"POST",
-    headers:{"Content-Type":"application/json","X-Goog-Api-Key":key,"X-Goog-FieldMask":"places.id,places.displayName,places.formattedAddress,places.googleMapsUri,places.primaryType,places.rating,places.userRatingCount"},
+    headers:{"Content-Type":"application/json","X-Goog-Api-Key":key,"X-Goog-FieldMask":"places.id,places.displayName,places.formattedAddress,places.googleMapsUri,places.primaryType,places.rating,places.userRatingCount,places.addressComponents,places.location"},
     body:JSON.stringify({textQuery:text,languageCode:"pt-BR",maxResultCount:6})
   });
   const body=await r.json().catch(()=>({}));
   if(!r.ok)return json({ok:false,error:body?.error?.message||"Erro Google Places",places:[]},r.status);
-  return json({ok:true,places:(body.places||[]).map(p=>({
-    id:p.id||"",name:p.displayName?.text||"",address:p.formattedAddress||"",mapsUrl:p.googleMapsUri||"",
-    category:p.primaryType||"",rating:p.rating||null,reviews:p.userRatingCount||0
-  }))});
+  return json({ok:true,places:(body.places||[]).map(p=>{
+    const comps=p.addressComponents||[];
+    const pick=(...types)=>{const c=comps.find(x=>(x.types||[]).some(t=>types.includes(t)));return c?.longText||c?.shortText||""};
+    return {
+      id:p.id||"",name:p.displayName?.text||"",address:p.formattedAddress||"",mapsUrl:p.googleMapsUri||"",
+      category:p.primaryType||"",rating:p.rating||null,reviews:p.userRatingCount||0,
+      city:pick("locality","postal_town","administrative_area_level_2","administrative_area_level_1"),
+      country:pick("country"),lat:p.location?.latitude??null,lng:p.location?.longitude??null
+    };
+  })});
 }
 
 

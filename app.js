@@ -196,15 +196,61 @@ window.ipaUploadMemoryFile=ipaUploadMemoryFile;
 window.ipaPersistMemoryMeta=ipaPersistMemoryMeta;
 function bind(){
  setTimeout(()=>{ipaInitRealMap();ipaInitExploreRealMap();},60);
- document.querySelectorAll('[data-admin-new-place]').forEach(b=>b.onclick=()=>showModal(`<span class="eyebrow">BANCO DE LUGARES</span><h2>Novo lugar</h2>
- <div class="planner-grid"><label>Nome<input id="catalogName" class="v2-concierge-input" placeholder="Ex.: Torre Eiffel"></label><label>Categoria<select id="catalogCategory" class="v2-concierge-input"><option>Atração</option><option>Gastronomia</option><option>Museu</option><option>Natureza</option><option>Compras</option><option>Experiência</option><option>Vida noturna</option><option>Outro</option></select></label><label>Cidade<input id="catalogCity" class="v2-concierge-input"></label><label>País<input id="catalogCountry" class="v2-concierge-input"></label></div>
- <label>Endereço / referência Google<input id="catalogAddress" class="v2-concierge-input"></label>
- <div class="planner-grid"><label>Custo por pessoa<input id="catalogCost" type="number" min="0" step=".01" class="v2-concierge-input"></label><label>Moeda<select id="catalogCurrency" class="v2-concierge-input"><option>EUR</option><option>BRL</option><option>USD</option></select></label><label>Duração (min)<input id="catalogDuration" type="number" min="15" step="15" value="120" class="v2-concierge-input"></label><label>Prioridade<select id="catalogPriority" class="v2-concierge-input"><option>Recomendado</option><option>Imperdível</option><option>Opcional</option></select></label></div>
- <label>Interesses relacionados</label><div class="planner-interests" id="catalogInterests">${IPA_INTERESTS.map(x=>`<label><input type="checkbox" value="${x}"> ${x}</label>`).join('')}</div>
- <div class="planner-grid"><label class="route-pro-check"><input id="catalogKids" type="checkbox" checked> 👶 Bom com crianças</label><label>Reserva<select id="catalogReservation" class="v2-concierge-input"><option>Não exige</option><option>Recomendada</option><option>Obrigatória</option></select></label></div>
- <label>Dica Indo por Aí<textarea id="catalogTip" class="rating-text" placeholder="O que torna esse lugar especial?"></textarea></label>
- <button id="saveCatalogPlace" class="btn btn-primary btn-block">Salvar no Banco de Lugares</button>`));
- setTimeout(()=>{const s=document.querySelector('#saveCatalogPlace');if(s)s.onclick=async()=>{const v=id=>document.querySelector(id)?.value?.trim?.()||'';const name=v('#catalogName');if(!name){toast('Informe o nome do lugar');return}const interests=[...document.querySelectorAll('#catalogInterests input:checked')].map(x=>x.value);IPAData.addCatalogPlace({name,category:v('#catalogCategory'),city:v('#catalogCity'),country:v('#catalogCountry'),address:v('#catalogAddress'),cost:Number(v('#catalogCost')||0),currency:v('#catalogCurrency'),durationMinutes:Number(v('#catalogDuration')||120),priority:v('#catalogPriority'),interests,kidsFriendly:!!document.querySelector('#catalogKids')?.checked,reservation:v('#catalogReservation'),tip:v('#catalogTip')});if(window.IPAFirebase?.user)await window.IPAFirebase.syncNow();toast('Lugar salvo na curadoria ✓');modal.close();adminSection='places';render()}},0);
+ document.querySelectorAll('[data-admin-new-place]').forEach(b=>b.onclick=()=>{
+  showModal(`<span class="eyebrow">BANCO DE LUGARES</span><h2>Novo lugar</h2>
+  <label>Buscar no Google</label><div class="smart-place-search"><input id="catalogGoogleSearch" class="v2-concierge-input" autocomplete="off" placeholder="Ex.: Torre Eiffel, Museu do Louvre..."><button id="catalogOpenMaps" class="btn btn-light">Maps ↗</button></div>
+  <div id="catalogPlaceSuggestions" class="place-suggestions"><small>Digite pelo menos 2 letras. Ao escolher um resultado, nome, endereço, cidade e país serão preenchidos.</small></div>
+  <div class="planner-grid"><label>Nome<input id="catalogName" class="v2-concierge-input" placeholder="Nome do lugar"></label><label>Categoria<select id="catalogCategory" class="v2-concierge-input"><option>Atração</option><option>Gastronomia</option><option>Museu</option><option>Natureza</option><option>Compras</option><option>Experiência</option><option>Vida noturna</option><option>Outro</option></select></label><label>Cidade<input id="catalogCity" class="v2-concierge-input"></label><label>País<input id="catalogCountry" class="v2-concierge-input"></label></div>
+  <label>Endereço<input id="catalogAddress" class="v2-concierge-input" placeholder="Preenchido pelo Google ou manualmente"></label>
+  <div class="planner-grid"><label>Custo por pessoa<input id="catalogCost" type="number" min="0" step=".01" class="v2-concierge-input"></label><label>Moeda<select id="catalogCurrency" class="v2-concierge-input"><option>EUR</option><option>BRL</option><option>USD</option></select></label><label>Duração (min)<input id="catalogDuration" type="number" min="15" step="15" value="120" class="v2-concierge-input"></label><label>Prioridade<select id="catalogPriority" class="v2-concierge-input"><option>Recomendado</option><option>Imperdível</option><option>Opcional</option></select></label></div>
+  <label>Interesses relacionados</label><div class="planner-interests" id="catalogInterests">${IPA_INTERESTS.map(x=>`<label><input type="checkbox" value="${x}"> ${x}</label>`).join('')}</div>
+  <div class="planner-grid"><label class="route-pro-check"><input id="catalogKids" type="checkbox" checked> 👶 Bom com crianças</label><label>Reserva<select id="catalogReservation" class="v2-concierge-input"><option>Não exige</option><option>Recomendada</option><option>Obrigatória</option></select></label></div>
+  <label>Dica Indo por Aí<textarea id="catalogTip" class="rating-text" placeholder="O que torna esse lugar especial?"></textarea></label>
+  <input id="catalogPlaceId" type="hidden"><input id="catalogMapsUrl" type="hidden"><input id="catalogLat" type="hidden"><input id="catalogLng" type="hidden">
+  <button id="saveCatalogPlace" class="btn btn-primary btn-block">Salvar no Banco de Lugares</button>`);
+  setTimeout(()=>{
+   const q=document.querySelector('#catalogGoogleSearch'),box=document.querySelector('#catalogPlaceSuggestions'),save=document.querySelector('#saveCatalogPlace');
+   if(!q||!box||!save)return;
+   let timer;
+   q.oninput=()=>{clearTimeout(timer);timer=setTimeout(async()=>{
+    const text=q.value.trim();if(text.length<2){box.innerHTML='<small>Digite pelo menos 2 letras.</small>';return}
+    box.innerHTML='<small>Buscando no Google Places...</small>';
+    try{
+     const destination=[document.querySelector('#catalogCity')?.value,document.querySelector('#catalogCountry')?.value].filter(Boolean).join(', ');
+     const r=await fetch(`/api/places/search?q=${encodeURIComponent(text)}&destination=${encodeURIComponent(destination)}`,{cache:'no-store'});
+     const j=await r.json();if(!r.ok||!j.ok)throw new Error(j.error||'Não foi possível consultar o Google Places');
+     box.innerHTML=(j.places||[]).map(p=>`<button type="button" data-catalog-place='${encodeURIComponent(JSON.stringify(p))}'><b>${ipaEscape(p.name||'')}</b><small>${ipaEscape(p.address||'')}</small>${p.rating?`<em>★ ${p.rating} · ${p.reviews||0} avaliações</em>`:''}</button>`).join('')||'<small>Nenhum resultado. Tente outro termo.</small>';
+     box.querySelectorAll('[data-catalog-place]').forEach(item=>item.onclick=()=>{
+      const p=JSON.parse(decodeURIComponent(item.dataset.catalogPlace));
+      q.value=p.name||'';
+      document.querySelector('#catalogName').value=p.name||'';
+      document.querySelector('#catalogAddress').value=p.address||'';
+      if(p.city)document.querySelector('#catalogCity').value=p.city;
+      if(p.country)document.querySelector('#catalogCountry').value=p.country;
+      document.querySelector('#catalogPlaceId').value=p.id||'';
+      document.querySelector('#catalogMapsUrl').value=p.mapsUrl||'';
+      document.querySelector('#catalogLat').value=p.lat??'';
+      document.querySelector('#catalogLng').value=p.lng??'';
+      box.innerHTML=`<div class="selected-place">✓ ${ipaEscape(p.name||'')}<small>${ipaEscape(p.address||'')}</small></div>`;
+     });
+    }catch(e){console.error(e);box.innerHTML=`<small>${ipaEscape(e.message||'Não foi possível buscar agora.')}</small>`}
+   },350)};
+   document.querySelector('#catalogOpenMaps').onclick=()=>window.open('https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(q.value||document.querySelector('#catalogName').value||''),'_blank');
+   save.onclick=async()=>{
+    const v=id=>document.querySelector(id)?.value?.trim?.()||'';
+    const name=v('#catalogName');if(!name){toast('Informe ou selecione o nome do lugar');return}
+    const city=v('#catalogCity'),country=v('#catalogCountry');if(!city||!country){toast('Informe cidade e país');return}
+    const interests=[...document.querySelectorAll('#catalogInterests input:checked')].map(x=>x.value);
+    const payload={name,category:v('#catalogCategory'),city,country,address:v('#catalogAddress'),cost:Number(v('#catalogCost')||0),currency:v('#catalogCurrency'),durationMinutes:Number(v('#catalogDuration')||120),priority:v('#catalogPriority'),interests,kidsFriendly:!!document.querySelector('#catalogKids')?.checked,reservation:v('#catalogReservation'),tip:v('#catalogTip'),placeId:v('#catalogPlaceId'),mapsUrl:v('#catalogMapsUrl'),lat:Number(v('#catalogLat'))||null,lng:Number(v('#catalogLng'))||null};
+    try{
+     save.disabled=true;save.textContent='Salvando...';
+     IPAData.addCatalogPlace(payload);
+     try{if(window.IPAFirebase?.user)await window.IPAFirebase.syncNow()}catch(syncErr){console.warn('Lugar salvo localmente; sync pendente',syncErr)}
+     toast('Lugar salvo no Banco de Lugares ✓');modal.close();adminSection='places';render();
+    }catch(e){console.error(e);toast(e.message||'Não foi possível salvar');save.disabled=false;save.textContent='Salvar no Banco de Lugares'}
+   };
+  },0);
+ });
  const openPlanner=document.querySelector('#openTravelPlanner');if(openPlanner)openPlanner.onclick=()=>{showModal(ipaPlannerForm());setTimeout(()=>{const g=document.querySelector('#generatePlannerRoute');if(g)g.onclick=()=>{const interests=[...document.querySelectorAll('.planner-interests input:checked')].map(x=>x.value),input={destination:document.querySelector('#plannerDestination').value.trim(),days:Number(document.querySelector('#plannerDays').value||1),adults:Number(document.querySelector('#plannerAdults').value||1),children:Number(document.querySelector('#plannerChildren').value||0),budget:Number(document.querySelector('#plannerBudget').value||0),currency:document.querySelector('#plannerCurrency').value,pace:document.querySelector('#plannerPace').value,interests};if(!input.destination){toast('Informe o destino');return}const result=ipaGenerateCuratedRoute(input);IPAData.addTravelLead({...input,resultSummary:{count:result.count,estimatedCost:result.spent}});document.querySelector('#plannerResult').innerHTML=ipaPlannerResultHtml(result,input);const w=document.querySelector('#plannerWhatsApp');if(w)w.onclick=async()=>{try{const r=await fetch('/api/contact/whatsapp',{cache:'no-store'}),j=await r.json();if(!r.ok||!j.ok)throw new Error(j.error||'WhatsApp não configurado');window.location.href=j.url}catch(e){toast(e.message||'Não foi possível abrir o WhatsApp')}}}},0)};
 
  document.querySelectorAll('[data-remove-smart-route]').forEach(b=>b.onclick=()=>{
