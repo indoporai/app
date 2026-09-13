@@ -40,6 +40,10 @@ document.addEventListener('click', event => {
    if(action==='admin'){ modal.close(); localStorage.removeItem('ipa-preview-trip-id'); state.profile='admin'; state.route='admin'; document.body.classList.add('hidden-nav'); render(); return; }
    if(action==='profile'){ modal.close(); openProfileChooser(); return; }
  }
+ const templateSave = event.target.closest('#saveTemplate');
+ if(templateSave){ event.preventDefault(); event.stopPropagation(); ipaSaveTemplateBuilder(); return; }
+ const templateOptimize = event.target.closest('#optimizeTemplate');
+ if(templateOptimize){ event.preventDefault(); event.stopPropagation(); ipaOptimizeTemplateBuilder(); return; }
  const modeButton = event.target.closest('[data-mode]');
  if(!modeButton) return;
  event.preventDefault();
@@ -194,6 +198,100 @@ async function ipaPersistMemoryMeta(moment){
 window.ipaCurrentClientId=ipaCurrentClientId;
 window.ipaUploadMemoryFile=ipaUploadMemoryFile;
 window.ipaPersistMemoryMeta=ipaPersistMemoryMeta;
+async function ipaSaveTemplateBuilder(){
+ const save=document.querySelector('#saveTemplate');
+ try{
+  const name=document.querySelector('#templateName')?.value?.trim()||'';
+  const destination=document.querySelector('#templateDestination')?.value?.trim()||'';
+  const description=document.querySelector('#templateDescription')?.value?.trim()||'';
+  const dayCount=Math.max(1,Number(document.querySelector('#templateDays')?.value||1));
+  if(!name){toast('Informe o nome do roteiro');return false}
+  if(!destination){toast('Informe o destino');return false}
+  const selected=[...document.querySelectorAll('[data-template-place]:checked')];
+  if(!selected.length){toast('Selecione pelo menos um lugar');return false}
+  const places=adminData().placeCatalog||[];
+  const itinerary=Array.from({length:dayCount},(_,i)=>({day:i+1,title:`Dia ${i+1}`,places:[]}));
+  const daySelectors=[...document.querySelectorAll('[data-template-day]')];
+  selected.forEach((x,idx)=>{
+   const catalogId=String(x.getAttribute('data-template-place')||'');
+   const place=places.find(p=>String(p.id)===catalogId);
+   if(!place)return;
+   const daySelect=daySelectors.find(sel=>String(sel.getAttribute('data-template-day'))===catalogId);
+   const dayNo=Math.min(dayCount,Math.max(1,Number(daySelect?.value||1)));
+   itinerary[dayNo-1].places.push({...place,id:`place-${Date.now()}-${idx}-${Math.random().toString(36).slice(2,6)}`,catalogPlaceId:place.id});
+  });
+  const totalPlaces=itinerary.reduce((n,d)=>n+d.places.length,0);
+  if(!totalPlaces){toast('Não consegui ler os lugares selecionados');return false}
+  if(save){save.disabled=true;save.textContent='Salvando roteiro...'}
+  const allChosen=itinerary.flatMap(d=>d.places);
+  const estimatedCost=allChosen.reduce((n,p)=>n+Number(p.cost||0),0);
+  const created=IPAData.createItineraryTemplate({name,destination,description,days:dayCount,itinerary,estimatedCost,currency:allChosen.find(p=>p.currency)?.currency||'EUR',generatedFromCatalog:true});
+  if(!created)throw new Error('Não foi possível criar o roteiro');
+  toast(`Roteiro salvo com ${totalPlaces} lugar${totalPlaces>1?'es':''} ✓`);
+  modal.close();
+  adminSection='templates';
+  render();
+  if(window.IPAFirebase?.user)window.IPAFirebase.syncNow().catch(e=>console.warn('Roteiro salvo; sincronização pendente',e));
+  return true;
+ }catch(e){
+  console.error('ipaSaveTemplateBuilder',e);
+  if(save){save.disabled=false;save.textContent='Salvar roteiro'}
+  toast(e.message||'Não foi possível salvar o roteiro');
+  return false;
+ }
+}
+window.ipaSaveTemplateBuilder=ipaSaveTemplateBuilder;
+
+function ipaTemplateBuilderSelected(){
+ const places=adminData().placeCatalog||[];
+ const dayCount=Math.max(1,Number(document.querySelector('#templateDays')?.value||1));
+ const daySelectors=[...document.querySelectorAll('[data-template-day]')];
+ return [...document.querySelectorAll('[data-template-place]:checked')].map(x=>{
+  const id=String(x.getAttribute('data-template-place')||'');
+  const place=places.find(p=>String(p.id)===id);
+  const daySel=daySelectors.find(sel=>String(sel.getAttribute('data-template-day'))===id);
+  return place?{...place,_day:Math.min(dayCount,Math.max(1,Number(daySel?.value||1)))}:null;
+ }).filter(Boolean);
+}
+function ipaDistanceKm(a,b){
+ const lat1=Number(a?.lat),lon1=Number(a?.lng),lat2=Number(b?.lat),lon2=Number(b?.lng);
+ if(![lat1,lon1,lat2,lon2].every(Number.isFinite))return Infinity;
+ const R=6371,toRad=x=>x*Math.PI/180,dLat=toRad(lat2-lat1),dLon=toRad(lon2-lon1);
+ const q=Math.sin(dLat/2)**2+Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
+ return 2*R*Math.asin(Math.sqrt(q));
+}
+function ipaOptimizeTemplateBuilder(){
+ const selected=ipaTemplateBuilderSelected();
+ if(selected.length<2){toast('Selecione pelo menos 2 lugares');return}
+ const dayCount=Math.max(1,Number(document.querySelector('#templateDays')?.value||1));
+ const geo=selected.filter(p=>Number.isFinite(Number(p.lat))&&Number.isFinite(Number(p.lng)));
+ if(geo.length<2){toast('Cadastre pelo menos 2 lugares com localização do Google para otimizar');return}
+ const ordered=[];let remaining=[...geo],cur=remaining.shift();ordered.push(cur);
+ while(remaining.length){remaining.sort((a,b)=>ipaDistanceKm(cur,a)-ipaDistanceKm(cur,b));cur=remaining.shift();ordered.push(cur)}
+ // Distribui em blocos geograficamente próximos pelos dias, respeitando a ordem otimizada.
+ const per=Math.ceil(ordered.length/dayCount);
+ const selectors=[...document.querySelectorAll('[data-template-day]')];
+ ordered.forEach((p,i)=>{const sel=selectors.find(x=>String(x.getAttribute('data-template-day'))===String(p.id));if(sel)sel.value=Math.min(dayCount,Math.floor(i/per)+1)});
+ ipaRefreshTemplateBuilder();
+ toast('Roteiro reorganizado por proximidade ✓');
+}
+function ipaRefreshTemplateBuilder(){
+ const places=adminData().placeCatalog||[],days=document.querySelector('#templateDays'),summary=document.querySelector('#templateSelectionSummary');
+ const max=Math.max(1,Number(days?.value||1));
+ document.querySelectorAll('[data-template-day]').forEach(sel=>{[...sel.options].forEach(o=>o.hidden=Number(o.value)>max);if(Number(sel.value)>max)sel.value=max});
+ const selected=ipaTemplateBuilderSelected();
+ const total=selected.reduce((sum,p)=>sum+Number(p.cost||0),0);
+ const currency=selected.find(p=>p.currency)?.currency||'EUR';
+ if(summary)summary.innerHTML=`<b>${selected.length} lugares selecionados</b><span>custo base ${ipaCatalogMoney(total,currency)} por pessoa</span>`;
+ const preview=document.querySelector('#templateVisualPreview');
+ if(preview){preview.innerHTML=Array.from({length:max},(_,i)=>{const list=selected.filter(p=>p._day===i+1);return `<div class="builder-day"><div class="builder-day-head"><strong>Dia ${i+1}</strong><small>${list.length} lugar${list.length===1?'':'es'}</small></div>${list.map(p=>`<div class="builder-place"><span>${p.category==='Gastronomia'?'🍴':p.category==='Natureza'?'🌿':'📍'}</span><div><b>${ipaEscape(p.name)}</b><small>${ipaEscape([p.city,p.category].filter(Boolean).join(' · '))}</small></div><em>${ipaCatalogMoney(p.cost,p.currency||currency)}</em></div>`).join('')||'<small class="builder-empty">Arraste sua seleção para este dia usando o seletor ao lado de cada lugar.</small>'}</div>`}).join('')}
+ const budget=Number(document.querySelector('#templateBudget')?.value||0),budgetBox=document.querySelector('#templateBudgetStatus');
+ if(budgetBox){const left=budget-total;budgetBox.className='template-budget-status '+(budget&&left<0?'over':'ok');budgetBox.innerHTML=budget?`<span>Orçamento: <b>${ipaCatalogMoney(budget,currency)}</b></span><span>Roteiro: <b>${ipaCatalogMoney(total,currency)}</b></span><span>${left>=0?`Disponível: <b>${ipaCatalogMoney(left,currency)}</b>`:`Excedido: <b>${ipaCatalogMoney(Math.abs(left),currency)}</b>`}</span>`:'<span>Informe um orçamento para acompanhar o custo do roteiro.</span>'}
+ const why=document.querySelector('#templateWhy');
+ if(why){const interests=[...new Set(selected.flatMap(p=>p.interests||[]))].slice(0,3);const imperdiveis=selected.filter(p=>p.priority==='Imperdível').length;why.textContent=selected.length?`Este roteiro combina ${selected.length} experiências da curadoria${interests.length?`, com foco em ${interests.join(', ')}`:''}${imperdiveis?` e ${imperdiveis} destaque${imperdiveis>1?'s':''} imperdível${imperdiveis>1?'eis':''}`:''}. A distribuição pode ser otimizada por proximidade.`:'Selecione lugares para ver por que este roteiro combina com o perfil da viagem.'}
+}
+
+
 function bind(){
  setTimeout(()=>{ipaInitRealMap();ipaInitExploreRealMap();},60);
  document.querySelectorAll('[data-admin-new-place]').forEach(b=>b.onclick=()=>{
@@ -629,18 +727,22 @@ function bind(){
  document.querySelectorAll('[data-admin-new-template]').forEach(b=>b.onclick=()=>{
    const d=adminData(),places=d.placeCatalog||[];
    showModal(`<span class="eyebrow">ROTEIRO CURADO</span><h2>Montar roteiro com meus lugares</h2>
-   <div class="planner-grid"><label>Nome do roteiro<input id="templateName" class="v2-concierge-input" placeholder="Ex.: Paris Essencial"></label><label>Destino<input id="templateDestination" class="v2-concierge-input" placeholder="Ex.: Paris"></label><label>Dias<input id="templateDays" type="number" min="1" max="30" value="3" class="v2-concierge-input"></label><label>Descrição<input id="templateDescription" class="v2-concierge-input" placeholder="Resumo do roteiro"></label></div>
+   <div class="planner-grid"><label>Nome do roteiro<input id="templateName" class="v2-concierge-input" placeholder="Ex.: Paris Essencial"></label><label>Destino<input id="templateDestination" class="v2-concierge-input" placeholder="Ex.: Paris"></label><label>Dias<input id="templateDays" type="number" min="1" max="30" value="3" class="v2-concierge-input"></label><label>Orçamento por pessoa<input id="templateBudget" type="number" min="0" step="10" class="v2-concierge-input" placeholder="Ex.: 500"></label></div>
+   <label>Descrição<input id="templateDescription" class="v2-concierge-input" placeholder="Resumo do roteiro"></label>
+   <div class="route-builder-actions"><button id="optimizeTemplate" type="button" class="btn btn-light">✨ Otimizar por proximidade</button><small>Usa as coordenadas salvas pelo Google para agrupar os lugares.</small></div>
+   <div id="templateBudgetStatus" class="template-budget-status"><span>Informe um orçamento para acompanhar o custo do roteiro.</span></div>
    <div class="route-builder-toolbar"><input id="templatePlaceFilter" class="v2-concierge-input" placeholder="Filtrar lugares cadastrados..."><small>Selecione os lugares e escolha em qual dia cada um entra.</small></div>
-   <div id="templatePlacePicker" class="template-place-picker">${places.map(p=>`<label class="template-place-option" data-template-place-search="${ipaEscape(`${p.name} ${p.city} ${p.country} ${(p.interests||[]).join(' ')}`.toLowerCase())}"><input type="checkbox" data-template-place="${ipaEscape(p.id)}"><span><b>${ipaEscape(p.name)}</b><small>${ipaEscape([p.city,p.country].filter(Boolean).join(', '))} · ${ipaCatalogMoney(p.cost,p.currency)} · ${Number(p.durationMinutes||120)} min</small></span><select data-template-day="${ipaEscape(p.id)}" class="v2-concierge-input">${Array.from({length:30},(_,i)=>`<option value="${i+1}">Dia ${i+1}</option>`).join('')}</select></label>`).join('')||'<div class="smart-empty"><b>Nenhum lugar cadastrado.</b><small>Cadastre lugares em ADM → Lugares antes de montar o roteiro.</small></div>'}</div>
-   <div id="templateSelectionSummary" class="template-selection-summary">0 lugares selecionados</div>
-   <button id="saveTemplate" class="btn btn-primary btn-block" ${places.length?'':'disabled'}>Salvar roteiro</button>`);
-   setTimeout(()=>{
-    const filter=document.querySelector('#templatePlaceFilter'),days=document.querySelector('#templateDays'),summary=document.querySelector('#templateSelectionSummary'),save=document.querySelector('#saveTemplate');
-    const refresh=()=>{const max=Math.max(1,Number(days?.value||1));document.querySelectorAll('[data-template-day]').forEach(sel=>{[...sel.options].forEach(o=>o.hidden=Number(o.value)>max);if(Number(sel.value)>max)sel.value=max});const selected=[...document.querySelectorAll('[data-template-place]:checked')];const total=selected.reduce((sum,x)=>{const p=places.find(y=>y.id===x.dataset.templatePlace);return sum+Number(p?.cost||0)},0);summary.textContent=`${selected.length} lugares selecionados · custo base ${selected.length?ipaCatalogMoney(total,places.find(p=>selected.some(x=>x.dataset.templatePlace===p.id))?.currency||'EUR'):ipaCatalogMoney(0,'EUR')} por pessoa`};
-    if(filter)filter.oninput=()=>{const q=filter.value.trim().toLowerCase();document.querySelectorAll('[data-template-place-search]').forEach(row=>row.style.display=!q||row.dataset.templatePlaceSearch.includes(q)?'grid':'none')};
-    if(days)days.oninput=refresh;document.querySelectorAll('[data-template-place]').forEach(x=>x.onchange=refresh);refresh();
-    if(save)save.onclick=async()=>{const name=document.querySelector('#templateName').value.trim(),destination=document.querySelector('#templateDestination').value.trim(),dayCount=Math.max(1,Number(days.value||1));if(!name)return toast('Informe o nome do roteiro');if(!destination)return toast('Informe o destino');const selected=[...document.querySelectorAll('[data-template-place]:checked')];if(!selected.length)return toast('Selecione pelo menos um lugar');const itinerary=Array.from({length:dayCount},(_,i)=>({day:i+1,title:`Dia ${i+1}`,places:[]}));selected.forEach(x=>{const place=places.find(p=>p.id===x.dataset.templatePlace);if(!place)return;const daySelect=[...document.querySelectorAll('[data-template-day]')].find(el=>el.dataset.templateDay===place.id);const dayNo=Number(daySelect?.value||1);itinerary[dayNo-1].places.push({...place,id:'place-'+Date.now()+'-'+Math.random().toString(36).slice(2,6),catalogPlaceId:place.id})});save.disabled=true;save.textContent='Salvando...';try{const created=IPAData.createItineraryTemplate({name,destination,description:document.querySelector('#templateDescription').value.trim(),days:dayCount,itinerary});if(!created)throw new Error('Não foi possível criar o roteiro');toast('Roteiro montado com sua curadoria ✓');modal.close();adminSection='templates';render();if(window.IPAFirebase?.user)window.IPAFirebase.syncNow().catch(e=>console.warn('Roteiro salvo; sincronização pendente',e))}catch(e){console.error(e);save.disabled=false;save.textContent='Salvar roteiro';toast(e.message||'Não foi possível salvar o roteiro')}};
-   },0);
+   <div id="templatePlacePicker" class="template-place-picker">${places.map(p=>`<label class="template-place-option" data-template-place-search="${ipaEscape(`${p.name} ${p.city} ${p.country} ${(p.interests||[]).join(' ')} ${p.priority||''}`.toLowerCase())}"><input type="checkbox" data-template-place="${ipaEscape(p.id)}"><span><b>${ipaEscape(p.name)}</b><small>${ipaEscape([p.city,p.country].filter(Boolean).join(', '))} · ${ipaCatalogMoney(p.cost,p.currency)} · ${Number(p.durationMinutes||120)} min</small><em>${p.priority==='Imperdível'?'⭐ Imperdível':p.priority==='Opcional'?'↪ Opcional':'✓ Recomendado Indo por Aí'}</em></span><select data-template-day="${ipaEscape(p.id)}" class="v2-concierge-input">${Array.from({length:30},(_,i)=>`<option value="${i+1}">Dia ${i+1}</option>`).join('')}</select></label>`).join('')||'<div class="smart-empty"><b>Nenhum lugar cadastrado.</b><small>Cadastre lugares em ADM → Lugares antes de montar o roteiro.</small></div>'}</div>
+   <div id="templateSelectionSummary" class="template-selection-summary"><b>0 lugares selecionados</b><span>custo base € 0,00 por pessoa</span></div>
+   <div class="builder-why"><span class="eyebrow">POR QUE ESTE ROTEIRO?</span><p id="templateWhy">Selecione lugares para ver por que este roteiro combina com o perfil da viagem.</p></div>
+   <div class="builder-preview"><span class="eyebrow">PRÉVIA VISUAL DOS DIAS</span><div id="templateVisualPreview"></div></div>
+   <button id="saveTemplate" type="button" class="btn btn-primary btn-block" ${places.length?'':'disabled'}>Salvar roteiro</button>`);
+   const filter=document.querySelector('#templatePlaceFilter'),days=document.querySelector('#templateDays'),budget=document.querySelector('#templateBudget');
+   if(filter)filter.oninput=()=>{const q=filter.value.trim().toLowerCase();document.querySelectorAll('[data-template-place-search]').forEach(row=>row.style.display=!q||row.dataset.templatePlaceSearch.includes(q)?'grid':'none')};
+   if(days)days.oninput=ipaRefreshTemplateBuilder;if(budget)budget.oninput=ipaRefreshTemplateBuilder;
+   document.querySelectorAll('[data-template-place]').forEach(x=>x.onchange=ipaRefreshTemplateBuilder);
+   document.querySelectorAll('[data-template-day]').forEach(x=>x.onchange=ipaRefreshTemplateBuilder);
+   ipaRefreshTemplateBuilder();
  });
 
 
