@@ -17,6 +17,7 @@ import {
   doc,
   getDoc,
   setDoc,
+  deleteDoc,
   serverTimestamp,
   query,
   where,
@@ -60,6 +61,45 @@ function notify(name="ipa-firebase-state"){
 async function readCollection(name){
   const snap = await getDocs(collection(firestore,name));
   return snap.docs.map(d=>({id:d.id,...d.data()}));
+}
+
+const IPA_CLEAN_RESET_VERSION = "6.26.1-clean";
+
+async function ipaDeleteCollectionBestEffort(name){
+  try{
+    const snap=await getDocs(collection(firestore,name));
+    await Promise.all(snap.docs.map(x=>deleteDoc(doc(firestore,name,x.id)).catch(()=>null)));
+  }catch(e){ console.warn("Reset ignorou coleção",name,e?.message||e); }
+}
+
+async function ipaResetTestEnvironmentOnce(){
+  if(!currentUser || currentUser.uid!==ADMIN_UID) return;
+  const marker=`ipa-clean-reset-${IPA_CLEAN_RESET_VERSION}`;
+  if(localStorage.getItem(marker)==="done") return;
+
+  const collections=[
+    "clients","trips","payments","benefits","itineraryTemplates","paymentPlans",
+    "recommendations","tripDocuments","memories","conciergeRequests","journeyPlaces",
+    "tripMessages","placeCatalog","travelLeads"
+  ];
+  for(const name of collections) await ipaDeleteCollectionBestEffort(name);
+
+  try{
+    await setDoc(doc(firestore,"settings","main"),{
+      client:{},
+      exchange:{requestedEuro:0,buyRate:0,sellRate:0,status:"",partner:""},
+      prep:{purchase:[],documents:[],checkin:[],luggage:[]},
+      visitReviews:{},ratings:{},
+      resetVersion:IPA_CLEAN_RESET_VERSION,
+      updatedAt:serverTimestamp()
+    },{merge:false});
+  }catch(e){ console.warn("Reset settings",e?.message||e); }
+
+  // Limpa somente dados do Indo por Aí neste navegador; não toca no login Firebase.
+  Object.keys(localStorage).filter(k=>k.startsWith("ipa-")).forEach(k=>localStorage.removeItem(k));
+  if(window.IPAData?.reset) window.IPAData.reset();
+  localStorage.setItem(marker,"done");
+  localStorage.setItem("ipa-clean-environment","true");
 }
 
 async function remoteHasData(){
@@ -448,6 +488,7 @@ async function bootstrapAfterLogin(){
   status="syncing";
   notify();
   try{
+    await ipaResetTestEnvironmentOnce();
     const exists = await remoteHasData();
     if(exists){
       await pullAll();
