@@ -63,52 +63,14 @@ async function readCollection(name){
   return snap.docs.map(d=>({id:d.id,...d.data()}));
 }
 
-const IPA_CLEAN_RESET_VERSION = "6.26.1-clean";
-
-async function ipaDeleteCollectionBestEffort(name){
-  try{
-    const snap=await getDocs(collection(firestore,name));
-    await Promise.all(snap.docs.map(x=>deleteDoc(doc(firestore,name,x.id)).catch(()=>null)));
-  }catch(e){ console.warn("Reset ignorou coleção",name,e?.message||e); }
-}
-
-async function ipaResetTestEnvironmentOnce(){
-  if(!currentUser || currentUser.uid!==ADMIN_UID) return;
-  const marker=`ipa-clean-reset-${IPA_CLEAN_RESET_VERSION}`;
-  if(localStorage.getItem(marker)==="done") return;
-
-  const collections=[
-    "clients","trips","payments","benefits","itineraryTemplates","paymentPlans",
-    "recommendations","tripDocuments","memories","conciergeRequests","journeyPlaces",
-    "tripMessages","placeCatalog","travelLeads"
-  ];
-  for(const name of collections) await ipaDeleteCollectionBestEffort(name);
-
-  try{
-    await setDoc(doc(firestore,"settings","main"),{
-      client:{},
-      exchange:{requestedEuro:0,buyRate:0,sellRate:0,status:"",partner:""},
-      prep:{purchase:[],documents:[],checkin:[],luggage:[]},
-      visitReviews:{},ratings:{},
-      resetVersion:IPA_CLEAN_RESET_VERSION,
-      updatedAt:serverTimestamp()
-    },{merge:false});
-  }catch(e){ console.warn("Reset settings",e?.message||e); }
-
-  // Limpa somente dados do Indo por Aí neste navegador; não toca no login Firebase.
-  Object.keys(localStorage).filter(k=>k.startsWith("ipa-")).forEach(k=>localStorage.removeItem(k));
-  if(window.IPAData?.reset) window.IPAData.reset();
-  localStorage.setItem(marker,"done");
-  localStorage.setItem("ipa-clean-environment","true");
-}
-
+// Beta 6.28.1: ambiente persistente. Nenhum reset automático de dados.
 async function remoteHasData(){
   const snap = await getDocs(collection(firestore,"clients"));
   return !snap.empty;
 }
 
 async function pullAll(){
-  const [clients,trips,payments,benefits,itineraryTemplates,paymentPlans,recommendations,tripDocuments,memories,conciergeRequests] = await Promise.all([
+  const [clients,trips,payments,benefits,itineraryTemplates,paymentPlans,recommendations,tripDocuments,memories,conciergeRequests,placeCatalog,travelLeads] = await Promise.all([
     readCollection("clients"),
     readCollection("trips"),
     readCollection("payments"),
@@ -118,7 +80,9 @@ async function pullAll(){
     readCollection("recommendations"),
     readCollection("tripDocuments"),
     readCollection("memories"),
-    readCollection("conciergeRequests")
+    readCollection("conciergeRequests"),
+    readCollection("placeCatalog"),
+    readCollection("travelLeads")
   ]);
 
   const settingsSnap = await getDoc(doc(firestore,"settings","main"));
@@ -135,7 +99,9 @@ async function pullAll(){
     recommendations,
     tripDocuments,
     memories,
-    conciergeRequests
+    conciergeRequests,
+    placeCatalog,
+    travelLeads
   };
 
   if(window.IPAData?.replaceFromCloud){
@@ -168,7 +134,9 @@ async function syncAll(data){
       upsertCollection("recommendations",data.recommendations),
       upsertCollection("tripDocuments",data.tripDocuments),
       upsertCollection("memories",data.memories),
-      upsertCollection("conciergeRequests",data.conciergeRequests)
+      upsertCollection("conciergeRequests",data.conciergeRequests),
+      upsertCollection("placeCatalog",data.placeCatalog),
+      upsertCollection("travelLeads",data.travelLeads)
     ]);
 
     await setDoc(doc(firestore,"settings","main"),{
@@ -488,7 +456,6 @@ async function bootstrapAfterLogin(){
   status="syncing";
   notify();
   try{
-    await ipaResetTestEnvironmentOnce();
     const exists = await remoteHasData();
     if(exists){
       await pullAll();
@@ -534,6 +501,14 @@ onAuthStateChanged(auth,async user=>{
 });
 
 window.IPAFirebase = {
+  async submitProspectRequest(lead,client){
+    if(!lead?.id || !client?.id) throw new Error("Pedido inválido.");
+    // Grava somente os dois documentos necessários. As regras do Firestore 6.28.1
+    // permitem CREATE público validado, mas leitura/alteração continuam exclusivas do ADM.
+    await setDoc(doc(firestore,"travelLeads",lead.id),{...lead,createdAt:lead.createdAt||new Date().toISOString()},{merge:false});
+    await setDoc(doc(firestore,"clients",client.id),{...client,createdAt:client.createdAt||new Date().toISOString()},{merge:false});
+    return {leadId:lead.id,clientId:client.id};
+  },
   listenTripMessages(tripId,onChange,onError){
     if(!tripId)return ()=>{};
     const q=query(collection(firestore,"tripMessages"),where("tripId","==",tripId),orderBy("createdAt","asc"),limit(200));

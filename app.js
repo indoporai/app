@@ -510,7 +510,7 @@ function bind(){
      <label>Nome</label><input id="admClientName" class="v2-concierge-input" placeholder="Nome completo">
      <label>E-mail</label><input id="admClientEmail" class="v2-concierge-input" placeholder="email@cliente.com">
      <label>Telefone</label><input id="admClientPhone" class="v2-concierge-input" placeholder="(11) 99999-9999">
-     <label>Pacote</label><select id="admClientPlan" class="v2-concierge-input"><option>Explore</option><option>Signature</option><option>Elite</option><option>Groups</option></select>
+     <label>Pacote contratado</label><select id="admClientPlan" class="v2-concierge-input"><option>Explore</option><option>Signature</option><option>Elite</option><option>Groups</option></select><small class="firebase-security-note">Acessos ao app: Explore 1 · Signature 3 · Elite 5 · Groups ilimitado. Viajantes não contam como acesso até terem login liberado.</small>
      <label>Tipo</label><select id="admClientType" class="v2-concierge-input"><option>Titular</option><option>Acompanhante</option></select>
      <label>Titular (somente para acompanhante)</label><select id="admClientPrimary" class="v2-concierge-input"><option value="">—</option>${adminData().clients.filter(x=>(x.clientType||'Titular')==='Titular').map(x=>`<option value="${x.id}">${ipaEscape(x.name)}</option>`).join('')}</select>
      <button id="admSaveClient" class="btn btn-primary btn-block">Salvar cliente</button>
@@ -1341,7 +1341,7 @@ function ipaAccessUsage(client,d=adminData()){
 }
 function adminClients(){
  const d=adminData();
- return `<div class="ipa-admin-head"><div><span class="eyebrow">CRM</span><h1>Clientes</h1><p>Cadastros manuais e solicitações do Quero viajar.</p></div><button class="btn btn-primary" data-admin-new-client>+ Novo cliente</button></div><div class="ipa-admin-client-grid">${d.clients.map(c=>{const a=ipaAccessUsage(c,d),pending=(c.approvalStatus||'Aprovado')!=='Aprovado';return `<div class="ipa-admin-client"><div class="ipa-admin-avatar">${(c.name||'C').split(' ').map(x=>x[0]).slice(0,2).join('')}</div><div><b>${ipaEscape(c.name)}</b><small>${ipaEscape(c.email||'')} ${c.phone?' · '+ipaEscape(c.phone):''}</small><em>${ipaEscape(c.plan||'Explore')} · ${ipaEscape(c.clientType||'Titular')} · ${pending?'🟠 Aguardando aprovação':'🟢 Aprovado'}</em><small>Acessos: ${a.used} de ${a.total===Infinity?'ilimitados':a.total}</small><div class="lead-actions"><button class="btn btn-light" data-admin-edit-client="${c.id}">✏️ Editar</button>${pending?`<button class="btn btn-primary" data-admin-approve-client="${c.id}">✓ Aprovar cliente</button>`:`<button class="btn btn-light" data-admin-resend-access="${c.id}">📲 Reenviar acesso</button>`}</div></div></div>`}).join('')||'<div class="smart-empty"><b>Nenhum cliente cadastrado.</b></div>'}</div>`
+ return `<div class="ipa-admin-head"><div><span class="eyebrow">CRM</span><h1>Clientes</h1><p>Cadastros manuais e solicitações do Quero viajar.</p></div><button class="btn btn-primary" data-admin-new-client>+ Novo cliente</button></div><div class="catalog-summary ipa-access-summary"><div><strong>1</strong><small>Explore · acesso</small></div><div><strong>3</strong><small>Signature · acessos</small></div><div><strong>5</strong><small>Elite · acessos</small></div><div><strong>∞</strong><small>Groups · acessos</small></div></div><div class="ipa-admin-client-grid">${d.clients.map(c=>{const a=ipaAccessUsage(c,d),pending=(c.approvalStatus||'Aprovado')!=='Aprovado';return `<div class="ipa-admin-client"><div class="ipa-admin-avatar">${(c.name||'C').split(' ').map(x=>x[0]).slice(0,2).join('')}</div><div><b>${ipaEscape(c.name)}</b><small>${ipaEscape(c.email||'')} ${c.phone?' · '+ipaEscape(c.phone):''}</small><em>${ipaEscape(c.plan||'Explore')} · ${ipaEscape(c.clientType||'Titular')} · ${pending?'🟠 Aguardando aprovação':'🟢 Aprovado'}</em><small>Acessos: ${a.used} de ${a.total===Infinity?'ilimitados':a.total}</small><div class="lead-actions"><button class="btn btn-light" data-admin-edit-client="${c.id}">✏️ Editar</button>${pending?`<button class="btn btn-primary" data-admin-approve-client="${c.id}">✓ Aprovar cliente</button>`:`<button class="btn btn-light" data-admin-resend-access="${c.id}">📲 Reenviar acesso</button>`}</div></div></div>`}).join('')||'<div class="smart-empty"><b>Nenhum cliente cadastrado.</b></div>'}</div>`
 }
 
 function adminTrips(){return `<div class="ipa-admin-head"><div><span class="eyebrow">EXPERIÊNCIAS</span><h1>Viagens</h1><p>Escolha uma viagem para personalizar o app.</p></div><button class="btn btn-primary" data-admin-new-trip>+ Nova viagem</button></div><section class="ipa-admin-panel">${adminTripList()}</section>`}
@@ -1514,8 +1514,15 @@ function ipaBindProspectForm(){
    send.disabled=true;send.textContent='Enviando pedido...';
    const saved=IPAData.addTravelLead(lead);
    const existing=adminData().clients.find(c=>(lead.email&&c.email===lead.email)||(lead.phone&&c.phone===lead.phone));
-   if(!existing) IPAData.createClient({name:lead.name,email:lead.email,phone:lead.phone,plan:lead.plan||'Explore',clientType:'Titular',approvalStatus:'Aguardando aprovação',accessApproved:false,source:'Quero viajar',requestCode:lead.requestCode,leadId:saved.id});
-   try{if(window.IPAFirebase?.user)await window.IPAFirebase.syncNow()}catch(e){console.warn('Pedido salvo localmente; sync pendente',e)}
+   let prospectClient=existing;
+   if(!existing) prospectClient=IPAData.createClient({id:'prospect-'+saved.id,name:lead.name,email:lead.email,phone:lead.phone,plan:lead.plan||'Explore',clientType:'Titular',approvalStatus:'Aguardando aprovação',accessApproved:false,source:'Quero viajar',requestCode:lead.requestCode,leadId:saved.id,createdAt:new Date().toISOString()});
+   try{
+     if(window.IPAFirebase?.user) await window.IPAFirebase.syncNow();
+     else if(window.IPAFirebase?.submitProspectRequest) await window.IPAFirebase.submitProspectRequest(saved,prospectClient);
+   }catch(e){
+     console.error('Falha ao gravar pedido no Firebase',e);
+     throw new Error('Não conseguimos registrar seu pedido agora. Tente novamente em instantes.');
+   }
    const text=ipaLeadWhatsappText(saved);
    const r=await fetch('/api/contact/whatsapp?text='+encodeURIComponent(text),{cache:'no-store'}),j=await r.json();
    if(!r.ok||!j.ok)throw new Error(j.error||'WhatsApp não configurado');

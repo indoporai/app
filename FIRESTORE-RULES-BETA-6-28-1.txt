@@ -1,0 +1,53 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn(){ return request.auth != null; }
+    function isAdmin(){ return signedIn() && request.auth.uid == "5dlGX6JlrUQHyjFWSHB9Dye0r1E3"; }
+    function clientDoc(clientId){ return get(/databases/$(database)/documents/clients/$(clientId)); }
+    function ownsClient(clientId){ return signedIn() && (clientDoc(clientId).data.authUid == request.auth.uid || clientDoc(clientId).data.email == request.auth.token.email); }
+    function shortString(v,n){ return v is string && v.size() <= n; }
+
+    match /clients/{clientId} {
+      allow read, write: if isAdmin();
+      // Pré-cadastro vindo do formulário público. Sem leitura pública e sem update público.
+      allow create: if !signedIn()
+        && request.resource.data.source == "Quero viajar"
+        && request.resource.data.approvalStatus == "Aguardando aprovação"
+        && request.resource.data.accessApproved == false
+        && request.resource.data.clientType == "Titular"
+        && shortString(request.resource.data.name,120)
+        && shortString(request.resource.data.email,180)
+        && shortString(request.resource.data.phone,40)
+        && request.resource.data.plan in ["Explore","Signature","Elite","Groups","A definir"];
+      allow read: if signedIn() && (resource.data.authUid == request.auth.uid || resource.data.email == request.auth.token.email);
+      allow update: if signedIn() && resource.data.email == request.auth.token.email
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['authUid','firstAccessAt'])
+        && request.resource.data.authUid == request.auth.uid;
+    }
+    match /travelLeads/{id} {
+      allow read, write: if isAdmin();
+      allow create: if !signedIn()
+        && request.resource.data.status == "Novo"
+        && shortString(request.resource.data.name,120)
+        && shortString(request.resource.data.phone,40)
+        && shortString(request.resource.data.destination,160)
+        && request.resource.data.days is number
+        && request.resource.data.days >= 1 && request.resource.data.days <= 90
+        && request.resource.data.adults is number
+        && request.resource.data.adults >= 1 && request.resource.data.adults <= 100;
+    }
+    match /placeCatalog/{id} { allow read, write: if isAdmin(); }
+    match /trips/{id} { allow read, write: if isAdmin(); allow read: if signedIn() && resource.data.published == true && ownsClient(resource.data.clientId); }
+    match /payments/{id} { allow read, write: if isAdmin(); allow read: if signedIn() && ownsClient(resource.data.clientId); }
+    match /paymentPlans/{id} { allow read, write: if isAdmin(); allow read: if signedIn() && ownsClient(resource.data.clientId); }
+    match /tripDocuments/{id} { allow read, write: if isAdmin(); allow read: if signedIn() && ownsClient(resource.data.clientId); }
+    match /memories/{id} { allow read, write: if isAdmin(); allow read, create, update: if signedIn() && ownsClient(request.resource.data.clientId); }
+    match /recommendations/{id} { allow read, write: if isAdmin(); allow read: if signedIn(); }
+    match /conciergeRequests/{id} { allow read, write: if isAdmin(); allow create, read: if signedIn() && ownsClient(request.resource.data.clientId); }
+    match /benefits/{id} { allow read, write: if isAdmin(); allow read: if signedIn(); }
+    match /itineraryTemplates/{id} { allow read, write: if isAdmin(); }
+    match /users/{id} { allow read, write: if isAdmin(); allow read: if signedIn() && request.auth.uid == id; }
+    match /settings/{document=**} { allow read, write: if isAdmin(); }
+    match /{document=**} { allow read, write: if false; }
+  }
+}
