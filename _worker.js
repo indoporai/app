@@ -198,6 +198,26 @@ async function computeRoadRoute(request,env){
  return json({ok:true,distanceMeters:route.distanceMeters||0,duration:route.duration||"",encodedPolyline:route.polyline?.encodedPolyline||""});
 }
 
+
+async function generateClimate(request,env){
+ const key=env.OPENAI_API_KEY;
+ if(!key)return json({ok:false,needsKey:true,error:"OPENAI_API_KEY não configurada no Cloudflare. Adicione o segredo para ativar o Entre no Clima com IA."},500);
+ let b={};try{b=await request.json()}catch{return json({ok:false,error:"JSON inválido"},400)}
+ const destination=String(b.destination||"").trim(),country=String(b.country||"").trim();
+ if(!destination)return json({ok:false,error:"Destino obrigatório"},400);
+ const prompt=`Você é o curador cultural do app de viagens Indo por Aí. Crie o módulo \"Entre no Clima\" para ${destination}${country?`, ${country}`:""}. Pesquise na web quando necessário para evitar invenções. Retorne SOMENTE JSON válido, sem markdown, no formato {\"items\":[...]}. Exatamente 6 itens, nesta ordem e tipos: Filme / série, Playlist, Livro, Expressão local, Prato típico, Curiosidade. Cada item: icon (emoji adequado), type, title, description (1-2 frases em português do Brasil), url (somente se você encontrar um link público confiável e diretamente relacionado; caso contrário string vazia). Para Expressão local, title deve trazer uma expressão realmente usada no idioma/local e description explicar significado/uso. Para prato típico, escolha algo realmente associado ao destino. Não invente títulos, obras, links ou fatos.`;
+ const r=await fetch("https://api.openai.com/v1/responses",{method:"POST",headers:{"content-type":"application/json","authorization":`Bearer ${key}`},body:JSON.stringify({model:"gpt-5.6-luna",tools:[{type:"web_search"}],input:prompt})});
+ const body=await r.json().catch(()=>({}));
+ if(!r.ok)return json({ok:false,error:body?.error?.message||"Erro ao gerar conteúdo com IA"},r.status);
+ let text=body.output_text||"";
+ if(!text&&Array.isArray(body.output))for(const o of body.output||[])for(const c of o.content||[])if(c.type==="output_text")text+=c.text||"";
+ text=String(text).trim().replace(/^```(?:json)?\s*/i,"").replace(/\s*```$/i,"");
+ let parsed;try{parsed=JSON.parse(text)}catch{return json({ok:false,error:"A IA respondeu em formato inesperado. Tente gerar novamente."},502)}
+ const items=Array.isArray(parsed?.items)?parsed.items.slice(0,6):[];
+ if(items.length!==6)return json({ok:false,error:"Conteúdo incompleto. Tente gerar novamente."},502);
+ return json({ok:true,source:"openai-web",items:items.map(x=>({icon:String(x.icon||"✨").slice(0,8),type:String(x.type||"").slice(0,40),title:String(x.title||"").slice(0,160),description:String(x.description||"").slice(0,500),url:/^https?:\/\//i.test(String(x.url||""))?String(x.url):""}))});
+}
+
 function whatsappContact(request,env){
   const raw=String(env.WHATSAPP_NUMBER||"").replace(/\D/g,"");
   if(!raw)return json({ok:false,error:"WHATSAPP_NUMBER não configurado no Cloudflare."},500);
@@ -218,6 +238,7 @@ export default {
     if (url.pathname === "/api/contact/whatsapp" && request.method === "GET") return whatsappContact(request,env);
     if (url.pathname === "/api/places/search" && request.method === "GET") return googlePlaceSearch(request,env);
     if (url.pathname === "/api/routes/compute" && request.method === "POST") return computeRoadRoute(request,env);
+    if (url.pathname === "/api/climate/generate" && request.method === "POST") return generateClimate(request,env);
     if (url.pathname === "/api/live/create" && request.method === "POST") return createLiveRoom(env);
     if (url.pathname === "/api/live/join" && request.method === "POST") return joinLiveRoom(request,env);
 

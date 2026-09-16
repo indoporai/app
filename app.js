@@ -351,8 +351,36 @@ function bind(){
  });
  const openPlanner=document.querySelector('#openTravelPlanner');if(openPlanner)openPlanner.onclick=()=>{showModal(ipaPlannerForm(ipaProspectPlan));setTimeout(()=>ipaBindProspectForm(),0)};
  document.querySelectorAll('[data-choose-prospect-plan]').forEach(btn=>btn.onclick=()=>{ipaProspectPlan=btn.dataset.chooseProspectPlan||'';modal.close();showModal(ipaPlannerForm(ipaProspectPlan));setTimeout(()=>ipaBindProspectForm(),0)});
- document.querySelectorAll('[data-lead-generate]').forEach(btn=>btn.onclick=()=>{const d=adminData(),lead=(d.travelLeads||[]).find(x=>x.id===btn.dataset.leadGenerate);if(!lead)return;const result=ipaGenerateCuratedRoute(lead);IPAData.updateTravelLead(lead.id,{adminSuggestion:result,status:'Em análise'});const box=document.querySelector(`[data-lead-result="${lead.id}"]`);if(box)box.innerHTML=ipaAdminSuggestionHtml(lead,result);btn.textContent='↻ Gerar novamente';try{window.IPAFirebase?.syncNow()}catch(e){}});
+ document.querySelectorAll('[data-lead-generate]').forEach(btn=>btn.onclick=async()=>{const d=adminData(),lead=(d.travelLeads||[]).find(x=>x.id===btn.dataset.leadGenerate);if(!lead)return;const result=ipaGenerateCuratedRoute(lead);IPAData.updateTravelLead(lead.id,{adminSuggestion:result,status:'Em análise'});const box=document.querySelector(`[data-lead-result="${lead.id}"]`);if(box)box.innerHTML=ipaAdminSuggestionHtml(lead,result);btn.textContent='↻ Gerar novamente';try{if(window.IPAFirebase?.user)await window.IPAFirebase.syncNow()}catch(e){console.warn(e)};bind()});
+ document.querySelectorAll('[data-lead-create-trip]').forEach(btn=>btn.onclick=async()=>{
+   const d=adminData(),lead=(d.travelLeads||[]).find(x=>x.id===btn.dataset.leadCreateTrip);if(!lead?.adminSuggestion)return toast('Gere a sugestão antes de criar a viagem');
+   if(lead.tripId){adminSection='trips';adminTripId=lead.tripId;render();return}
+   const client=(d.clients||[]).find(c=>c.id===lead.clientId||c.leadId===lead.id||c.requestCode===lead.requestCode||(lead.email&&String(c.email||'').toLowerCase()===String(lead.email).toLowerCase())||(lead.phone&&c.phone===lead.phone));
+   if(!client)return toast('Cliente do pedido não encontrado');
+   const itinerary=(lead.adminSuggestion.days||[]).map(day=>({day:Number(day.day),title:`Dia ${day.day}`,places:(day.places||[]).map((p,i)=>({...p,id:`trip-place-${Date.now()}-${day.day}-${i}`,catalogPlaceId:p.catalogPlaceId||p.id}))}));
+   const trip=IPAData.createTrip({clientId:client.id,name:`${lead.destination} · ${lead.name||client.name}`,destination:lead.destination,country:'',plan:client.plan||lead.plan||'Explore',itinerary,sourceLeadId:lead.id,sourceRequestCode:lead.requestCode,smartRouteApprovedAt:new Date().toISOString(),status:'Em preparação'});
+   IPAData.updateClientById(client.id,{activeTripId:trip.id,lastConfiguredTripId:trip.id});
+   IPAData.updateTravelLead(lead.id,{tripId:trip.id,status:'Roteiro aprovado'});
+   try{if(window.IPAFirebase?.user)await window.IPAFirebase.syncNow()}catch(e){console.error(e);toast('Viagem criada, mas a sincronização ficou pendente');return}
+   modal?.close?.();adminSection='trips';adminTripId=trip.id;render();toast('Roteiro aprovado e viagem criada ✓');
+ });
 
+ document.querySelectorAll('[data-admin-generate-climate]').forEach(b=>b.onclick=async()=>{
+   const tripId=b.dataset.adminGenerateClimate,d=adminData(),t=(d.trips||[]).find(x=>x.id===tripId);if(!t)return;
+   const original=b.textContent;b.disabled=true;b.textContent='✨ Gerando conteúdo...';
+   try{
+    const r=await fetch('/api/climate/generate',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({destination:tripDestination(t),country:tripCountry(t),plan:t.plan||'Explore'})});
+    const j=await r.json();if(!r.ok||!j.ok)throw new Error(j.error||'Não foi possível gerar o conteúdo');
+    IPAData.updateTrip(tripId,{climateContent:j.items,climateGeneratedAt:new Date().toISOString(),climateSource:j.source||'ai'});
+    if(window.IPAFirebase?.user)await window.IPAFirebase.syncNow();
+    toast('Entre no Clima gerado e salvo ✓');view.innerHTML=adminTripEditor(tripId);bind();
+   }catch(e){console.error(e);toast(e.message||'Erro ao gerar Entre no Clima');b.disabled=false;b.textContent=original}
+ });
+ document.querySelectorAll('[data-admin-edit-climate]').forEach(b=>b.onclick=()=>{
+   const [tripId,idxRaw]=b.dataset.adminEditClimate.split(':'),idx=Number(idxRaw),d=adminData(),t=(d.trips||[]).find(x=>x.id===tripId),item=t?.climateContent?.[idx];if(!item)return;
+   showModal(`<span class="eyebrow">ENTRE NO CLIMA</span><h2>Editar ${ipaEscape(item.type||'conteúdo')}</h2><label>Título<input id="climateEditTitle" class="v2-concierge-input" value="${ipaEscape(item.title||'')}"></label><label>Descrição<textarea id="climateEditDescription" class="rating-text">${ipaEscape(item.description||'')}</textarea></label><label>Link opcional<input id="climateEditUrl" class="v2-concierge-input" value="${ipaEscape(item.url||'')}"></label><button id="saveClimateEdit" class="btn btn-primary btn-block">Salvar alteração</button>`);
+   setTimeout(()=>{const save=document.querySelector('#saveClimateEdit');if(save)save.onclick=async()=>{const list=[...(t.climateContent||[])];list[idx]={...item,title:document.querySelector('#climateEditTitle').value.trim(),description:document.querySelector('#climateEditDescription').value.trim(),url:document.querySelector('#climateEditUrl').value.trim()};IPAData.updateTrip(tripId,{climateContent:list,climateEditedAt:new Date().toISOString()});if(window.IPAFirebase?.user)await window.IPAFirebase.syncNow();modal.close();view.innerHTML=adminTripEditor(tripId);bind();toast('Entre no Clima atualizado ✓')}},0);
+ });
  document.querySelectorAll('[data-remove-smart-route]').forEach(b=>b.onclick=()=>{
   const t=activeTrip();if(!t)return;
   const dayNo=Number(state.tripDay||1),id=decodeURIComponent(b.dataset.removeSmartRoute||''),list=ipaGetPersonalRoute(t,dayNo);
@@ -453,7 +481,14 @@ function bind(){
    view.innerHTML=adminTripEditor(adminTripId);bind();
  });
  document.querySelectorAll('[data-admin-module]').forEach(x=>x.onchange=()=>{IPAData.toggleTripModule(adminTripId,x.dataset.adminModule,x.checked);view.innerHTML=adminTripEditor(adminTripId);bind()});
- document.querySelectorAll('[data-admin-publish]').forEach(b=>b.onclick=()=>{const t=adminData().trips.find(x=>x.id===b.dataset.adminPublish);IPAData.publishTrip(t.id,!t.published);view.innerHTML=adminTripEditor(t.id);bind()});
+ document.querySelectorAll('[data-admin-publish]').forEach(b=>b.onclick=async()=>{
+  const t=adminData().trips.find(x=>x.id===b.dataset.adminPublish);if(!t)return;
+  const next=!t.published;
+  IPAData.publishTrip(t.id,next);
+  try{if(window.IPAFirebase?.user)await window.IPAFirebase.syncNow()}catch(e){console.error('Falha ao sincronizar publicação',e);toast('Alteração salva, mas a sincronização com o cliente ficou pendente');return}
+  view.innerHTML=adminTripEditor(t.id);bind();
+  toast(next?'Viagem publicada e sincronizada com o cliente ✓':'Viagem retirada da publicação ✓');
+});
 
  document.querySelectorAll('[data-admin-benefit]').forEach(x=>x.onchange=()=>{IPAData.setBenefit(x.dataset.adminBenefit,x.checked);render()});
  document.querySelectorAll('[data-admin-remind]').forEach(b=>b.onclick=()=>toast('Lembrete enviado ao cliente'));
@@ -1252,6 +1287,7 @@ function paymentsView(){
 
 
 function climateForTrip(t){
+ if(Array.isArray(t?.climateContent)&&t.climateContent.length) return t.climateContent.map(x=>[x.icon||'✨',x.type||'',x.title||'',x.description||'',x.url||'']);
  const dest=tripDestination(t), country=tripCountry(t);
  const k=(dest+" "+country).toLowerCase();
  if(k.includes("madrid")||k.includes("espan")){
@@ -1285,7 +1321,7 @@ function climateForTrip(t){
 }
 function climateSection(t){
  const dest=tripDestination(t),cards=climateForTrip(t);
- return `<section class="section climate-section"><div class="section-head"><div><span class="eyebrow">✨ ENTRE NO CLIMA</span><h2>${dest} começa antes do embarque</h2></div></div><div class="climate-grid">${cards.map((x,i)=>`<article><span>${x[0]}</span><small>${x[1]}</small><b>${x[2]}</b><p>${x[3]}</p>${i===4?`<button data-climate-explore="${encodeURIComponent(x[2])}">📍 Ver no Explorar</button>`:''}</article>`).join('')}</div></section>`;
+ return `<section class="section climate-section"><div class="section-head"><div><span class="eyebrow">✨ ENTRE NO CLIMA</span><h2>${dest} começa antes do embarque</h2></div></div><div class="climate-grid">${cards.map((x,i)=>`<article><span>${x[0]}</span><small>${x[1]}</small><b>${x[2]}</b><p>${x[3]}</p>${x[4]?`<button data-external-route="${x[4]}">Abrir sugestão ↗</button>`:i===4?`<button data-climate-explore="${encodeURIComponent(x[2])}">📍 Ver no Explorar</button>`:''}</article>`).join('')}</div></section>`;
 }
 function flightWalletSection(t,d){
  const flight=t?.flight||{};
@@ -1389,6 +1425,7 @@ function adminTripEditor(id){
  <div class="smart-route-banner"><span>✨</span><div><b>Dica Inteligente</b><small>Cadastre atrações, cafés, restaurantes, lojas e experiências. Use “Adicionar como dica” para recomendações fora do roteiro principal.</small></div></div>
  <div class="ipa-admin-days">${(t.itinerary||[]).sort((a,b)=>a.day-b.day).map(day=>`<div class="admin-day-expanded"><div class="admin-day-title"><strong>${day.day}</strong><span><b>${day.title}</b><small>${day.date||''}</small></span><button class="admin-add-place-btn" data-admin-add-place="${t.id}:${day.day}">+ Lugar / dica</button></div><div class="admin-place-list">${normalizedPlaces(day).map((p,i)=>`<div><span>${i+1}</span><div><b>${p.time?`${p.time} · `:''}${p.category||'📍'} ${p.name}</b><small>${p.address||p.note||''}</small>${p.smartTip?`<em>💡 ${p.smartTip}</em>`:''}</div>${p.mapsUrl?`<button data-external-route="${p.mapsUrl}">Maps ↗</button>`:''}</div>`).join('')||'<small>Nenhum local neste dia.</small>'}</div></div>`).join('')||'<p>Comece adicionando o primeiro dia.</p>'}</div>
  <div class="network-tip-list">${(d.recommendations||[]).filter(r=>r.tripId===t.id).map(r=>`<div><span>💡</span><div><b>${r.category||'Dica'} · ${r.name}</b><small>${r.address||''}</small><em>${r.smartTip||'Indo por Aí recomenda'}</em></div></div>`).join('')||'<small>Nenhuma dica extra cadastrada.</small>'}</div></section>
+ <section class="ipa-admin-panel"><div class="section-head"><div><span class="eyebrow">✨ ANTES · ENTRE NO CLIMA</span><h2>Conteúdo do destino</h2></div><button class="btn btn-primary" data-admin-generate-climate="${t.id}">${t.climateContent?.length?'🔄 Gerar novamente com IA':'✨ Gerar com IA'}</button></div><p>A IA prepara filme/série, playlist, livro, expressões locais, prato típico e curiosidade conforme o destino. O conteúdo fica salvo nesta viagem até você gerar novamente ou editar.</p><div class="climate-admin-grid">${climateForTrip(t).map((x,i)=>`<div><span>${x[0]}</span><small>${x[1]}</small><b>${x[2]}</b><p>${x[3]}</p>${t.climateContent?.length?`<button class="btn btn-light" data-admin-edit-climate="${t.id}:${i}">✏️ Editar</button>`:''}</div>`).join('')}</div></section>
  <section class="ipa-admin-panel"><div class="section-head"><div><span class="eyebrow">ANTES · CARTEIRA DA VIAGEM</span><h2>Documentos do cliente</h2></div><button class="btn btn-light" data-admin-document="${t.id}" data-client-id="${t.clientId}">+ Documento</button></div><p>Passagens, hotel, vouchers, seguro, ingressos e transfer. O ADM cadastra e o cliente consulta no Antes.</p><div class="admin-doc-list">${(d.tripDocuments||[]).filter(x=>x.tripId===t.id).map(x=>`<div><span>${x.type==='Passagem aérea'?'✈️':'📄'}</span><div><b>${x.title}</b><small>${[x.date,x.time,x.terminal&&('Terminal '+x.terminal),x.gate&&('Portão '+x.gate)].filter(Boolean).join(' · ')}</small></div>${x.url?`<button data-external-route="${x.url}">Abrir</button>`:''}</div>`).join('')||'<small>Nenhum documento cadastrado.</small>'}</div></section>
 
  <section class="ipa-admin-panel"><div class="section-head"><div><span class="eyebrow">👥 PARTICIPANTES</span><h2>Quem vai nessa viagem?</h2></div><button class="btn btn-light" data-admin-add-participant="${t.id}">+ Participante</button></div>
@@ -1495,7 +1532,7 @@ function adminLeads(){
 }
 function ipaAdminSuggestionHtml(lead,result){
  if(!result?.count)return `<div class="planner-empty"><b>Banco de Lugares sem combinação suficiente.</b><small>Cadastre mais experiências para ${ipaEscape(lead.destination||'este destino')} e gere novamente.</small></div>`;
- return `<div class="planner-result admin-only-suggestion"><div class="planner-result-head"><span>✨</span><div><small>SUGESTÃO INTERNA · ${ipaEscape(lead.requestCode||'')}</small><h3>${ipaEscape(lead.destination)} · ${lead.days} dias</h3></div></div>${result.days.map(d=>`<div class="planner-day"><b>Dia ${d.day}</b>${d.places.map(p=>`<div><span>${p.category||'📍'}</span><p><strong>${ipaEscape(p.name)}</strong><small>${p.interests?.slice(0,2).join(' · ')||'Curadoria Indo por Aí'}</small></p><em>${ipaCatalogMoney(p.cost,p.currency||result.currency)}</em></div>`).join('')||'<small>Dia livre.</small>'}</div>`).join('')}<div class="planner-total"><span>Estimativa por pessoa</span><strong>${ipaCatalogMoney(result.spent,result.currency)}</strong><small>de ${ipaCatalogMoney(result.budget,result.currency)} informados</small></div><small>🔒 Sugestão interna. O prospect não visualiza estes lugares.</small></div>`;
+ return `<div class="planner-result admin-only-suggestion"><div class="planner-result-head"><span>✨</span><div><small>SUGESTÃO INTERNA · ${ipaEscape(lead.requestCode||'')}</small><h3>${ipaEscape(lead.destination)} · ${lead.days} dias</h3></div></div>${result.days.map(d=>`<div class="planner-day"><b>Dia ${d.day}</b>${d.places.map(p=>`<div><span>${p.category||'📍'}</span><p><strong>${ipaEscape(p.name)}</strong><small>${p.interests?.slice(0,2).join(' · ')||'Curadoria Indo por Aí'}</small></p><em>${ipaCatalogMoney(p.cost,p.currency||result.currency)}</em></div>`).join('')||'<small>Dia livre.</small>'}</div>`).join('')}<div class="planner-total"><span>Estimativa por pessoa</span><strong>${ipaCatalogMoney(result.spent,result.currency)}</strong><small>de ${ipaCatalogMoney(result.budget,result.currency)} informados</small></div><small>🔒 Sugestão interna. O prospect não visualiza estes lugares.</small><div class="lead-actions">${lead.tripId?`<button class="btn btn-light" data-admin-trip="${ipaEscape(lead.tripId)}">✈️ Ver viagem</button>`:`<button class="btn btn-primary" data-lead-create-trip="${ipaEscape(lead.id)}">✅ Aprovar roteiro e criar viagem</button>`}</div></div>`;
 }
 function prospectView(){return `<section class="prospect-premium">
  <span class="eyebrow">Ainda não sou cliente</span><h1>Sua viagem começa antes do embarque.</h1><p>Escolha uma experiência e conte como você quer viajar. Nossa equipe recebe seu pedido e prepara uma proposta personalizada.</p><button class="btn btn-primary" id="openTravelPlanner">Quero viajar com o Indo por Aí</button>
