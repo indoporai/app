@@ -367,14 +367,10 @@ function bind(){
 
  document.querySelectorAll('[data-admin-generate-climate]').forEach(b=>b.onclick=async()=>{
    const tripId=b.dataset.adminGenerateClimate,d=adminData(),t=(d.trips||[]).find(x=>x.id===tripId);if(!t)return;
-   const original=b.textContent;b.disabled=true;b.textContent='✨ Gerando conteúdo...';
-   try{
-    const r=await fetch('/api/climate/generate',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({destination:tripDestination(t),country:tripCountry(t),plan:t.plan||'Explore'})});
-    const j=await r.json();if(!r.ok||!j.ok)throw new Error(j.error||'Não foi possível gerar o conteúdo');
-    IPAData.updateTrip(tripId,{climateContent:j.items,climateGeneratedAt:new Date().toISOString(),climateSource:j.source||'ai'});
-    if(window.IPAFirebase?.user)await window.IPAFirebase.syncNow();
-    toast('Entre no Clima gerado e salvo ✓');view.innerHTML=adminTripEditor(tripId);bind();
-   }catch(e){console.error(e);toast(e.message||'Erro ao gerar Entre no Clima');b.disabled=false;b.textContent=original}
+   const generated=climateForTrip({...t,climateContent:[]}).map(x=>({icon:x[0],type:x[1],title:x[2],description:x[3],url:x[4]||''}));
+   IPAData.updateTrip(tripId,{climateContent:generated,climateGeneratedAt:new Date().toISOString(),climateSource:'destination-curation'});
+   try{if(window.IPAFirebase?.user)await window.IPAFirebase.syncNow()}catch(e){console.warn(e);toast('Conteúdo salvo; sincronização com o cliente ficou pendente');return}
+   toast('Entre no Clima preparado e salvo ✓');view.innerHTML=adminTripEditor(tripId);bind();
  });
  document.querySelectorAll('[data-admin-edit-climate]').forEach(b=>b.onclick=()=>{
    const [tripId,idxRaw]=b.dataset.adminEditClimate.split(':'),idx=Number(idxRaw),d=adminData(),t=(d.trips||[]).find(x=>x.id===tripId),item=t?.climateContent?.[idx];if(!item)return;
@@ -1288,35 +1284,66 @@ function paymentsView(){
 
 function climateForTrip(t){
  if(Array.isArray(t?.climateContent)&&t.climateContent.length) return t.climateContent.map(x=>[x.icon||'✨',x.type||'',x.title||'',x.description||'',x.url||'']);
- const dest=tripDestination(t), country=tripCountry(t);
- const k=(dest+" "+country).toLowerCase();
- if(k.includes("madrid")||k.includes("espan")){
-   return [
-    ["🎬","Filme / série","La Casa de Papel","Entre no clima espanhol antes da viagem."],
-    ["🎵","Playlist","Madrid & Spanish vibes","Flamenco, pop espanhol e músicas para a viagem."],
-    ["📚","Livro","Histórias de Madrid","Leitura leve para conhecer a cidade antes de chegar."],
-    ["🗣️","Expressão local","¿Qué tal?","Uma forma comum e descontraída de perguntar como estão as coisas."],
-    ["🍽️","Prato típico","Bocadillo de calamares","Clássico madrilenho para procurar durante o passeio."],
-    ["💡","Curiosidade","Madrid vive até tarde","Jantares e programas noturnos normalmente começam mais tarde."]
-   ];
- }
- if(k.includes("porto")||k.includes("portugal")){
-   return [
-    ["🎬","Filme / série","Porto em cena","Escolha um filme ambientado em Portugal para entrar no clima."],
-    ["🎵","Playlist","Portugal para viajar","Fado contemporâneo, pop e sons portugueses."],
-    ["📚","Livro","Histórias do Porto","Uma leitura sobre a cidade, o Douro e suas tradições."],
-    ["🗣️","Expressão local","Está tudo?","Uma saudação informal que você pode ouvir por lá."],
-    ["🍽️","Prato típico","Francesinha","Um dos sabores mais conhecidos do Porto."],
-    ["💡","Curiosidade","O Douro dita o ritmo","A cidade e o vinho do Porto estão profundamente ligados ao rio."]
-   ];
- }
+ const dest=tripDestination(t), country=tripCountry(t), k=(dest+" "+country).toLowerCase();
+ const presets=[
+  {keys:['paris','frança','france'],items:[
+   ['🎬','Filme / série','Meia-Noite em Paris','Uma viagem romântica pela Paris de diferentes épocas, perfeita para entrar no clima da cidade.'],
+   ['🎵','Playlist','Parisian vibes','Chanson française, jazz e pop francês para começar a viagem antes do embarque.'],
+   ['📚','Livro','Paris é uma Festa','Memórias de Ernest Hemingway sobre a vida na Paris dos anos 1920.'],
+   ['🗣️','Expressão local','Bonjour !','O clássico “bom dia/olá”. Um bonjour ao entrar em lojas e cafés faz parte da etiqueta local.'],
+   ['🍽️','Prato típico','Croque-monsieur','Sanduíche francês gratinado com presunto e queijo, clássico de cafés parisienses.'],
+   ['💡','Curiosidade','Paris tem 20 arrondissements','Os distritos formam uma espiral a partir do centro e ajudam a entender onde ficam as atrações.']
+  ]},
+  {keys:['madrid','espanha','spain'],items:[
+   ['🎬','Filme / série','La Casa de Papel','Uma produção espanhola popular para entrar no clima antes da viagem.'],
+   ['🎵','Playlist','Madrid & Spanish vibes','Flamenco, pop espanhol e músicas para acompanhar o planejamento.'],
+   ['📚','Livro','Fortunata e Jacinta','Romance clássico de Benito Pérez Galdós que retrata a vida madrilenha do século XIX.'],
+   ['🗣️','Expressão local','¿Qué tal?','Uma forma comum e descontraída de perguntar como estão as coisas.'],
+   ['🍽️','Prato típico','Bocadillo de calamares','Sanduíche de lula frita muito associado ao centro de Madrid.'],
+   ['💡','Curiosidade','Madrid vive até tarde','Refeições e programas noturnos costumam começar mais tarde do que em muitos outros países.']
+  ]},
+  {keys:['porto'],items:[
+   ['🎬','Filme / série','Porto','Filme de Gabe Klinger ambientado na cidade, com uma atmosfera intimista do Porto.'],
+   ['🎵','Playlist','Sons de Portugal','Fado contemporâneo, pop e música portuguesa para entrar no clima.'],
+   ['📚','Livro','O Porto de Agustina','Uma porta de entrada literária para a cidade através do olhar de Agustina Bessa-Luís.'],
+   ['🗣️','Expressão local','Está tudo?','Uma saudação informal que você pode ouvir em Portugal.'],
+   ['🍽️','Prato típico','Francesinha','Um dos pratos mais conhecidos do Porto, servido com molho quente característico.'],
+   ['💡','Curiosidade','O Douro dita o ritmo','A história da cidade e do vinho do Porto está profundamente ligada ao rio Douro.']
+  ]},
+  {keys:['lisboa','lisbon'],items:[
+   ['🎬','Filme / série','Lisbon Story','Um filme de Wim Wenders que transforma sons e ruas de Lisboa em parte da história.'],
+   ['🎵','Playlist','Lisboa em sons','Fado, música portuguesa contemporânea e canções para acompanhar a viagem.'],
+   ['📚','Livro','Livro do Desassossego','Fernando Pessoa é uma das grandes referências literárias ligadas a Lisboa.'],
+   ['🗣️','Expressão local','Obrigado / Obrigada','A forma básica de agradecer em português e uma das primeiras palavras úteis na chegada.'],
+   ['🍽️','Prato típico','Pastel de nata','Um dos sabores portugueses mais conhecidos, encontrado em pastelarias por toda Lisboa.'],
+   ['💡','Curiosidade','Lisboa é conhecida pelas sete colinas','Os miradouros fazem parte da experiência da cidade — e explicam muitas de suas subidas.']
+  ]},
+  {keys:['londres','london','inglaterra','england'],items:[
+   ['🎬','Filme / série','Notting Hill','Uma comédia romântica que usa o bairro londrino como parte essencial do cenário.'],
+   ['🎵','Playlist','London calling','Rock britânico, pop e clássicos ligados à cena musical de Londres.'],
+   ['📚','Livro','Sherlock Holmes','As histórias de Arthur Conan Doyle são uma maneira divertida de imaginar a Londres clássica.'],
+   ['🗣️','Expressão local','Cheers!','Além de um brinde, no Reino Unido também pode ser usado informalmente como “obrigado”.'],
+   ['🍽️','Prato típico','Fish and chips','Um clássico britânico simples de encontrar em pubs e casas especializadas.'],
+   ['💡','Curiosidade','O metrô é chamado de Tube','O London Underground é uma das redes de metrô mais antigas do mundo.']
+  ]},
+  {keys:['roma','rome','itália','italia','italy'],items:[
+   ['🎬','Filme / série','A Doce Vida','O clássico de Federico Fellini eternizou vários cenários de Roma.'],
+   ['🎵','Playlist','Roma italiana','Canções italianas clássicas e contemporâneas para entrar no clima.'],
+   ['📚','Livro','Anjos e Demônios','Thriller de Dan Brown que percorre diversos pontos conhecidos de Roma e do Vaticano.'],
+   ['🗣️','Expressão local','Buongiorno!','“Bom dia” em italiano e uma saudação simples para começar qualquer interação.'],
+   ['🍽️','Prato típico','Cacio e pepe','Massa romana preparada tradicionalmente com pecorino romano e pimenta-preta.'],
+   ['💡','Curiosidade','Roma envolve outro país','A Cidade do Vaticano é um Estado independente localizado dentro de Roma.']
+  ]}
+ ];
+ const hit=presets.find(p=>p.keys.some(key=>k.includes(key)));
+ if(hit)return hit.items;
  return [
-  ["🎬","Filme / série",dest+" em cena","Uma sugestão para entrar no clima do destino."],
-  ["🎵","Playlist","Sons de "+dest,"Uma trilha para começar a viagem antes do embarque."],
-  ["📚","Livro","Descobrindo "+dest,"Uma leitura leve sobre cultura e histórias locais."],
-  ["🗣️","Expressão local","Fale como um local","Aprenda algumas expressões úteis antes de chegar."],
-  ["🍽️","Prato típico","Sabores de "+dest,"Descubra um prato para experimentar durante a viagem."],
-  ["💡","Curiosidade","Você sabia?","Uma curiosidade cultural para começar a explorar o destino."]
+  ['🎬','Filme / série',dest+' em cena','Uma seleção cultural para começar a descobrir '+dest+' antes do embarque.'],
+  ['🎵','Playlist','Sons de '+dest,'Uma trilha inspirada no destino para acompanhar o planejamento da viagem.'],
+  ['📚','Livro','Descobrindo '+dest,'Uma leitura para conhecer melhor a cultura e as histórias do destino.'],
+  ['🗣️','Expressão local','Fale como um local','Conheça palavras e expressões úteis antes de chegar.'],
+  ['🍽️','Prato típico','Sabores de '+dest,'Descubra sabores tradicionais para procurar durante a viagem.'],
+  ['💡','Curiosidade','Você sabia?','Uma curiosidade cultural para começar a explorar '+dest+'.']
  ];
 }
 function climateSection(t){
@@ -1425,7 +1452,7 @@ function adminTripEditor(id){
  <div class="smart-route-banner"><span>✨</span><div><b>Dica Inteligente</b><small>Cadastre atrações, cafés, restaurantes, lojas e experiências. Use “Adicionar como dica” para recomendações fora do roteiro principal.</small></div></div>
  <div class="ipa-admin-days">${(t.itinerary||[]).sort((a,b)=>a.day-b.day).map(day=>`<div class="admin-day-expanded"><div class="admin-day-title"><strong>${day.day}</strong><span><b>${day.title}</b><small>${day.date||''}</small></span><button class="admin-add-place-btn" data-admin-add-place="${t.id}:${day.day}">+ Lugar / dica</button></div><div class="admin-place-list">${normalizedPlaces(day).map((p,i)=>`<div><span>${i+1}</span><div><b>${p.time?`${p.time} · `:''}${p.category||'📍'} ${p.name}</b><small>${p.address||p.note||''}</small>${p.smartTip?`<em>💡 ${p.smartTip}</em>`:''}</div>${p.mapsUrl?`<button data-external-route="${p.mapsUrl}">Maps ↗</button>`:''}</div>`).join('')||'<small>Nenhum local neste dia.</small>'}</div></div>`).join('')||'<p>Comece adicionando o primeiro dia.</p>'}</div>
  <div class="network-tip-list">${(d.recommendations||[]).filter(r=>r.tripId===t.id).map(r=>`<div><span>💡</span><div><b>${r.category||'Dica'} · ${r.name}</b><small>${r.address||''}</small><em>${r.smartTip||'Indo por Aí recomenda'}</em></div></div>`).join('')||'<small>Nenhuma dica extra cadastrada.</small>'}</div></section>
- <section class="ipa-admin-panel"><div class="section-head"><div><span class="eyebrow">✨ ANTES · ENTRE NO CLIMA</span><h2>Conteúdo do destino</h2></div><button class="btn btn-primary" data-admin-generate-climate="${t.id}">${t.climateContent?.length?'🔄 Gerar novamente com IA':'✨ Gerar com IA'}</button></div><p>A IA prepara filme/série, playlist, livro, expressões locais, prato típico e curiosidade conforme o destino. O conteúdo fica salvo nesta viagem até você gerar novamente ou editar.</p><div class="climate-admin-grid">${climateForTrip(t).map((x,i)=>`<div><span>${x[0]}</span><small>${x[1]}</small><b>${x[2]}</b><p>${x[3]}</p>${t.climateContent?.length?`<button class="btn btn-light" data-admin-edit-climate="${t.id}:${i}">✏️ Editar</button>`:''}</div>`).join('')}</div></section>
+ <section class="ipa-admin-panel"><div class="section-head"><div><span class="eyebrow">✨ ANTES · ENTRE NO CLIMA</span><h2>Conteúdo do destino</h2></div><button class="btn btn-primary" data-admin-generate-climate="${t.id}">${t.climateContent?.length?'🔄 Atualizar conteúdo':'✨ Preparar conteúdo'}</button></div><p>O app prepara filme/série, playlist, livro, expressão local, prato típico e curiosidade conforme o destino, sem depender de API externa. O conteúdo fica salvo nesta viagem e você pode editar antes de publicar.</p><div class="climate-admin-grid">${climateForTrip(t).map((x,i)=>`<div><span>${x[0]}</span><small>${x[1]}</small><b>${x[2]}</b><p>${x[3]}</p>${t.climateContent?.length?`<button class="btn btn-light" data-admin-edit-climate="${t.id}:${i}">✏️ Editar</button>`:''}</div>`).join('')}</div></section>
  <section class="ipa-admin-panel"><div class="section-head"><div><span class="eyebrow">ANTES · CARTEIRA DA VIAGEM</span><h2>Documentos do cliente</h2></div><button class="btn btn-light" data-admin-document="${t.id}" data-client-id="${t.clientId}">+ Documento</button></div><p>Passagens, hotel, vouchers, seguro, ingressos e transfer. O ADM cadastra e o cliente consulta no Antes.</p><div class="admin-doc-list">${(d.tripDocuments||[]).filter(x=>x.tripId===t.id).map(x=>`<div><span>${x.type==='Passagem aérea'?'✈️':'📄'}</span><div><b>${x.title}</b><small>${[x.date,x.time,x.terminal&&('Terminal '+x.terminal),x.gate&&('Portão '+x.gate)].filter(Boolean).join(' · ')}</small></div>${x.url?`<button data-external-route="${x.url}">Abrir</button>`:''}</div>`).join('')||'<small>Nenhum documento cadastrado.</small>'}</div></section>
 
  <section class="ipa-admin-panel"><div class="section-head"><div><span class="eyebrow">👥 PARTICIPANTES</span><h2>Quem vai nessa viagem?</h2></div><button class="btn btn-light" data-admin-add-participant="${t.id}">+ Participante</button></div>
