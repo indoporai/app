@@ -198,10 +198,12 @@ async function computeRoadRoute(request,env){
  return json({ok:true,distanceMeters:route.distanceMeters||0,duration:route.duration||"",encodedPolyline:route.polyline?.encodedPolyline||""});
 }
 
-function whatsappContact(env){
+function whatsappContact(request,env){
   const raw=String(env.WHATSAPP_NUMBER||"").replace(/\D/g,"");
   if(!raw)return json({ok:false,error:"WHATSAPP_NUMBER não configurado no Cloudflare."},500);
-  const message=encodeURIComponent("Olá! Vim pelo app Indo por Aí e quero planejar minha próxima viagem.");
+  const u=new URL(request.url);
+  const custom=(u.searchParams.get("text")||"").slice(0,4000);
+  const message=encodeURIComponent(custom||"Olá! Vim pelo app Indo por Aí e quero planejar minha próxima viagem.");
   return json({ok:true,url:`https://wa.me/${raw}?text=${message}`});
 }
 
@@ -213,7 +215,7 @@ export default {
       if(!env.GOOGLE_MAPS_BROWSER_KEY)return json({ok:false,error:"GOOGLE_MAPS_BROWSER_KEY não configurada."},500);
       return json({ok:true,key:env.GOOGLE_MAPS_BROWSER_KEY});
     }
-    if (url.pathname === "/api/contact/whatsapp" && request.method === "GET") return whatsappContact(env);
+    if (url.pathname === "/api/contact/whatsapp" && request.method === "GET") return whatsappContact(request,env);
     if (url.pathname === "/api/places/search" && request.method === "GET") return googlePlaceSearch(request,env);
     if (url.pathname === "/api/routes/compute" && request.method === "POST") return computeRoadRoute(request,env);
     if (url.pathname === "/api/live/create" && request.method === "POST") return createLiveRoom(env);
