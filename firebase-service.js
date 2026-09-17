@@ -580,7 +580,7 @@ window.IPAFirebase = {
   async sendClientInvite(email,clientId,tripId=""){
     if(!currentUser || currentUser.uid!==ADMIN_UID) throw new Error("Entre como administrador.");
     if(!email) throw new Error("Cliente sem e-mail cadastrado.");
-    const url=new URL("https://app-ci8.pages.dev/");
+    const url=new URL("https://app.indoporaicomagente.com/");
     url.searchParams.set("clientInvite","1");
     if(clientId) url.searchParams.set("clientId",clientId);
     if(tripId) url.searchParams.set("tripId",tripId);
