@@ -339,15 +339,9 @@ async function loadClientExperience(){
     }
   }
 
-  // Convite com tripId é estrito: nunca abre uma viagem antiga como fallback.
-  if(inviteContext.tripId && !chosenTrip){
-    status="client-no-trip";
-    lastError="O link desta viagem não é mais válido ou a viagem ainda não foi publicada.";
-    notify("ipa-client-experience-ready");
-    return null;
-  }
-
-  // Sem tripId no link (acesso geral), aí sim usa a viagem ativa.
+  // Se o link trouxer um tripId antigo/inválido, não deixa o cliente em uma tela vazia.
+  // A fonte de verdade passa a ser também a viagem ativa vinculada ao cadastro do cliente.
+  // Isso é importante quando o acesso foi aprovado antes da viagem final ser criada/publicada.
   if(!chosenTrip){
     const fallbackId=client.activeTripId||client.lastInvitedTripId||"";
     if(fallbackId){
@@ -443,7 +437,7 @@ async function loadClientExperience(){
   // Limpa a URL somente DEPOIS de a viagem ter sido resolvida.
   try{
     const clean=new URL(window.location.href);
-    ["mode","oobCode","apiKey","lang","clientInvite","clientId","tripId","continueUrl","continue_url"]
+    ["mode","oobCode","apiKey","lang","clientInvite","clientId","tripId","ipaInvite","continueUrl","continue_url"]
       .forEach(k=>clean.searchParams.delete(k));
     history.replaceState({},document.title,clean.pathname+(clean.searchParams.toString()?("?"+clean.searchParams.toString()):""));
   }catch(e){}
