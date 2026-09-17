@@ -469,6 +469,32 @@ function bind(){
    render();
  });
 
+ document.querySelectorAll('[data-admin-link-client]').forEach(b=>b.onclick=async()=>{
+   const tripId=b.dataset.adminLinkClient;
+   const d=adminData();
+   const trip=d.trips.find(t=>t.id===tripId);
+   const select=document.querySelector(`[data-trip-client-select="${tripId}"]`);
+   const clientId=select?.value||'';
+   if(!trip){toast('Viagem não encontrada');return}
+   if(!clientId){toast('Selecione um cliente cadastrado');return}
+   const client=d.clients.find(c=>c.id===clientId);
+   if(!client){toast('Cliente não encontrado');return}
+   const previousClientId=trip.clientId||'';
+   IPAData.updateTrip(tripId,{clientId,linkedClientAt:new Date().toISOString()});
+   // Mantém a viagem como fonte de verdade e prepara o acesso do cliente selecionado.
+   IPAData.updateClientById(clientId,{activeTripId:tripId,lastConfiguredTripId:tripId});
+   // Se a viagem saiu de outro cliente, não deixe o antigo apontando para ela.
+   if(previousClientId&&previousClientId!==clientId){
+     const previous=d.clients.find(c=>c.id===previousClientId);
+     if(previous?.activeTripId===tripId) IPAData.updateClientById(previousClientId,{activeTripId:''});
+     if(previous?.lastConfiguredTripId===tripId) IPAData.updateClientById(previousClientId,{lastConfiguredTripId:''});
+     if(previous?.lastInvitedTripId===tripId) IPAData.updateClientById(previousClientId,{lastInvitedTripId:''});
+   }
+   try{if(window.IPAFirebase?.user)await window.IPAFirebase.syncNow()}catch(e){console.error(e);toast('Vínculo salvo localmente, mas a sincronização ficou pendente');return}
+   view.innerHTML=adminTripEditor(tripId);bind();
+   toast(`Viagem vinculada a ${client.name} ✓`);
+ });
+
  document.querySelectorAll('[data-admin-plan]').forEach(b=>b.onclick=async()=>{
    const plan=b.dataset.adminPlan;
    IPAData.applyPlanPreset(adminTripId,plan);
@@ -1447,6 +1473,10 @@ function adminTripEditor(id){
  const labels={itinerary:'Roteiro',documents:'Documentos',luggage:'Mala inteligente',checkin:'Check-in',preboardingSupport:'Suporte pré-embarque',bookingSupport:'Hotel & passagens',concierge:'Concierge',exchange:'Câmbio / Exchange',payments:'Pagamentos',community:'Comunidade',live:'Live',album:'Álbum',movie:'Filme',passport:'Passaporte',groupManagement:'Gestão de grupos'};
  const country=tripCountry(t),flag=countryFlag(country);
  return `<div class="ipa-admin-editor-head"><button data-admin-section="trips">← Viagens</button><div><span class="eyebrow">${c?.name||'CLIENTE'}</span><h1>${flag} ${t.name}</h1><p>${tripDestination(t)}, ${country}</p></div><button class="btn btn-light" data-client-preview="${t.id}" data-client-preview-client="${t.clientId}">👁 Ver como cliente</button></div>
+ <section class="ipa-admin-panel"><div class="section-head"><div><span class="eyebrow">👤 CLIENTE DA VIAGEM</span><h2>Vincular cliente cadastrado</h2></div>${c?`<span class="chip">✓ ${c.name}</span>`:`<span class="chip">Sem cliente</span>`}</div>
+ <p>Selecione quem receberá esta viagem. O vínculo é salvo no Firebase e passa a ser usado na prévia, publicação e envio do acesso.</p>
+ <div class="admin-trip-fields"><label>Cliente<select data-trip-client-select="${t.id}"><option value="">Selecione um cliente...</option>${(d.clients||[]).map(client=>`<option value="${client.id}" ${client.id===t.clientId?'selected':''}>${client.name}${client.email?' · '+client.email:''}${client.approvalStatus?' · '+client.approvalStatus:''}</option>`).join('')}</select></label><button class="btn btn-primary" data-admin-link-client="${t.id}">${c?'Alterar vínculo':'Vincular cliente'}</button></div>
+ ${!c?`<small>⚠️ Vincule um cliente antes de publicar/enviar o acesso.</small>`:''}</section>
  <section class="ipa-admin-panel"><div class="section-head"><div><span class="eyebrow">VIAGEM</span><h2>Destino e pacote</h2></div><b class="ipa-plan">${t.plan}</b></div>
  <div class="admin-trip-fields"><label>Destino<input id="editTripDestination" value="${tripDestination(t)}"></label><label>País<input id="editTripCountry" value="${country}"></label><button class="btn btn-light" data-admin-save-destination="${t.id}">Salvar destino</button></div>
  <div class="ipa-admin-plan-grid">${['Explore','Signature','Elite','Groups'].map(p=>`<button data-admin-plan="${p}" class="${t.plan===p?'active':''}"><b>${p}</b><small>${p==='Explore'?'Roteiro + app':p==='Signature'?'Pré-embarque + compras':p==='Elite'?'Experiência completa':'Grandes grupos'}</small></button>`).join('')}</div>
