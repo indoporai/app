@@ -1,11 +1,9 @@
-# Indo por Aí — Roteiro + Descobertas + Instagram
+# Indo por Aí — Beta 6.29.1
 
-Mantém o Modelo Ideal aprovado e adiciona:
-- avaliações e recomendações no roteiro;
-- Descobertas pelo Caminho;
-- Escolha Indo por Aí, Vale uma parada e Joia escondida;
-- distância, desvio, preço e avaliações;
-- inclusão de paradas no roteiro;
-- rodapé com @indo.por.ai.com.a.gente.
+Base: Beta 6.29.0 limpa para GitHub.
 
-Suba todos os arquivos para a raiz do GitHub, incluindo `_headers`.
+Correção cirúrgica de layout no ADM > Pedidos de viagem > Sugestão Interna:
+- separa categoria, nome, interesses e valor;
+- evita sobreposição dos textos;
+- mantém o layout responsivo;
+- nenhuma alteração no motor de sugestão, Firebase, autenticação, viagens ou demais módulos.
