@@ -1,4 +1,4 @@
-const CACHE = "indo-por-ai-v2-beta-6-26-1-clean";
+const CACHE = "indo-por-ai-v2-beta-6-28-8-pwa-install";
 const CORE = [
   "./",
   "index.html",
@@ -11,6 +11,7 @@ const CORE = [
   "admin.js",
   "admin.css",
   "manifest.webmanifest",
+  "pwa-install.js?v=v2-beta-6-28-8",
   "assets/apple-touch-icon.png",
   "assets/icon-192.png",
   "assets/icon-512.png"

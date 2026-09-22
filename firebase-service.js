@@ -8,7 +8,9 @@ import {
   browserLocalPersistence,
   sendSignInLinkToEmail,
   isSignInWithEmailLink,
-  signInWithEmailLink
+  signInWithEmailLink,
+  updatePassword,
+  sendPasswordResetEmail
 } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-auth.js";
 import {
   getFirestore,
@@ -479,6 +481,14 @@ onAuthStateChanged(auth,async user=>{
   }
 
   if(user.uid!==ADMIN_UID){
+    // No primeiro acesso pelo convite, o cliente precisa criar uma senha
+    // antes de entrar definitivamente na experiência.
+    if(isSignInWithEmailLink(auth,window.location.href) || sessionStorage.getItem("ipa-client-password-setup")==="1"){
+      status="client-password-setup";
+      lastError="";
+      notify("ipa-client-password-setup");
+      return;
+    }
     try{
       await loadClientExperience();
       notify("ipa-firebase-ready");
@@ -574,6 +584,34 @@ window.IPAFirebase = {
       throw err;
     }
   },
+  async clientLogin(email,password){
+    status="client-signing-in"; lastError="";
+    const credential=await signInWithEmailAndPassword(auth,String(email||"").trim().toLowerCase(),password);
+    currentUser=credential.user;
+    if(currentUser.uid===ADMIN_UID){
+      await signOut(auth); currentUser=null;
+      throw new Error("Use o acesso ADM para esta conta.");
+    }
+    await loadClientExperience();
+    return credential.user;
+  },
+  async setClientPassword(password){
+    if(!currentUser || currentUser.uid===ADMIN_UID) throw new Error("Acesso de cliente não autenticado.");
+    if(String(password||"").length<6) throw new Error("A senha precisa ter pelo menos 6 caracteres.");
+    await updatePassword(currentUser,password);
+    sessionStorage.removeItem("ipa-client-password-setup");
+    // Remove os parâmetros do link mágico sem trocar o domínio/rota do app.
+    history.replaceState({},document.title,window.location.pathname);
+    await loadClientExperience();
+    notify("ipa-client-experience-ready");
+    return true;
+  },
+  async resetClientPassword(email){
+    const normalized=String(email||"").trim().toLowerCase();
+    if(!normalized) throw new Error("Informe seu e-mail.");
+    await sendPasswordResetEmail(auth,normalized,{url:"https://app.indoporaicomagente.com/"});
+    return true;
+  },
   async logout(){
     await signOut(auth);
   },
@@ -603,8 +641,11 @@ window.IPAFirebase = {
     if(context.tripId)localStorage.setItem("ipa-trip-id-for-signin",context.tripId);
     email=(email||localStorage.getItem("ipa-email-for-signin")||"").trim().toLowerCase();
     if(!email) throw new Error("Confirme o e-mail que recebeu o convite.");
+    sessionStorage.setItem("ipa-client-password-setup","1");
     const user=(await signInWithEmailLink(auth,email,window.location.href)).user;
     localStorage.removeItem("ipa-email-for-signin");
+    status="client-password-setup";
+    notify("ipa-client-password-setup");
     return user;
   },
   async loadClientExperience(){

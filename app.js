@@ -1128,6 +1128,18 @@ function openPlanDetails(plan){
      <button class="btn btn-primary btn-block" data-choose-prospect-plan="${plan}">Quero este plano</button>
    </div>
   </div>`);
+ // O CTA deste modal é criado dinamicamente; vincula o plano no momento em que o modal abre.
+ // Assim, "Quero este plano" sempre leva o pacote escolhido para o formulário.
+ setTimeout(()=>{
+   const choose=document.querySelector(`[data-choose-prospect-plan="${plan}"]`);
+   if(!choose)return;
+   choose.onclick=()=>{
+     ipaProspectPlan=plan;
+     modal.close();
+     showModal(ipaPlannerForm(ipaProspectPlan));
+     setTimeout(()=>ipaBindProspectForm(),0);
+   };
+ },0);
 }
 
 
@@ -1990,6 +2002,21 @@ async function handlePhotos(e){
  state.mode='after';state.route='memories';localStorage.removeItem('ipa-memory-prompt');e.target.value='';render();
 }
 function showModal(html){modalContent.innerHTML=html;modal.showModal();setTimeout(()=>{modalContent.querySelectorAll('[data-map]').forEach(b=>b.onclick=()=>window.open('https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(b.dataset.map),'_blank'));modalContent.querySelectorAll('[data-profile]').forEach(b=>b.onclick=()=>{modal.close();setProfile(b.dataset.profile)})},0)}
+function showClientLogin(){
+ document.body.classList.add('hidden-nav');
+ view.innerHTML=`<section class="scenario-entry"><div class="scenario-entry-brand"><span class="eyebrow">JÁ SOU CLIENTE</span><h1>Acesse sua viagem</h1><p>Entre com o mesmo e-mail cadastrado no Indo por Aí e sua senha.</p></div><div class="card" style="padding:22px"><label>E-mail</label><input id="clientLoginEmail" class="v2-concierge-input" type="email" autocomplete="email" placeholder="seu@email.com"><label style="margin-top:12px">Senha</label><input id="clientLoginPassword" class="v2-concierge-input" type="password" autocomplete="current-password" placeholder="Sua senha"><button class="btn btn-primary btn-block" id="clientLoginBtn" style="margin-top:16px">Entrar</button><button class="btn btn-light btn-block" id="clientForgotBtn" style="margin-top:8px">Esqueci minha senha</button><button class="btn btn-light btn-block" id="clientLoginBack" style="margin-top:8px">← Voltar</button><small id="clientLoginStatus" style="display:block;margin-top:10px"></small></div></section>`;
+ const email=document.querySelector('#clientLoginEmail'),pass=document.querySelector('#clientLoginPassword'),btn=document.querySelector('#clientLoginBtn'),statusEl=document.querySelector('#clientLoginStatus');
+ btn.onclick=async()=>{if(!email.value||!pass.value){statusEl.textContent='Informe e-mail e senha.';return}btn.disabled=true;btn.textContent='Entrando...';statusEl.textContent='';try{await window.IPAFirebase.clientLogin(email.value,pass.value);state.scenarioChosen=true;state.profile='client';state.mode='before';state.route='today';document.body.classList.remove('hidden-nav');render()}catch(e){console.error(e);statusEl.textContent='Não foi possível entrar. Confira seu e-mail e senha.';btn.disabled=false;btn.textContent='Entrar'}};
+ document.querySelector('#clientForgotBtn').onclick=async()=>{if(!email.value){statusEl.textContent='Digite seu e-mail primeiro.';return}try{await window.IPAFirebase.resetClientPassword(email.value);statusEl.textContent='Enviamos um e-mail para redefinir sua senha.'}catch(e){console.error(e);statusEl.textContent='Não foi possível enviar a redefinição agora.'}};
+ document.querySelector('#clientLoginBack').onclick=()=>showInitialScenario();
+}
+function showClientPasswordSetup(){
+ document.body.classList.add('hidden-nav');
+ const email=window.IPAFirebase?.user?.email||'';
+ view.innerHTML=`<section class="scenario-entry"><div class="scenario-entry-brand"><span class="eyebrow">PRIMEIRO ACESSO</span><h1>Crie sua senha</h1><p>Seu e-mail <b>${ipaEscape(email)}</b> será seu login para acessar o Indo por Aí sempre que quiser.</p></div><div class="card" style="padding:22px"><label>Crie uma senha</label><input id="clientNewPassword" class="v2-concierge-input" type="password" autocomplete="new-password" placeholder="Mínimo de 6 caracteres"><label style="margin-top:12px">Confirme a senha</label><input id="clientConfirmPassword" class="v2-concierge-input" type="password" autocomplete="new-password" placeholder="Repita a senha"><button class="btn btn-primary btn-block" id="clientCreatePasswordBtn" style="margin-top:16px">Criar senha e entrar</button><small id="clientPasswordStatus" style="display:block;margin-top:10px"></small></div></section>`;
+ const p1=document.querySelector('#clientNewPassword'),p2=document.querySelector('#clientConfirmPassword'),btn=document.querySelector('#clientCreatePasswordBtn'),st=document.querySelector('#clientPasswordStatus');
+ btn.onclick=async()=>{if(p1.value.length<6){st.textContent='A senha precisa ter pelo menos 6 caracteres.';return}if(p1.value!==p2.value){st.textContent='As senhas não conferem.';return}btn.disabled=true;btn.textContent='Criando acesso...';try{await window.IPAFirebase.setClientPassword(p1.value);state.scenarioChosen=true;state.profile='client';state.mode='before';state.route='today';document.body.classList.remove('hidden-nav');render()}catch(e){console.error(e);st.textContent='Não foi possível criar a senha. Tente novamente.';btn.disabled=false;btn.textContent='Criar senha e entrar'}};
+}
 function showInitialScenario(){
  document.body.classList.add('hidden-nav');
  if(typeof topTitle!=='undefined' && topTitle) topTitle.textContent='Indo por Aí';
@@ -2017,7 +2044,7 @@ function showInitialScenario(){
        render();
        return;
      }
-     if(s==='client') document.body.classList.remove('hidden-nav');
+     if(s==='client'){ showClientLogin(); return; }
      setProfile(s);
    };
  });
@@ -2084,8 +2111,7 @@ async function handleClientEmailInvite(){
    view.innerHTML=`<section class="client-login-loading"><span>✈️</span><h2>Preparando sua viagem...</h2><p>Estamos carregando sua experiência personalizada.</p></section>`;
 
    await window.IPAFirebase.completeEmailLink(email);
-
-   // onAuthStateChanged fará o vínculo e carregará a experiência.
+   showClientPasswordSetup();
    return true;
  }catch(err){
    console.error(err);
@@ -2096,6 +2122,7 @@ async function handleClientEmailInvite(){
  }
 }
 window.addEventListener('ipa-firebase-service-loaded',()=>{handleClientEmailInvite()});
+window.addEventListener('ipa-client-password-setup',()=>{if(window.IPAFirebase?.user)showClientPasswordSetup()});
 
 if(!(window.IPAFirebase?.isEmailSignInLink?.())){
   // O Firebase é módulo e pode ainda não ter carregado neste ponto.
