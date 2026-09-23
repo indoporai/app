@@ -1,4 +1,4 @@
-const CACHE = "indo-por-ai-v2-beta-6-28-8-pwa-install";
+const CACHE = "indo-por-ai-v2-beta-6-29-2-pix-real";
 const CORE = [
   "./",
   "index.html",

@@ -7,127 +7,123 @@ const json = (data, status = 200) =>
     }
   });
 
-function extractPix(order) {
-  const payment = order?.transactions?.payments?.[0] || {};
-  const method = payment?.payment_method || {};
+function extractPixPayment(payment) {
+  const tx = payment?.point_of_interaction?.transaction_data || {};
   return {
-    orderId: order?.id || "",
-    orderStatus: order?.status || "",
-    orderStatusDetail: order?.status_detail || "",
-    paymentId: payment?.id || "",
+    paymentId: String(payment?.id || ""),
     paymentStatus: payment?.status || "",
     paymentStatusDetail: payment?.status_detail || "",
-    ticketUrl: method?.ticket_url || "",
-    qrCode: method?.qr_code || "",
-    qrCodeBase64: method?.qr_code_base64 || method?.qr_code_based64 || ""
+    externalReference: payment?.external_reference || "",
+    ticketUrl: tx?.ticket_url || "",
+    qrCode: tx?.qr_code || "",
+    qrCodeBase64: tx?.qr_code_base64 || "",
+    dateOfExpiration: payment?.date_of_expiration || ""
   };
 }
 
 async function mercadoPagoFetch(env, path, init = {}) {
   const token = env.MERCADO_PAGO_ACCESS_TOKEN;
   if (!token) {
-    return {
-      ok: false,
-      response: json({
-        ok: false,
-        error: "MERCADO_PAGO_ACCESS_TOKEN não configurado no Cloudflare."
-      }, 500)
-    };
+    return { ok:false, response:json({ok:false,error:"MERCADO_PAGO_ACCESS_TOKEN não configurado no Cloudflare."},500) };
   }
-
   const response = await fetch(`https://api.mercadopago.com${path}`, {
     ...init,
-    headers: {
-      "accept": "application/json",
-      "content-type": "application/json",
-      "authorization": `Bearer ${token}`,
+    headers:{
+      "accept":"application/json",
+      "content-type":"application/json",
+      "authorization":`Bearer ${token}`,
       ...(init.headers || {})
     }
   });
-
-  let body;
-  try { body = await response.json(); }
-  catch { body = { message: await response.text() }; }
-
-  if (!response.ok) {
-    return {
-      ok: false,
-      response: json({
-        ok: false,
-        status: response.status,
-        error: body?.message || body?.error || "Erro Mercado Pago",
-        details: body
-      }, response.status)
-    };
+  let body={};
+  try { body=await response.json(); } catch { body={message:await response.text()}; }
+  if(!response.ok){
+    return {ok:false,response:json({ok:false,status:response.status,error:body?.message||body?.error||"Erro Mercado Pago",details:body},response.status)};
   }
-
-  return { ok: true, body };
+  return {ok:true,body};
 }
 
-async function createTestPix(request, env) {
-  let payload = {};
-  try { payload = await request.json(); }
-  catch { return json({ ok:false, error:"JSON inválido." }, 400); }
+function onlyDigits(value){ return String(value||"").replace(/\D/g,""); }
+function validEmail(value){ return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value||"").trim()); }
 
-  const reference = String(payload.paymentId || "").trim();
-  if (!reference) return json({ ok:false, error:"paymentId obrigatório." }, 400);
+async function stableIdempotency(reference){
+  const bytes=new TextEncoder().encode(reference);
+  const digest=new Uint8Array(await crypto.subtle.digest("SHA-256",bytes));
+  const hex=[...digest].map(b=>b.toString(16).padStart(2,"0")).join("").slice(0,32);
+  return `${hex.slice(0,8)}-${hex.slice(8,12)}-4${hex.slice(13,16)}-a${hex.slice(17,20)}-${hex.slice(20,32)}`;
+}
 
-  // Mercado Pago exige valores/dados predefinidos no teste de Pix via Orders.
-  const amount = "50.00";
-  const idempotency = crypto.randomUUID();
+async function createProductionPix(request, env) {
+  let payload={};
+  try { payload=await request.json(); } catch { return json({ok:false,error:"JSON inválido."},400); }
+  const reference=String(payload.paymentId||"").trim();
+  const amount=Number(payload.amount||0);
+  const email=String(payload.payerEmail||"").trim().toLowerCase();
+  const cpf=onlyDigits(payload.payerCpf);
+  const description=String(payload.description||"Cobrança Indo por Aí").trim().slice(0,120);
+  if(!reference)return json({ok:false,error:"paymentId obrigatório."},400);
+  if(!Number.isFinite(amount)||amount<=0)return json({ok:false,error:"Valor da cobrança inválido."},400);
+  if(!validEmail(email))return json({ok:false,error:"Informe um e-mail válido para o pagador."},400);
+  if(cpf.length!==11)return json({ok:false,error:"Informe um CPF válido com 11 dígitos."},400);
 
-  const orderPayload = {
-    type: "online",
-    external_reference: `indoporai_${reference}_${Date.now()}`,
-    total_amount: amount,
-    processing_mode: "automatic",
-    payer: {
-      email: "test_user_br@testuser.com",
-      first_name: "APRO"
-    },
-    transactions: {
-      payments: [{
-        amount,
-        payment_method: {
-          id: "pix",
-          type: "bank_transfer"
-        }
-      }]
-    }
+  const externalReference=`indoporai_${reference}`;
+  const idempotency=await stableIdempotency(`${externalReference}|${amount.toFixed(2)}|${email}`);
+  const body={
+    transaction_amount:Math.round(amount*100)/100,
+    description,
+    payment_method_id:"pix",
+    external_reference:externalReference,
+    notification_url:"https://app.indoporaicomagente.com/api/webhooks/mercadopago",
+    payer:{email,identification:{type:"CPF",number:cpf}}
   };
-
-  const result = await mercadoPagoFetch(env, "/v1/orders", {
-    method: "POST",
-    headers: { "X-Idempotency-Key": idempotency },
-    body: JSON.stringify(orderPayload)
+  const result=await mercadoPagoFetch(env,"/v1/payments",{
+    method:"POST",
+    headers:{"X-Idempotency-Key":idempotency},
+    body:JSON.stringify(body)
   });
-
-  if (!result.ok) return result.response;
-
-  return json({
-    ok: true,
-    environment: "test",
-    testAmount: 50,
-    ...extractPix(result.body)
-  });
+  if(!result.ok)return result.response;
+  return json({ok:true,environment:"production",amount,...extractPixPayment(result.body)});
 }
 
 async function getPixStatus(url, env) {
-  const orderId = url.searchParams.get("orderId");
-  if (!orderId) return json({ ok:false, error:"orderId obrigatório." }, 400);
+  const paymentId=url.searchParams.get("paymentId");
+  if(!paymentId)return json({ok:false,error:"paymentId obrigatório."},400);
+  const result=await mercadoPagoFetch(env,`/v1/payments/${encodeURIComponent(paymentId)}`,{method:"GET"});
+  if(!result.ok)return result.response;
+  return json({ok:true,environment:"production",...extractPixPayment(result.body)});
+}
 
-  const result = await mercadoPagoFetch(
-    env,
-    `/v1/orders/${encodeURIComponent(orderId)}`,
-    { method: "GET" }
-  );
-  if (!result.ok) return result.response;
+async function verifyMpWebhook(request,url,env){
+  const secret=String(env.MERCADO_PAGO_WEBHOOK_SECRET||"").trim();
+  if(!secret)return {ok:true,setup:true};
+  const signature=request.headers.get("x-signature")||"";
+  const requestId=request.headers.get("x-request-id")||"";
+  const parts=Object.fromEntries(signature.split(",").map(x=>x.trim().split("=")));
+  const ts=parts.ts||"",v1=parts.v1||"";
+  const dataId=String(url.searchParams.get("data.id")||url.searchParams.get("data_id")||"").toLowerCase();
+  if(!ts||!v1||!requestId||!dataId)return {ok:false};
+  const template=`id:${dataId};request-id:${requestId};ts:${ts};`;
+  const key=await crypto.subtle.importKey("raw",new TextEncoder().encode(secret),{name:"HMAC",hash:"SHA-256"},false,["sign"]);
+  const signed=new Uint8Array(await crypto.subtle.sign("HMAC",key,new TextEncoder().encode(template)));
+  const hex=[...signed].map(b=>b.toString(16).padStart(2,"0")).join("");
+  return {ok:hex===v1};
+}
 
-  return json({
-    ok: true,
-    environment: "test",
-    ...extractPix(result.body)
-  });
+async function mercadoPagoWebhook(request,url,env){
+  const verified=await verifyMpWebhook(request,url,env);
+  if(!verified.ok)return json({ok:false,error:"Assinatura inválida."},401);
+  let body={}; try{body=await request.json()}catch{}
+  const type=String(url.searchParams.get("type")||body?.type||"");
+  const dataId=String(url.searchParams.get("data.id")||body?.data?.id||"");
+  // A fonte de verdade continua sendo a API do Mercado Pago; o app consulta o ID recebido.
+  if(type==="payment"&&dataId){
+    const result=await mercadoPagoFetch(env,`/v1/payments/${encodeURIComponent(dataId)}`,{method:"GET"});
+    if(result.ok){
+      const p=extractPixPayment(result.body);
+      return json({ok:true,received:true,status:p.paymentStatus,externalReference:p.externalReference,setup:!!verified.setup});
+    }
+  }
+  return json({ok:true,received:true,setup:!!verified.setup});
 }
 
 
@@ -223,12 +219,16 @@ export default {
     if (url.pathname === "/api/live/create" && request.method === "POST") return createLiveRoom(env);
     if (url.pathname === "/api/live/join" && request.method === "POST") return joinLiveRoom(request,env);
 
-    if (url.pathname === "/api/pix/create" && request.method === "POST") {
-      return createTestPix(request, env);
+    if ((url.pathname === "/api/payments/pix" || url.pathname === "/api/pix/create") && request.method === "POST") {
+      return createProductionPix(request, env);
     }
 
-    if (url.pathname === "/api/pix/status" && request.method === "GET") {
+    if ((url.pathname === "/api/payments/pix/status" || url.pathname === "/api/pix/status") && request.method === "GET") {
       return getPixStatus(url, env);
+    }
+
+    if (url.pathname === "/api/webhooks/mercadopago" && request.method === "POST") {
+      return mercadoPagoWebhook(request, url, env);
     }
 
     // Mantém todo o aplicativo estático funcionando normalmente.

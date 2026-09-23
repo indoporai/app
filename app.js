@@ -1181,138 +1181,103 @@ function simulatePayment(payload){
    <p class="payment-safe">Cartão real será conectado em uma próxima etapa.</p>`);
 }
 
-async function createMercadoPagoPix(payment){
- showModal(`<div class="pix-real-loading"><span>◈</span><h2>Gerando Pix de teste...</h2><p>Conectando com o Mercado Pago de forma segura.</p></div>`);
- try{
-   const response=await fetch('/api/pix/create',{
-     method:'POST',
-     headers:{'Content-Type':'application/json'},
-     body:JSON.stringify({
-       paymentId:payment.id,
-       requestedAmount:Number(payment.amount||0)
-     })
-   });
-   const result=await response.json().catch(()=>({}));
-   if(!response.ok||!result.ok){
-     throw new Error(result?.error||result?.details?.message||`Erro ${response.status}`);
-   }
-
-   IPAData.updatePayment(payment.id,{
-     mpOrderId:result.orderId,
-     mpPaymentId:result.paymentId,
-     mpStatus:result.paymentStatus||result.orderStatus,
-     paymentEnvironment:'test'
-   });
-
-   showPixResult(payment,result);
- }catch(err){
-   console.error('Mercado Pago PIX',err);
-   showModal(`<span class="eyebrow">PIX · Mercado Pago</span><h2>Não conseguimos gerar o Pix</h2>
-     <div class="payment-error-box">${String(err?.message||err)}</div>
-     <p>Confira se a Beta 6.9 foi publicada depois da criação do Secret <b>MERCADO_PAGO_ACCESS_TOKEN</b>.</p>
-     <button class="btn btn-light btn-block" onclick="modal.close()">Fechar</button>`);
- }
+function currentPaymentClient(){
+ const d=ipaDB();
+ const activeClientId=localStorage.getItem('ipa-active-client-id');
+ const trip=activeTrip();
+ return (d?.clients||[]).find(c=>c.id===activeClientId)
+   ||(d?.clients||[]).find(c=>trip?.clientId&&c.id===trip.clientId)
+   ||d?.client||{};
 }
 
-function showPixResult(payment,result){
- const qrImage=result.qrCodeBase64
-   ? `<img class="pix-real-qr" alt="QR Code Pix" src="data:image/png;base64,${result.qrCodeBase64}">`
-   : `<div class="pix-real-qr-placeholder">PIX<br><small>QR indisponível no teste</small></div>`;
-
+function createMercadoPagoPix(payment){
+ const client=currentPaymentClient();
+ const safeEmail=String(client?.email||'').replace(/"/g,'&quot;');
  showModal(`<div class="pix-real-modal">
    <span class="eyebrow">PIX · MERCADO PAGO</span>
-   <div class="payment-test-badge">AMBIENTE DE TESTE</div>
-   <h2>Pix criado com sucesso</h2>
-   <p class="pix-original-charge">Cobrança no Indo por Aí: <b>${brl(payment.amount)}</b></p>
-   <div class="pix-test-warning">O Mercado Pago exige <b>R$ 50,00</b> na compra Pix de teste. Nenhum valor real será movimentado.</div>
-   ${qrImage}
-   ${result.qrCode?`<label class="pix-copy-label">Pix Copia e Cola</label><div class="pix-copy-row"><textarea id="pixCopyCode" readonly>${result.qrCode}</textarea><button data-copy-pix>Copiar</button></div>`:''}
-   ${result.ticketUrl?`<button class="btn btn-primary btn-block" data-open-pix-ticket="${result.ticketUrl}">Abrir Pix de teste</button>`:''}
-   <button class="btn btn-light btn-block" data-check-pix="${payment.id}:${result.orderId}">Verificar pagamento</button>
-   <small class="pix-order-id">Order: ${result.orderId}</small>
+   <h2>Gerar Pix</h2>
+   <p>Você vai gerar uma cobrança real de <b>${brl(payment.amount)}</b>.</p>
+   <div class="form-grid">
+    <label>E-mail do pagador<input id="pixPayerEmail" type="email" value="${safeEmail}" autocomplete="email"></label>
+    <label>CPF do pagador<input id="pixPayerCpf" inputmode="numeric" maxlength="14" placeholder="000.000.000-00"></label>
+   </div>
+   <p class="payment-safe">🔒 O CPF é enviado diretamente ao Mercado Pago para gerar esta cobrança e não é salvo pelo Indo por Aí.</p>
+   <button class="btn btn-primary btn-block" id="generateRealPix">Gerar Pix de ${brl(payment.amount)}</button>
+   <button class="btn btn-light btn-block" onclick="modal.close()">Cancelar</button>
  </div>`);
-
  setTimeout(()=>{
-   document.querySelectorAll('[data-copy-pix]').forEach(b=>b.onclick=async()=>{
-     const code=document.querySelector('#pixCopyCode')?.value||'';
-     try{await navigator.clipboard.writeText(code);toast('Pix copiado ✓')}
-     catch{toast('Selecione e copie o código')}
-   });
-   document.querySelectorAll('[data-open-pix-ticket]').forEach(b=>b.onclick=()=>window.open(b.dataset.openPixTicket,'_blank'));
-   document.querySelectorAll('[data-check-pix]').forEach(b=>b.onclick=()=>{
-     const [paymentId,orderId]=b.dataset.checkPix.split(':');
-     checkMercadoPagoPix(paymentId,orderId,b);
-   });
+   const b=document.querySelector('#generateRealPix'); if(!b)return;
+   b.onclick=()=>generateRealPix(payment,b);
  },0);
 }
 
-async function checkMercadoPagoPix(paymentId,orderId,button){
- const original=button.textContent;
- button.disabled=true;button.textContent='Consultando...';
+async function generateRealPix(payment,button){
+ const email=document.querySelector('#pixPayerEmail')?.value?.trim()||'';
+ const cpf=(document.querySelector('#pixPayerCpf')?.value||'').replace(/\D/g,'');
+ if(!email||!email.includes('@'))return toast('Informe o e-mail do pagador');
+ if(cpf.length!==11)return toast('Informe o CPF com 11 dígitos');
+ button.disabled=true;button.textContent='Gerando Pix...';
  try{
-   const response=await fetch(`/api/pix/status?orderId=${encodeURIComponent(orderId)}`,{cache:'no-store'});
+   const response=await fetch('/api/payments/pix',{
+     method:'POST',headers:{'Content-Type':'application/json'},
+     body:JSON.stringify({paymentId:payment.id,amount:Number(payment.amount||0),description:payment.title||payment.description||'Cobrança Indo por Aí',payerEmail:email,payerCpf:cpf})
+   });
+   const result=await response.json().catch(()=>({}));
+   if(!response.ok||!result.ok)throw new Error(result?.error||result?.details?.message||`Erro ${response.status}`);
+   IPAData.updatePayment(payment.id,{mpPaymentId:result.paymentId,mpStatus:result.paymentStatus,mpStatusDetail:result.paymentStatusDetail,paymentEnvironment:'production',pixCreatedAt:new Date().toISOString()});
+   if(window.IPAFirebase?.user)await window.IPAFirebase.syncNow().catch(()=>{});
+   showPixResult(payment,result);
+ }catch(err){
+   console.error('Mercado Pago PIX',err);
+   showModal(`<span class="eyebrow">PIX · Mercado Pago</span><h2>Não conseguimos gerar o Pix</h2><div class="payment-error-box">${String(err?.message||err)}</div><p>Nenhuma cobrança foi marcada como paga. Confira os dados e tente novamente.</p><button class="btn btn-light btn-block" onclick="modal.close()">Fechar</button>`);
+ }finally{button.disabled=false;}
+}
+
+function showPixResult(payment,result){
+ const qrImage=result.qrCodeBase64?`<img class="pix-real-qr" alt="QR Code Pix" src="data:image/png;base64,${result.qrCodeBase64}">`:`<div class="pix-real-qr-placeholder">PIX<br><small>Use o código abaixo</small></div>`;
+ showModal(`<div class="pix-real-modal">
+   <span class="eyebrow">PIX · MERCADO PAGO</span>
+   <h2>Pix gerado</h2>
+   <p class="pix-original-charge">Valor: <b>${brl(payment.amount)}</b></p>
+   ${qrImage}
+   ${result.qrCode?`<label class="pix-copy-label">Pix Copia e Cola</label><div class="pix-copy-row"><textarea id="pixCopyCode" readonly>${result.qrCode}</textarea><button data-copy-pix>Copiar</button></div>`:''}
+   ${result.ticketUrl?`<button class="btn btn-primary btn-block" data-open-pix-ticket="${result.ticketUrl}">Abrir pagamento Pix</button>`:''}
+   <button class="btn btn-light btn-block" data-check-pix="${payment.id}:${result.paymentId}">Já paguei · verificar</button>
+   <small class="pix-order-id">Pagamento Mercado Pago: ${result.paymentId}</small>
+ </div>`);
+ setTimeout(()=>{
+   document.querySelectorAll('[data-copy-pix]').forEach(b=>b.onclick=async()=>{const code=document.querySelector('#pixCopyCode')?.value||'';try{await navigator.clipboard.writeText(code);toast('Pix copiado ✓')}catch{toast('Selecione e copie o código')}});
+   document.querySelectorAll('[data-open-pix-ticket]').forEach(b=>b.onclick=()=>window.open(b.dataset.openPixTicket,'_blank'));
+   document.querySelectorAll('[data-check-pix]').forEach(b=>b.onclick=()=>{const [paymentId,mpPaymentId]=b.dataset.checkPix.split(':');checkMercadoPagoPix(paymentId,mpPaymentId,b)});
+ },0);
+}
+
+async function checkMercadoPagoPix(paymentId,mpPaymentId,button){
+ const original=button.textContent;button.disabled=true;button.textContent='Consultando...';
+ try{
+   const response=await fetch(`/api/payments/pix/status?paymentId=${encodeURIComponent(mpPaymentId)}`,{cache:'no-store'});
    const result=await response.json().catch(()=>({}));
    if(!response.ok||!result.ok)throw new Error(result?.error||`Erro ${response.status}`);
-
-   const status=String(result.paymentStatus||result.orderStatus||'').toLowerCase();
-   const detail=String(result.paymentStatusDetail||result.orderStatusDetail||'').toLowerCase();
-
-   IPAData.updatePayment(paymentId,{
-     mpStatus:status,
-     mpStatusDetail:detail
-   });
-
+   const status=String(result.paymentStatus||'').toLowerCase(),detail=String(result.paymentStatusDetail||'').toLowerCase();
+   IPAData.updatePayment(paymentId,{mpStatus:status,mpStatusDetail:detail});
    if(['approved','processed','paid'].includes(status)){
-     IPAData.updatePayment(paymentId,{
-       status:'Pago',
-       paidAt:new Date().toISOString().slice(0,10),
-       paymentEnvironment:'test'
-     });
-     showPixStatusModal('approved',status,detail,orderId);
-     return;
+     IPAData.updatePayment(paymentId,{status:'Pago',paidAt:new Date().toISOString().slice(0,10),paymentEnvironment:'production'});
+     if(window.IPAFirebase?.user)await window.IPAFirebase.syncNow().catch(()=>{});
+     showPixStatusModal('approved',status,detail,mpPaymentId);return;
    }
-
-   if(['rejected','cancelled','canceled','expired','failed'].includes(status)){
-     showPixStatusModal('error',status,detail,orderId);
-     return;
-   }
-
-   showPixStatusModal('pending',status,detail,orderId);
- }catch(err){
-   console.error(err);
-   showPixStatusModal('error','erro_consulta',String(err?.message||''),orderId);
- }finally{
-   button.disabled=false;button.textContent=original;
- }
+   if(['rejected','cancelled','canceled','expired','failed'].includes(status)){showPixStatusModal('error',status,detail,mpPaymentId);return;}
+   showPixStatusModal('pending',status,detail,mpPaymentId);
+ }catch(err){console.error(err);showPixStatusModal('error','erro_consulta',String(err?.message||''),mpPaymentId)}
+ finally{button.disabled=false;button.textContent=original;}
 }
 
-function showPixStatusModal(kind,status,detail,orderId){
- const isApproved=kind==='approved';
- const isError=kind==='error';
- const icon=isApproved?'✓':isError?'!':'⌛';
- const title=isApproved?'Pagamento de teste aprovado':isError?'Não foi possível concluir a verificação':'Aguardando atualização do Mercado Pago';
- const statusLabel=status||'sem status';
- const detailLabel=detail||'sem detalhe';
- const text=isApproved
-   ? 'O Mercado Pago retornou o pagamento como aprovado. A cobrança foi marcada como paga apenas no ambiente de teste.'
-   : isError
-     ? 'A consulta retornou erro, recusa ou expiração. Nenhum pagamento real foi realizado.'
-     : 'A Order existe e está sendo consultada corretamente. No teste oficial de Pix, o Mercado Pago pode iniciar em action_required / waiting_transfer e depois atualizar automaticamente para aprovado. Não faça um Pix real para testar.';
-
- showModal(`<div class="pix-status-card pix-status-${kind}">
-   <div class="pix-status-icon">${icon}</div>
-   <span class="eyebrow">PIX · MERCADO PAGO · TESTE</span>
-   <h2>${title}</h2>
-   <p>${text}</p>
-   <div class="pix-status-grid">
-     <div><small>Status</small><strong>${statusLabel}</strong></div>
-     <div><small>Detalhe</small><strong>${detailLabel}</strong></div>
-   </div>
-   ${!isApproved&&!isError?`<div class="pix-status-help">Você pode aguardar alguns instantes e consultar novamente. O teste é feito pela própria API do Mercado Pago.</div>`:''}
-   <small class="pix-order-id">Order: ${orderId}</small>
-   <button class="btn btn-light btn-block" onclick="modal.close();render()">Voltar</button>
- </div>`);
+function showPixStatusModal(kind,status,detail,paymentId){
+ const ok=kind==='approved',err=kind==='error';
+ const title=ok?'Pagamento confirmado':err?'Não foi possível confirmar':'Aguardando pagamento';
+ const text=ok?'O Mercado Pago confirmou o Pix. A cobrança foi marcada como paga.':err?'O Mercado Pago retornou erro, recusa ou expiração para esta cobrança.':'O Pix ainda está pendente no Mercado Pago. Depois do pagamento, consulte novamente.';
+ showModal(`<div class="pix-status-card pix-status-${kind}"><div class="pix-status-icon">${ok?'✓':err?'!':'⌛'}</div><span class="eyebrow">PIX · MERCADO PAGO</span><h2>${title}</h2><p>${text}</p><div class="pix-status-grid"><div><small>Status</small><strong>${status||'sem status'}</strong></div><div><small>Detalhe</small><strong>${detail||'sem detalhe'}</strong></div></div><small class="pix-order-id">Pagamento: ${paymentId}</small><button class="btn btn-light btn-block" onclick="modal.close();render()">Voltar</button></div>`);
 }
+
 function paymentsView(){
  const d=ipaDB(),t=activeTrip();
  const payments=(d.payments||[]).filter(p=>!t||p.tripId===t.id||(!p.tripId&&p.trip===t.name));
