@@ -1171,15 +1171,72 @@ function simulatePayment(payload){
    return;
  }
 
- showModal(`<span class="eyebrow">Checkout seguro</span><h2>${brl(p.amount)}</h2>
-   <div class="payment-test-badge">AMBIENTE DE TESTE</div>
-   <div class="fake-checkout">
-    <label>Nome no cartão<input value="Teste Mercado Pago"></label>
-    <label>Número do cartão<input value="•••• •••• •••• 4242"></label>
-    <div><label>Validade<input value="12/29"></label><label>CVV<input value="•••"></label></div>
-   </div>
-   <p class="payment-safe">Cartão real será conectado em uma próxima etapa.</p>`);
+ openMercadoPagoCard(p);
 }
+
+let ipaCardForm=null;
+async function openMercadoPagoCard(payment){
+ const client=currentPaymentClient();
+ const safeEmail=String(client?.email||'').replace(/"/g,'&quot;');
+ showModal(`<div class="card-real-modal">
+   <div class="payment-brand"><img src="assets/logo-inline.png" alt="Indo por Aí"><div><span class="eyebrow">CARTÃO · MERCADO PAGO</span><h2>Pagamento seguro</h2></div></div>
+   <div class="card-charge"><small>Valor da cobrança</small><strong>${brl(payment.amount)}</strong><span>🔒 Processado pelo Mercado Pago</span></div>
+   <form id="form-checkout" class="mp-card-form">
+    <label>Número do cartão<div id="form-checkout__cardNumber" class="mp-secure-field"></div></label>
+    <div class="mp-card-row"><label>Validade<div id="form-checkout__expirationDate" class="mp-secure-field"></div></label><label>CVV<div id="form-checkout__securityCode" class="mp-secure-field"></div></label></div>
+    <label>Nome no cartão<input type="text" id="form-checkout__cardholderName" autocomplete="cc-name" placeholder="Como está no cartão"></label>
+    <label>Emissor<select id="form-checkout__issuer"></select></label>
+    <label>Parcelamento<select id="form-checkout__installments"></select></label>
+    <div class="mp-card-row"><label>Documento<select id="form-checkout__identificationType"></select></label><label>Número<input type="text" id="form-checkout__identificationNumber" inputmode="numeric" placeholder="CPF"></label></div>
+    <label>E-mail<input type="email" id="form-checkout__cardholderEmail" value="${safeEmail}" autocomplete="email"></label>
+    <button type="submit" id="form-checkout__submit" class="btn btn-primary btn-block">Pagar ${brl(payment.amount)}</button>
+    <progress value="0" class="mp-progress">Carregando...</progress>
+   </form>
+   <p class="payment-safe">🔒 Número, validade e CVV são tokenizados pelo Mercado Pago e não ficam armazenados no Indo por Aí.</p>
+ </div>`);
+ try{
+   if(!window.MercadoPago)throw new Error('MercadoPago.js não carregou. Verifique sua conexão.');
+   const keyResponse=await fetch('/api/payments/public-key',{cache:'no-store'});
+   const keyData=await keyResponse.json().catch(()=>({}));
+   if(!keyResponse.ok||!keyData.publicKey)throw new Error(keyData.error||'Public Key do Mercado Pago indisponível.');
+   const mp=new MercadoPago(keyData.publicKey,{locale:'pt-BR'});
+   ipaCardForm=mp.cardForm({
+    amount:String(Number(payment.amount||0).toFixed(2)),iframe:true,
+    form:{id:'form-checkout',cardNumber:{id:'form-checkout__cardNumber',placeholder:'Número do cartão'},expirationDate:{id:'form-checkout__expirationDate',placeholder:'MM/AA'},securityCode:{id:'form-checkout__securityCode',placeholder:'CVV'},cardholderName:{id:'form-checkout__cardholderName',placeholder:'Nome no cartão'},issuer:{id:'form-checkout__issuer',placeholder:'Emissor'},installments:{id:'form-checkout__installments',placeholder:'Parcelas'},identificationType:{id:'form-checkout__identificationType',placeholder:'Tipo'},identificationNumber:{id:'form-checkout__identificationNumber',placeholder:'Documento'},cardholderEmail:{id:'form-checkout__cardholderEmail',placeholder:'E-mail'}},
+    callbacks:{
+     onFormMounted:error=>{if(error){console.error('Mercado Pago CardForm',error);toast('Não foi possível carregar o cartão');}},
+     onSubmit:event=>{event.preventDefault();processMercadoPagoCard(payment,ipaCardForm);},
+     onFetching:()=>{const bar=document.querySelector('.mp-progress');bar?.removeAttribute('value');return()=>bar?.setAttribute('value','0');}
+    }
+   });
+ }catch(err){console.error(err);showCardStatusModal('error','configuração',String(err?.message||err),'');}
+}
+
+async function processMercadoPagoCard(payment,cardForm){
+ const submit=document.querySelector('#form-checkout__submit');
+ try{
+   if(submit){submit.disabled=true;submit.textContent='Processando...';}
+   const data=cardForm.getCardFormData();
+   if(!data.token)throw new Error('Confira os dados do cartão.');
+   const response=await fetch('/api/payments/card',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({paymentId:payment.id,amount:Number(payment.amount||0),description:payment.title||payment.description||'Cobrança Indo por Aí',token:data.token,payment_method_id:data.paymentMethodId,issuer_id:data.issuerId,installments:Number(data.installments||1),payer:{email:data.cardholderEmail,identification:{type:data.identificationType,number:data.identificationNumber}}})});
+   const result=await response.json().catch(()=>({}));
+   if(!response.ok||!result.ok)throw new Error(result?.error||result?.details?.message||`Erro ${response.status}`);
+   const status=String(result.paymentStatus||'').toLowerCase();
+   IPAData.updatePayment(payment.id,{mpPaymentId:result.paymentId,mpStatus:status,mpStatusDetail:result.paymentStatusDetail,paymentMethodId:result.paymentMethodId,installments:result.installments,paymentEnvironment:'production'});
+   if(['approved','processed','paid'].includes(status)){IPAData.updatePayment(payment.id,{status:'Pago',paidAt:new Date().toISOString().slice(0,10)});if(window.IPAFirebase?.user)await window.IPAFirebase.syncNow().catch(()=>{});showCardStatusModal('approved',status,result.paymentStatusDetail,result.paymentId);return;}
+   if(['rejected','cancelled','canceled','expired','failed'].includes(status)){showCardStatusModal('error',status,result.paymentStatusDetail,result.paymentId);return;}
+   showCardStatusModal('pending',status,result.paymentStatusDetail,result.paymentId);
+ }catch(err){console.error('Mercado Pago cartão',err);showCardStatusModal('error','não aprovado',String(err?.message||err),'');}
+ finally{if(submit){submit.disabled=false;submit.textContent=`Pagar ${brl(payment.amount)}`;}}
+}
+
+function showCardStatusModal(kind,status,detail,paymentId){
+ const ok=kind==='approved',pending=kind==='pending';
+ const title=ok?'Pagamento aprovado':pending?'Pagamento em análise':'Pagamento não aprovado';
+ const text=ok?'O Mercado Pago confirmou o pagamento.':pending?'O Mercado Pago está analisando o pagamento.':'O pagamento não foi concluído. Confira os dados ou tente outro cartão.';
+ showModal(`<div class="pix-status-card pix-status-${ok?'approved':pending?'pending':'error'}"><div class="pix-status-icon">${ok?'✓':pending?'⌛':'!'}</div><span class="eyebrow">CARTÃO · MERCADO PAGO</span><h2>${title}</h2><p>${text}</p><div class="pix-status-grid"><div><small>Status</small><strong>${status||'-'}</strong></div><div><small>Detalhe</small><strong>${detail||'-'}</strong></div></div>${paymentId?`<small class="pix-order-id">Pagamento: ${paymentId}</small>`:''}<button class="btn btn-light btn-block" onclick="modal.close();render()">Voltar</button></div>`);
+}
+
 
 function currentPaymentClient(){
  const d=ipaDB();

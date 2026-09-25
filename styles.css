@@ -576,3 +576,7 @@ body{min-height:100vh}.app-shell{width:min(100%,520px);min-height:100vh;margin:a
     gap:8px;
   }
 }
+
+
+/* Beta 6.29.3 — cartão real Mercado Pago */
+.payment-brand{display:flex;align-items:center;gap:12px;text-align:left;margin-bottom:14px}.payment-brand img{width:58px;height:58px;object-fit:contain}.payment-brand h2{margin:2px 0}.card-charge{background:#eef7fb;border-radius:16px;padding:14px;margin:10px 0 16px;text-align:left}.card-charge small,.card-charge strong,.card-charge span{display:block}.card-charge strong{font-size:25px;color:#075568;margin:3px 0}.card-charge span{font-size:11px;color:#66787c}.mp-card-form{display:grid;gap:10px;text-align:left}.mp-card-form label{display:grid;gap:5px;font-size:11px;font-weight:800;color:#526568}.mp-card-form input,.mp-card-form select,.mp-secure-field{box-sizing:border-box;width:100%;min-height:44px;border:1px solid #dce7e4;border-radius:12px;background:#fff;padding:11px;font:inherit;color:#1f3034}.mp-secure-field{padding:0 10px;display:flex;align-items:center}.mp-card-row{display:grid;grid-template-columns:1fr 1fr;gap:9px}.mp-progress{width:100%;height:4px}.card-real-modal .payment-safe{margin-top:12px}@media(max-width:420px){.mp-card-row{grid-template-columns:1fr 1fr}}

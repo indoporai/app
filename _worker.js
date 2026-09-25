@@ -85,6 +85,52 @@ async function createProductionPix(request, env) {
   return json({ok:true,environment:"production",amount,...extractPixPayment(result.body)});
 }
 
+
+function extractCardPayment(payment) {
+  return {
+    paymentId: String(payment?.id || ""),
+    paymentStatus: payment?.status || "",
+    paymentStatusDetail: payment?.status_detail || "",
+    externalReference: payment?.external_reference || "",
+    paymentMethodId: payment?.payment_method_id || "",
+    paymentTypeId: payment?.payment_type_id || "",
+    installments: Number(payment?.installments || 1)
+  };
+}
+
+async function createProductionCard(request, env) {
+  let payload={};
+  try { payload=await request.json(); } catch { return json({ok:false,error:"JSON inválido."},400); }
+  const reference=String(payload.paymentId||"").trim();
+  const amount=Number(payload.amount||payload.transaction_amount||0);
+  const token=String(payload.token||"").trim();
+  const paymentMethodId=String(payload.payment_method_id||payload.paymentMethodId||"").trim();
+  const issuerId=String(payload.issuer_id||payload.issuerId||"").trim();
+  const installments=Math.max(1,Number(payload.installments||1));
+  const email=String(payload.payer?.email||payload.payerEmail||"").trim().toLowerCase();
+  const identificationType=String(payload.payer?.identification?.type||payload.identificationType||"CPF").trim();
+  const identificationNumber=onlyDigits(payload.payer?.identification?.number||payload.identificationNumber);
+  const description=String(payload.description||"Cobrança Indo por Aí").trim().slice(0,120);
+  if(!reference)return json({ok:false,error:"paymentId obrigatório."},400);
+  if(!Number.isFinite(amount)||amount<=0)return json({ok:false,error:"Valor da cobrança inválido."},400);
+  if(!token)return json({ok:false,error:"Token do cartão não informado."},400);
+  if(!paymentMethodId)return json({ok:false,error:"Meio de pagamento não identificado."},400);
+  if(!validEmail(email))return json({ok:false,error:"Informe um e-mail válido para o pagador."},400);
+  if(!identificationNumber)return json({ok:false,error:"Documento do pagador não informado."},400);
+  const externalReference=`indoporai_${reference}`;
+  const idempotency=await stableIdempotency(`${externalReference}|card|${token}`);
+  const body={
+    transaction_amount:Math.round(amount*100)/100, token, description, installments,
+    payment_method_id:paymentMethodId, external_reference:externalReference,
+    notification_url:"https://app.indoporaicomagente.com/api/webhooks/mercadopago",
+    payer:{email,identification:{type:identificationType,number:identificationNumber}}
+  };
+  if(issuerId) body.issuer_id=issuerId;
+  const result=await mercadoPagoFetch(env,"/v1/payments",{method:"POST",headers:{"X-Idempotency-Key":idempotency},body:JSON.stringify(body)});
+  if(!result.ok)return result.response;
+  return json({ok:true,environment:"production",amount,...extractCardPayment(result.body)});
+}
+
 async function getPixStatus(url, env) {
   const paymentId=url.searchParams.get("paymentId");
   if(!paymentId)return json({ok:false,error:"paymentId obrigatório."},400);
@@ -218,6 +264,16 @@ export default {
     if (url.pathname === "/api/climate/generate" && request.method === "POST") return generateClimate(request,env);
     if (url.pathname === "/api/live/create" && request.method === "POST") return createLiveRoom(env);
     if (url.pathname === "/api/live/join" && request.method === "POST") return joinLiveRoom(request,env);
+
+
+    if (url.pathname === "/api/payments/public-key" && request.method === "GET") {
+      if(!env.MERCADO_PAGO_PUBLIC_KEY)return json({ok:false,error:"MERCADO_PAGO_PUBLIC_KEY não configurada no Cloudflare."},500);
+      return json({ok:true,publicKey:env.MERCADO_PAGO_PUBLIC_KEY});
+    }
+
+    if (url.pathname === "/api/payments/card" && request.method === "POST") {
+      return createProductionCard(request, env);
+    }
 
     if ((url.pathname === "/api/payments/pix" || url.pathname === "/api/pix/create") && request.method === "POST") {
       return createProductionPix(request, env);
