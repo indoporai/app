@@ -250,6 +250,41 @@ function whatsappContact(request,env){
   return json({ok:true,url:`https://wa.me/${raw}?text=${message}`});
 }
 
+
+function weatherTip(days){
+ const rain=Math.max(0,...days.map(d=>Number(d.rain||0))),min=Math.min(...days.map(d=>Number(d.min||99))),max=Math.max(...days.map(d=>Number(d.max||-99)));
+ if(rain>=8)return 'Há sinal de chuva em parte da viagem. Vale levar guarda-chuva e manter opções cobertas no roteiro.';
+ if(max>=30)return 'Dias quentes são esperados: água, protetor solar e pausas em locais frescos ajudam bastante.';
+ if(min<=10)return 'Pode fazer frio, principalmente no início e no fim do dia. Leve uma camada extra de roupa.';
+ return 'O clima parece confortável para passeios. Continue acompanhando: a previsão fica mais precisa perto do embarque.';
+}
+function dateISO(d){return d.toISOString().slice(0,10)}
+async function tripWeather(request){
+ try{
+  const u=new URL(request.url),destination=(u.searchParams.get('destination')||'').trim(),country=(u.searchParams.get('country')||'').trim(),start=u.searchParams.get('start')||'',end=u.searchParams.get('end')||start;
+  if(!destination||!/^\\d{4}-\\d{2}-\\d{2}$/.test(start))return json({ok:false,error:'Destino e data da viagem são obrigatórios.'},400);
+  const g=await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(destination)}&count=8&language=pt&format=json`);
+  const gj=await g.json(); let hits=gj.results||[]; if(country){const c=country.toLowerCase();hits.sort((a,b)=>(String(b.country||'').toLowerCase().includes(c)?1:0)-(String(a.country||'').toLowerCase().includes(c)?1:0))}
+  const loc=hits[0]; if(!loc)return json({ok:false,error:'Não encontrei o destino para consultar o clima.'},404);
+  const today=new Date(); today.setHours(0,0,0,0); const sd=new Date(start+'T00:00:00'); const horizon=new Date(today);horizon.setDate(horizon.getDate()+15);
+  let days=[],kind='estimate';
+  if(sd<=horizon && sd>=new Date(today.getTime()-86400000)){
+   const safeEnd=new Date(Math.min(new Date(end+'T00:00:00').getTime(),horizon.getTime()));
+   const url=`https://api.open-meteo.com/v1/forecast?latitude=${loc.latitude}&longitude=${loc.longitude}&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum&timezone=auto&start_date=${start}&end_date=${dateISO(safeEnd)}`;
+   const r=await fetch(url);const w=await r.json(); if(!r.ok||!w.daily)throw new Error('Previsão indisponível');
+   days=w.daily.time.map((date,i)=>({date,code:w.daily.weather_code[i],max:w.daily.temperature_2m_max[i],min:w.daily.temperature_2m_min[i],rain:w.daily.precipitation_sum[i]||0}));kind='forecast';
+  }else{
+   const targetStart=new Date(start+'T00:00:00'),targetEnd=new Date(end+'T00:00:00'); const len=Math.max(1,Math.min(7,Math.round((targetEnd-targetStart)/86400000)+1));
+   const samples=Array.from({length:5},(_,k)=>{const y=today.getFullYear()-1-k;const a=new Date(Date.UTC(y,targetStart.getUTCMonth(),targetStart.getUTCDate()));const b=new Date(a);b.setUTCDate(b.getUTCDate()+len-1);return [dateISO(a),dateISO(b)]});
+   const acc=Array.from({length:len},()=>({max:[],min:[],rain:[],codes:[]}));
+   for(const [a,b] of samples){try{const r=await fetch(`https://archive-api.open-meteo.com/v1/archive?latitude=${loc.latitude}&longitude=${loc.longitude}&start_date=${a}&end_date=${b}&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum&timezone=auto`);const w=await r.json();if(w.daily)w.daily.time.forEach((_,i)=>{if(acc[i]){acc[i].max.push(w.daily.temperature_2m_max[i]);acc[i].min.push(w.daily.temperature_2m_min[i]);acc[i].rain.push(w.daily.precipitation_sum[i]||0);acc[i].codes.push(w.daily.weather_code[i])}})}catch{}}
+   const avg=a=>a.length?a.reduce((x,y)=>x+Number(y||0),0)/a.length:0,mode=a=>a.length?a.sort((x,y)=>a.filter(v=>v===x).length-a.filter(v=>v===y).length).pop():1;
+   days=acc.map((x,i)=>{const d=new Date(targetStart);d.setDate(d.getDate()+i);return {date:dateISO(d),code:mode(x.codes),max:avg(x.max),min:avg(x.min),rain:avg(x.rain)}});
+  }
+  return json({ok:true,kind,location:[loc.name,loc.country].filter(Boolean).join(', '),days,tip:weatherTip(days)});
+ }catch(e){return json({ok:false,error:e?.message||'Não foi possível consultar o clima.'},502)}
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -264,6 +299,7 @@ export default {
     if (url.pathname === "/api/climate/generate" && request.method === "POST") return generateClimate(request,env);
     if (url.pathname === "/api/live/create" && request.method === "POST") return createLiveRoom(env);
     if (url.pathname === "/api/live/join" && request.method === "POST") return joinLiveRoom(request,env);
+    if (url.pathname === "/api/weather/trip" && request.method === "GET") return tripWeather(request);
 
 
     if (url.pathname === "/api/payments/public-key" && request.method === "GET") {

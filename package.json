@@ -1,6 +1,6 @@
 {
   "name": "indo-por-ai",
-  "version": "1.0.0",
+  "version": "6.29.7",
   "private": true,
   "engines": {
     "node": ">=18"
