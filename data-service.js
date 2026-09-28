@@ -119,5 +119,32 @@ window.IPAData={
  addItineraryPlace(tripId,dayNumber,place){const d=readData();const t=(d.trips||[]).find(x=>x.id===tripId);if(!t)return null;t.itinerary=t.itinerary||[];let day=t.itinerary.find(x=>Number(x.day)===Number(dayNumber));if(!day){day={day:Number(dayNumber),title:"Dia "+dayNumber,date:"",places:[]};t.itinerary.push(day)}day.places=day.places||[];day.places.push({...place,id:place.id&&String(place.id).startsWith('place-')?place.id:("place-"+Date.now()+"-"+Math.random().toString(36).slice(2,6)),name:place.name||"Novo local",address:place.address||"",time:place.time||"",note:place.note||"",placeId:place.placeId||"",mapsUrl:place.mapsUrl||"",category:place.category||"Atração",smartTip:place.smartTip||place.tip||"",networkRecommended:!!place.networkRecommended});writeData(d);return t},
  createItineraryTemplate(template){const d=readData();template.id=template.id||("tpl-"+Date.now());template.days=Number(template.days)||1;template.itinerary=template.itinerary||[];d.itineraryTemplates=d.itineraryTemplates||[];d.itineraryTemplates.push(template);writeData(d);return template},
  markPaymentPaid(id){const d=readData();const p=d.payments.find(x=>x.id===id);if(p){p.status="Pago";p.paidAt=new Date().toISOString().slice(0,10)}writeData(d);return p},
- replaceFromCloud(cloudData){const defaults=clone(IPA_DEFAULT_DATA);const fresh={...defaults,...(cloudData||{}),client:{...defaults.client,...((cloudData||{}).client||{})},plans:{...defaults.plans,...((cloudData||{}).plans||{})},exchange:{...defaults.exchange,...((cloudData||{}).exchange||{})},prep:{...defaults.prep,...((cloudData||{}).prep||{})}};writeData(fresh,"cloud");return fresh}
+ replaceFromCloud(cloudData){
+  // Beta 6.29.5: Firestore is authoritative. Never merge stale operational
+  // browser data back into an intentionally empty cloud state.
+  const defaults=clone(IPA_DEFAULT_DATA);
+  const incoming=cloudData||{};
+  const clean={
+    ...defaults,
+    ...incoming,
+    client:{...defaults.client,...(incoming.client||{})},
+    plans:{...defaults.plans,...(incoming.plans||{})},
+    exchange:{...defaults.exchange,...(incoming.exchange||{})},
+    prep:{...defaults.prep,...(incoming.prep||{})},
+    clients:Array.isArray(incoming.clients)?incoming.clients:[],
+    trips:Array.isArray(incoming.trips)?incoming.trips:[],
+    payments:Array.isArray(incoming.payments)?incoming.payments:[],
+    paymentPlans:Array.isArray(incoming.paymentPlans)?incoming.paymentPlans:[],
+    travelLeads:Array.isArray(incoming.travelLeads)?incoming.travelLeads:[],
+    tripDocuments:Array.isArray(incoming.tripDocuments)?incoming.tripDocuments:[],
+    memories:Array.isArray(incoming.memories)?incoming.memories:[],
+    recommendations:Array.isArray(incoming.recommendations)?incoming.recommendations:[],
+    conciergeRequests:Array.isArray(incoming.conciergeRequests)?incoming.conciergeRequests:[],
+    benefits:Array.isArray(incoming.benefits)?incoming.benefits:[],
+    itineraryTemplates:Array.isArray(incoming.itineraryTemplates)?incoming.itineraryTemplates:[],
+    placeCatalog:Array.isArray(incoming.placeCatalog)?incoming.placeCatalog:[]
+  };
+  writeData(clean,"cloud");
+  return clean
+}
 };

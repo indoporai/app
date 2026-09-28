@@ -1,22 +1,20 @@
-const CACHE = "indo-por-ai-v2-beta-6-29-5-cloud-authoritative";
+const CACHE = "indo-por-ai-v2-beta-6-29-5-clean-state";
 const CORE = [
   "./",
   "index.html",
-  "styles.css?v=v2-beta-6-15-1-2-2",
-  "app.js?v=v2-beta-6-15-1-2-2",
-  "data-service.js?v=v2-beta-6-15-1-2-2",
-  "firebase-service.js?v=v2-beta-6-15-1-2-2",
-  "firebase-service.js?v=v2-beta-5",
+  "styles.css?v=v2-beta-6-29-5",
+  "app.js?v=v2-beta-6-29-5",
+  "data-service.js?v=v2-beta-6-29-5",
+  "firebase-service.js?v=v2-beta-6-29-5",
   "admin.html",
-  "admin.js",
+  "admin.js?v=v2-beta-6-29-5",
   "admin.css",
   "manifest.webmanifest",
-  "pwa-install.js?v=v2-beta-6-28-8",
+  "pwa-install.js?v=v2-beta-6-29-5",
   "assets/apple-touch-icon.png",
   "assets/icon-192.png",
   "assets/icon-512.png"
 ];
-
 self.addEventListener("install", event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(CORE)).then(() => self.skipWaiting()));
 });
@@ -26,8 +24,8 @@ self.addEventListener("activate", event => {
 self.addEventListener("fetch", event => {
   if(event.request.method !== "GET") return;
   const url = new URL(event.request.url);
-  const core = url.pathname === "/" || url.pathname.endsWith("/") || url.pathname.endsWith("index.html") || url.pathname.endsWith("app.js") || url.pathname.endsWith("styles.css") || url.pathname.endsWith("service-worker.js") || url.pathname.endsWith("firebase-service.js") || url.pathname.endsWith("data-service.js");
-  if(core){
+  const critical = url.origin === self.location.origin && (url.pathname === "/" || url.pathname.endsWith("/") || /\.(?:html|js|css)$/.test(url.pathname));
+  if(critical){
     event.respondWith(fetch(event.request,{cache:"no-store"}).then(response=>{
       const copy=response.clone();
       caches.open(CACHE).then(cache=>cache.put(event.request,copy));
