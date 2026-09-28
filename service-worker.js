@@ -1,4 +1,4 @@
-const CACHE = "indo-por-ai-v2-beta-6-29-3-card-real";
+const CACHE = "indo-por-ai-v2-beta-6-29-5-cloud-authoritative";
 const CORE = [
   "./",
   "index.html",
@@ -26,7 +26,7 @@ self.addEventListener("activate", event => {
 self.addEventListener("fetch", event => {
   if(event.request.method !== "GET") return;
   const url = new URL(event.request.url);
-  const core = url.pathname === "/" || url.pathname.endsWith("/") || url.pathname.endsWith("index.html") || url.pathname.endsWith("app.js") || url.pathname.endsWith("styles.css") || url.pathname.endsWith("service-worker.js");
+  const core = url.pathname === "/" || url.pathname.endsWith("/") || url.pathname.endsWith("index.html") || url.pathname.endsWith("app.js") || url.pathname.endsWith("styles.css") || url.pathname.endsWith("service-worker.js") || url.pathname.endsWith("firebase-service.js") || url.pathname.endsWith("data-service.js");
   if(core){
     event.respondWith(fetch(event.request,{cache:"no-store"}).then(response=>{
       const copy=response.clone();

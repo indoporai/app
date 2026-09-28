@@ -962,7 +962,7 @@ const routes={
 
 
 let adminSection='dashboard';
-let adminTripId='trip-portugal-2026';
+let adminTripId=null;
 function ipaDB(){return window.IPAData?IPAData.getAll():null}
 function activeTrip(){
  const d=ipaDB();
