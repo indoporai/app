@@ -452,13 +452,10 @@ async function bootstrapAfterLogin(){
   status="syncing";
   notify();
   try{
-    const exists = await remoteHasData();
-    if(exists){
-      await pullAll();
-    }else{
-      const local = window.IPAData?.getAll?.();
-      if(local) await syncAll(local);
-    }
+    // Beta 6.29.4: Firestore is the source of truth after admin login.
+    // An intentionally empty cloud database must stay empty; never repopulate
+    // it automatically from stale browser/localStorage data.
+    await pullAll();
     initialized=true;
     status="connected";
     lastError="";
