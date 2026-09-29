@@ -638,16 +638,14 @@ function bind(){
    showModal(`<span class="eyebrow">NOVA VIAGEM</span><h2>Criar experiência</h2>
    <label>Cliente</label><select id="admTripClient" class="v2-concierge-input">${d.clients.map(c=>`<option value="${c.id}">${c.name}</option>`).join('')}</select>
    <label>Nome da viagem</label><input id="admTripName" class="v2-concierge-input" value="Minha próxima viagem">
-   <label>Destino / cidade</label><input id="admTripDest" class="v2-concierge-input" placeholder="Ex.: Paris">
-   <label>País</label><input id="admTripCountry" class="v2-concierge-input" placeholder="Ex.: França">
    <label>Pacote contratado</label><select id="admTripPlan" class="v2-concierge-input"><option>Explore</option><option selected>Signature</option><option>Elite</option><option>Groups</option></select>
-   <label>Início</label><input id="admTripStart" type="date" class="v2-concierge-input">
-   <label>Fim</label><input id="admTripEnd" type="date" class="v2-concierge-input">
+   <div class="multi-destination-create"><div class="section-head"><div><span class="eyebrow">DESTINOS / ETAPAS</span><h3>Uma viagem, quantos destinos quiser</h3></div><button type="button" class="btn btn-light" id="admAddStage">+ Adicionar destino</button></div><div id="admStages"></div><small>Para uma viagem comum, deixe apenas uma etapa. Mochilões, road trips e Eurotrips podem ter várias.</small></div>
    <button id="admSaveTrip" class="btn btn-primary btn-block">Criar e personalizar</button>`);
-   setTimeout(()=>{const save=document.querySelector('#admSaveTrip');if(save)save.onclick=async()=>{
+   setTimeout(()=>{const stagesBox=document.querySelector('#admStages');let stageCount=0;const addStage=(v={})=>{stageCount++;const row=document.createElement('div');row.className='admin-stage-row';row.innerHTML=`<b>${stageCount}</b><label>Destino / cidade<input data-stage-dest class="v2-concierge-input" value="${ipaEscape(v.destination||'')}" placeholder="Ex.: Paris"></label><label>País<input data-stage-country class="v2-concierge-input" value="${ipaEscape(v.country||'')}" placeholder="Ex.: França"></label><label>Chegada<input data-stage-start type="date" class="v2-concierge-input" value="${v.startDate||''}"></label><label>Saída<input data-stage-end type="date" class="v2-concierge-input" value="${v.endDate||''}"></label><button type="button" class="btn btn-light" data-remove-stage>×</button>`;row.querySelector('[data-remove-stage]').onclick=()=>{if(stagesBox.children.length>1)row.remove();else toast('A viagem precisa ter pelo menos um destino')};stagesBox.appendChild(row)};addStage();document.querySelector('#admAddStage').onclick=()=>addStage();const save=document.querySelector('#admSaveTrip');if(save)save.onclick=async()=>{
      save.disabled=true;save.textContent='Salvando...';
      try{
-       const trip=IPAData.createTrip({clientId:document.querySelector('#admTripClient').value,name:document.querySelector('#admTripName').value||'Minha viagem',destination:document.querySelector('#admTripDest').value,country:document.querySelector('#admTripCountry').value,plan:document.querySelector('#admTripPlan').value,startDate:document.querySelector('#admTripStart').value,endDate:document.querySelector('#admTripEnd').value});
+       const stages=[...document.querySelectorAll('.admin-stage-row')].map((r,i)=>({id:'stage-'+Date.now()+'-'+i,destination:r.querySelector('[data-stage-dest]').value.trim(),country:r.querySelector('[data-stage-country]').value.trim(),startDate:r.querySelector('[data-stage-start]').value,endDate:r.querySelector('[data-stage-end]').value,order:i+1})).filter(x=>x.destination);if(!stages.length)throw new Error('Informe pelo menos um destino');const first=stages[0],last=stages[stages.length-1];
+       const trip=IPAData.createTrip({clientId:document.querySelector('#admTripClient').value,name:document.querySelector('#admTripName').value||'Minha viagem',destination:first.destination,country:first.country,plan:document.querySelector('#admTripPlan').value,startDate:first.startDate,endDate:last.endDate||first.endDate,stages});
        if(window.IPAFirebase?.user)await window.IPAFirebase.syncNow();
        toast('Viagem salva no Firebase ✓');modal.close();view.innerHTML=adminTripEditor(trip.id);bind();
      }catch(e){console.error(e);toast('Erro ao salvar viagem');save.disabled=false;save.textContent='Tentar novamente'}
@@ -759,6 +757,9 @@ function bind(){
  document.querySelectorAll('[data-firebase-logout]').forEach(b=>b.onclick=async()=>{await window.IPAFirebase.logout();render()});
  document.querySelectorAll('[data-firebase-sync]').forEach(b=>b.onclick=async()=>{toast('Sincronizando com Firebase...');try{await window.IPAFirebase.syncNow();toast('Firebase sincronizado')}catch(e){toast(e.message||'Erro ao sincronizar')}});
  document.querySelectorAll('[data-external-route]').forEach(b=>b.onclick=()=>window.open(b.dataset.externalRoute,'_blank'));
+ document.querySelectorAll('[data-admin-add-stage]').forEach(b=>b.onclick=()=>ipaEditStageModal(b.dataset.adminAddStage,-1));
+ document.querySelectorAll('[data-admin-edit-stage]').forEach(b=>b.onclick=()=>{const [id,i]=b.dataset.adminEditStage.split(':');ipaEditStageModal(id,Number(i))});
+ document.querySelectorAll('[data-admin-delete-stage]').forEach(b=>b.onclick=async()=>{const [id,ix]=b.dataset.adminDeleteStage.split(':'),d=adminData(),t=d.trips.find(x=>x.id===id);if(!t)return;const stages=tripStages(t);if(stages.length<=1)return;if(!confirm('Excluir esta etapa da viagem?'))return;stages.splice(Number(ix),1);stages.forEach((x,i)=>x.order=i+1);IPAData.updateTrip(id,{stages,destination:stages[0].destination,country:stages[0].country,startDate:stages[0].startDate,endDate:stages[stages.length-1].endDate});if(window.IPAFirebase?.user)await window.IPAFirebase.syncNow();view.innerHTML=adminTripEditor(id);bind();toast('Etapa excluída ✓')});
  document.querySelectorAll('[data-admin-save-destination]').forEach(b=>b.onclick=async()=>{
    const destination=document.querySelector('#editTripDestination')?.value.trim()||'';
    const country=document.querySelector('#editTripCountry')?.value.trim()||'';
@@ -1044,7 +1045,10 @@ function tripCountry(t){
  const parts=txt.split(",").map(x=>x.trim());
  return parts.length>1?parts[parts.length-1]:"";
 }
-function tripDestination(t){return String(t?.destination||t?.name||"Seu destino").split(",")[0].trim()}
+function tripStages(t){const a=Array.isArray(t?.stages)?t.stages.filter(Boolean):[];return a.length?a:[{id:"stage-legacy",destination:tripDestinationLegacy(t),country:tripCountry(t),startDate:t?.startDate||"",endDate:t?.endDate||"",order:1}]}
+function tripDestinationLegacy(t){return String(t?.destination||t?.name||"Seu destino").split(",")[0].trim()}
+function activeTripStage(t,date=new Date()){const stages=tripStages(t);const ymd=date.toISOString().slice(0,10);return stages.find(x=>x.startDate&&x.endDate&&ymd>=x.startDate&&ymd<=x.endDate)||stages.find(x=>x.startDate&&ymd<x.startDate)||stages[stages.length-1]}
+function tripDestination(t){return String(activeTripStage(t)?.destination||tripDestinationLegacy(t)).split(",")[0].trim()}
 function normalizedPlaces(day){
  return (day?.places||[]).map((p,i)=>typeof p==='string'?{id:'p-'+day.day+'-'+i,name:p,address:p,time:'',note:''}:p);
 }
@@ -1477,10 +1481,10 @@ function tripWeatherSection(t){
 }
 async function ipaHydrateTripWeather(){
  const box=document.querySelector('[data-trip-weather]'),t=activeTrip(); if(!box||!t?.startDate)return;
- const key=[tripDestination(t),tripCountry(t),t.startDate,t.endDate||t.startDate].join('|');
+ const ws=activeTripStage(t);const key=[ws?.destination||tripDestination(t),ws?.country||tripCountry(t),ws?.startDate||t.startDate,ws?.endDate||t.endDate||t.startDate].join('|');
  try{
   let data=ipaWeatherCache.get(key);
-  if(!data){const q=new URLSearchParams({destination:tripDestination(t),country:tripCountry(t)||'',start:t.startDate,end:t.endDate||t.startDate});const r=await fetch('/api/weather/trip?'+q,{cache:'no-store'});data=await r.json();if(!r.ok||!data.ok)throw new Error(data.error||'Clima indisponível');ipaWeatherCache.set(key,data)}
+  if(!data){const q=new URLSearchParams({destination:ws?.destination||tripDestination(t),country:ws?.country||tripCountry(t)||'',start:ws?.startDate||t.startDate,end:ws?.endDate||t.endDate||t.startDate});const r=await fetch('/api/weather/trip?'+q,{cache:'no-store'});data=await r.json();if(!r.ok||!data.ok)throw new Error(data.error||'Clima indisponível');ipaWeatherCache.set(key,data)}
   const days=(data.days||[]).slice(0,7);
   const title=data.kind==='forecast'?'Previsão para sua viagem':'Clima esperado para sua viagem';
   const note=data.kind==='forecast'?'Previsão meteorológica atualizada automaticamente.':'Estimativa sazonal baseada no histórico recente do destino. A previsão real aparecerá quando a viagem se aproximar.';
@@ -1574,7 +1578,8 @@ function adminTripEditor(id){
  <p>Selecione quem receberá esta viagem. O vínculo é salvo no Firebase e passa a ser usado na prévia, publicação e envio do acesso.</p>
  <div class="admin-trip-fields"><label>Cliente<select data-trip-client-select="${t.id}"><option value="">Selecione um cliente...</option>${(d.clients||[]).map(client=>`<option value="${client.id}" ${client.id===t.clientId?'selected':''}>${client.name}${client.email?' · '+client.email:''}${client.approvalStatus?' · '+client.approvalStatus:''}</option>`).join('')}</select></label><button class="btn btn-primary" data-admin-link-client="${t.id}">${c?'Alterar vínculo':'Vincular cliente'}</button></div>
  ${!c?`<small>⚠️ Vincule um cliente antes de publicar/enviar o acesso.</small>`:''}</section>
- <section class="ipa-admin-panel"><div class="section-head"><div><span class="eyebrow">VIAGEM</span><h2>Destino e pacote</h2></div><b class="ipa-plan">${t.plan}</b></div>
+ <section class="ipa-admin-panel"><div class="section-head"><div><span class="eyebrow">🧭 VIAGEM MULTIDESTINO</span><h2>Destinos / etapas</h2></div><button class="btn btn-light" data-admin-add-stage="${t.id}">+ Adicionar destino</button></div><p>Uma única viagem pode ter várias cidades ou países. O app muda automaticamente o destino ativo conforme as datas.</p><div class="admin-stage-list">${tripStages(t).map((st,i)=>`<div class="admin-stage-card"><strong>${i+1}</strong><div><b>${countryFlag(st.country)} ${ipaEscape(st.destination||'Destino')}</b><small>${st.startDate||'--/--'} → ${st.endDate||'--/--'} · ${ipaEscape(st.country||'')}</small></div><button class="btn btn-light" data-admin-edit-stage="${t.id}:${i}">✏️</button>${tripStages(t).length>1?`<button class="btn btn-light" data-admin-delete-stage="${t.id}:${i}">🗑</button>`:''}</div>`).join('')}</div></section>
+ <section class="ipa-admin-panel"><div class="section-head"><div><span class="eyebrow">VIAGEM</span><h2>Destino principal e pacote</h2></div><b class="ipa-plan">${t.plan}</b></div>
  <div class="admin-trip-fields"><label>Destino<input id="editTripDestination" value="${tripDestination(t)}"></label><label>País<input id="editTripCountry" value="${country}"></label><button class="btn btn-light" data-admin-save-destination="${t.id}">Salvar destino</button></div>
  <div class="ipa-admin-plan-grid">${['Explore','Signature','Elite','Groups'].map(p=>`<button data-admin-plan="${p}" class="${t.plan===p?'active':''}"><b>${p}</b><small>${p==='Explore'?'Roteiro + app':p==='Signature'?'Pré-embarque + compras':p==='Elite'?'Experiência completa':'Grandes grupos'}</small></button>`).join('')}</div>
  <div class="package-native-box"><span class="eyebrow">NATIVO DO ${t.plan.toUpperCase()}</span><div>${packageIncluded(t.plan).map(x=>`<span>✓ ${x}</span>`).join('')}</div><small>Ao trocar de pacote, estes recursos são habilitados automaticamente. Você ainda pode ajustar os módulos manualmente abaixo.</small></div></section>
@@ -1600,6 +1605,7 @@ function adminTripEditor(id){
  ${t.published?`<button class="btn btn-light btn-block" data-admin-invite-trip="${t.id}" data-client-id="${t.clientId}" data-client-email="${c?.email||''}">✉ Enviar acesso desta viagem</button>`:''}
  </div>${ipaParticipantAdminSection(t)}`;
 }
+function ipaEditStageModal(tripId,index){const d=adminData(),t=d.trips.find(x=>x.id===tripId);if(!t)return;const stages=tripStages(t),st=index>=0?stages[index]:{};showModal(`<span class="eyebrow">VIAGEM MULTIDESTINO</span><h2>${index>=0?'Editar etapa':'Adicionar destino'}</h2><label>Destino / cidade<input id="stageDest" class="v2-concierge-input" value="${ipaEscape(st.destination||'')}"></label><label>País<input id="stageCountry" class="v2-concierge-input" value="${ipaEscape(st.country||'')}"></label><label>Chegada<input id="stageStart" type="date" class="v2-concierge-input" value="${st.startDate||''}"></label><label>Saída<input id="stageEnd" type="date" class="v2-concierge-input" value="${st.endDate||''}"></label><button id="saveStage" class="btn btn-primary btn-block">Salvar etapa</button>`);setTimeout(()=>document.querySelector('#saveStage').onclick=async()=>{const item={id:st.id||('stage-'+Date.now()),destination:document.querySelector('#stageDest').value.trim(),country:document.querySelector('#stageCountry').value.trim(),startDate:document.querySelector('#stageStart').value,endDate:document.querySelector('#stageEnd').value};if(!item.destination){toast('Informe o destino');return}let next=[...stages];if(index>=0)next[index]={...next[index],...item};else next.push(item);next.sort((a,b)=>(a.startDate||'9999').localeCompare(b.startDate||'9999'));next.forEach((x,i)=>x.order=i+1);IPAData.updateTrip(tripId,{stages:next,destination:next[0].destination,country:next[0].country,startDate:next[0].startDate,endDate:next[next.length-1].endDate});if(window.IPAFirebase?.user)await window.IPAFirebase.syncNow();modal.close();view.innerHTML=adminTripEditor(tripId);bind();toast('Etapas atualizadas ✓')},0)}
 function adminLoginView(){
  const service=window.IPAFirebase;
  const status=service?.status||'connecting';
