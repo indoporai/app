@@ -312,9 +312,29 @@ function ipaRefreshTemplateBuilder(){
 }
 
 
+function ipaNormText(v){return String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim()}
+function ipaFindCatalogDuplicates(name,city,excludeId=''){
+ const n=ipaNormText(name),c=ipaNormText(city);if(!n)return [];
+ return (adminData().placeCatalog||[]).filter(p=>String(p.id)!==String(excludeId)&&(!c||ipaNormText(p.city)===c)&&(ipaNormText(p.name)===n||ipaNormText(p.name).includes(n)||n.includes(ipaNormText(p.name))));
+}
+async function ipaLocateCatalogPlace(p){
+ const q=[p.name,p.address].filter(Boolean).join(' '),destination=[p.city,p.country].filter(Boolean).join(', ');
+ const r=await fetch(`/api/places/search?q=${encodeURIComponent(q)}&destination=${encodeURIComponent(destination)}`,{cache:'no-store'}),j=await r.json();
+ if(!r.ok||!j.ok)throw new Error(j.error||'Não foi possível localizar');
+ const hit=(j.places||[])[0];if(!hit||!Number.isFinite(Number(hit.lat))||!Number.isFinite(Number(hit.lng)))throw new Error('Local não encontrado com segurança');
+ IPAData.updateCatalogPlace(p.id,{lat:Number(hit.lat),lng:Number(hit.lng),placeId:p.placeId||hit.id||'',mapsUrl:p.mapsUrl||hit.mapsUrl||'',address:p.address||hit.address||'',geoUpdatedAt:new Date().toISOString()});return hit;
+}
+function ipaBindCatalogTools(){
+ const search=document.querySelector('#catalogSearch'),filter=document.querySelector('#catalogGeoFilter');
+ const apply=()=>{const q=ipaNormText(search?.value),f=filter?.value||'all';document.querySelectorAll('[data-catalog-card]').forEach(card=>{const match=(!q||ipaNormText(card.dataset.search).includes(q))&&(f==='all'||card.dataset.geo===f);card.style.display=match?'':'none'});const hint=document.querySelector('#catalogDuplicateHint');if(hint)hint.textContent=q?`${[...document.querySelectorAll('[data-catalog-card]')].filter(x=>x.style.display!=='none').length} resultado(s) no banco.`:''};
+ if(search)search.oninput=apply;if(filter)filter.onchange=apply;
+ document.querySelectorAll('[data-admin-locate-place]').forEach(btn=>btn.onclick=async()=>{const p=(adminData().placeCatalog||[]).find(x=>x.id===btn.dataset.adminLocatePlace);if(!p)return;btn.disabled=true;btn.textContent='Localizando...';try{await ipaLocateCatalogPlace(p);if(window.IPAFirebase?.user)await window.IPAFirebase.syncNow();toast('Localização atualizada ✓');render()}catch(e){toast(e.message||'Não foi possível localizar');btn.disabled=false;btn.textContent='📍 Atualizar localização'}});
+ const bulk=document.querySelector('#catalogLocateMissing');if(bulk)bulk.onclick=async()=>{const missing=(adminData().placeCatalog||[]).filter(p=>!Number.isFinite(Number(p.lat))||!Number.isFinite(Number(p.lng)));if(!missing.length)return toast('Todos os lugares já têm localização ✓');bulk.disabled=true;let ok=0;for(const p of missing){bulk.textContent=`📍 Localizando ${ok+1}/${missing.length}...`;try{await ipaLocateCatalogPlace(p);ok++}catch(e){console.warn('Localização pendente',p.name,e)}}try{if(window.IPAFirebase?.user)await window.IPAFirebase.syncNow()}catch{}toast(`${ok} de ${missing.length} lugares localizados ✓`);render()};
+}
 function bind(){
  setTimeout(()=>ipaHydrateTripWeather(),0);
  setTimeout(()=>{ipaInitRealMap();ipaInitExploreRealMap();},60);
+ setTimeout(()=>ipaBindCatalogTools(),0);
  document.querySelectorAll('[data-admin-new-place]').forEach(b=>b.onclick=()=>{
   showModal(`<span class="eyebrow">BANCO DE LUGARES</span><h2>Novo lugar</h2>
   <label>Buscar no Google</label><div class="smart-place-search"><input id="catalogGoogleSearch" class="v2-concierge-input" autocomplete="off" placeholder="Ex.: Torre Eiffel, Museu do Louvre..."><button id="catalogOpenMaps" class="btn btn-light">Maps ↗</button></div>
@@ -359,6 +379,7 @@ function bind(){
     const v=id=>document.querySelector(id)?.value?.trim?.()||'';
     const name=v('#catalogName');if(!name){toast('Informe ou selecione o nome do lugar');return}
     const city=v('#catalogCity'),country=v('#catalogCountry');if(!city||!country){toast('Informe cidade e país');return}
+    const dup=ipaFindCatalogDuplicates(name,city);if(dup.length&&!confirm(`Possível local já cadastrado: “${dup[0].name}” em ${dup[0].city}.\n\nDeseja cadastrar mesmo assim?`))return;
     const interests=[...document.querySelectorAll('#catalogInterests input:checked')].map(x=>x.value);
     const payload={name,category:v('#catalogCategory'),city,country,address:v('#catalogAddress'),cost:Number(v('#catalogCost')||0),currency:v('#catalogCurrency'),durationMinutes:Number(v('#catalogDuration')||120),priority:v('#catalogPriority'),interests,kidsFriendly:!!document.querySelector('#catalogKids')?.checked,reservation:v('#catalogReservation'),tip:v('#catalogTip'),placeId:v('#catalogPlaceId'),mapsUrl:v('#catalogMapsUrl'),lat:Number(v('#catalogLat'))||null,lng:Number(v('#catalogLng'))||null};
     try{
@@ -857,13 +878,14 @@ function bind(){
   <label>Interesses relacionados</label><div class="planner-interests" id="epInterests">${IPA_INTERESTS.map(x=>`<label><input type="checkbox" value="${x}" ${(p.interests||[]).includes(x)?'checked':''}> ${x}</label>`).join('')}</div>
   <div class="planner-grid"><label class="route-pro-check"><input id="epKids" type="checkbox" ${p.kidsFriendly!==false?'checked':''}> 👶 Bom com crianças</label><label>Reserva<select id="epReservation" class="v2-concierge-input">${['Não exige','Recomendada','Obrigatória'].map(x=>`<option ${x===(p.reservation||'Não exige')?'selected':''}>${x}</option>`).join('')}</select></label></div>
   <label>Dica Indo por Aí<textarea id="epTip" class="rating-text">${ipaEscape(p.tip||'')}</textarea></label>
+  <div class="catalog-geo-edit"><span>${Number.isFinite(Number(p.lat))&&Number.isFinite(Number(p.lng))?'📍 Localização confirmada':'⚠️ Localização pendente'}</span>${!(Number.isFinite(Number(p.lat))&&Number.isFinite(Number(p.lng)))?`<button type="button" class="btn btn-light" id="epLocate">Atualizar localização</button>`:''}</div>
   <button id="epSave" class="btn btn-primary btn-block">💾 Salvar alterações</button>`);
-  setTimeout(()=>document.querySelector('#epSave').onclick=async()=>{
+  setTimeout(()=>{const locate=document.querySelector('#epLocate');if(locate)locate.onclick=async()=>{locate.disabled=true;locate.textContent='Localizando...';try{const temp={...p,name:document.querySelector('#epName').value.trim(),city:document.querySelector('#epCity').value.trim(),country:document.querySelector('#epCountry').value.trim(),address:document.querySelector('#epAddress').value.trim()};await ipaLocateCatalogPlace(temp);if(window.IPAFirebase?.user)await window.IPAFirebase.syncNow();modal.close();render();toast('Localização atualizada ✓')}catch(e){toast(e.message||'Não foi possível localizar');locate.disabled=false;locate.textContent='Atualizar localização'}};document.querySelector('#epSave').onclick=async()=>{
     const v=id=>document.querySelector(id)?.value?.trim?.()||'';const name=v('#epName'),city=v('#epCity'),country=v('#epCountry');if(!name||!city||!country){toast('Informe nome, cidade e país');return}
     const interests=[...document.querySelectorAll('#epInterests input:checked')].map(x=>x.value);
     IPAData.updateCatalogPlace(p.id,{name,category:v('#epCategory'),city,country,address:v('#epAddress'),cost:Number(v('#epCost')||0),currency:v('#epCurrency'),durationMinutes:Number(v('#epDuration')||120),priority:v('#epPriority'),interests,kidsFriendly:!!document.querySelector('#epKids')?.checked,reservation:v('#epReservation'),tip:v('#epTip')});
     if(window.IPAFirebase?.user)await window.IPAFirebase.syncNow();modal.close();render();toast('Lugar atualizado no Firebase ✓');
-  },0);
+  };},0);
  });
  document.querySelectorAll('[data-admin-delete-place]').forEach(b=>b.onclick=async()=>{
   const p=adminData().placeCatalog.find(x=>x.id===b.dataset.adminDeletePlace);if(!p)return;
@@ -1558,11 +1580,13 @@ function adminLive(){return `<div class="ipa-admin-head"><div><span class="eyebr
 function ipaCatalogMoney(v,currency='EUR'){try{return new Intl.NumberFormat('pt-BR',{style:'currency',currency:currency||'EUR'}).format(Number(v||0))}catch(e){return `${currency} ${Number(v||0).toFixed(2)}`}}
 function adminPlaces(){
  const d=adminData(), places=d.placeCatalog||[];
- const cities=[...new Set(places.map(p=>p.city).filter(Boolean))];
+ const cities=[...new Set(places.map(p=>p.city).filter(Boolean))], located=places.filter(p=>Number.isFinite(Number(p.lat))&&Number.isFinite(Number(p.lng))).length;
  return `<div class="ipa-admin-head"><div><span class="eyebrow">CURADORIA INDO POR AÍ</span><h1>Banco de Lugares</h1><p>Seu acervo é a fonte do gerador automático de roteiros.</p></div><button class="btn btn-primary" data-admin-new-place>+ Novo lugar</button></div>
- <div class="catalog-summary"><div><strong>${places.length}</strong><small>lugares cadastrados</small></div><div><strong>${cities.length}</strong><small>destinos</small></div><div><strong>${places.filter(p=>Number(p.cost||0)===0).length}</strong><small>experiências gratuitas</small></div></div>
+ <div class="catalog-summary"><div><strong>${places.length}</strong><small>lugares cadastrados</small></div><div><strong>${cities.length}</strong><small>destinos</small></div><div><strong>${located}/${places.length}</strong><small>com localização</small></div></div>
  <section class="ipa-admin-panel"><div class="section-head"><div><span class="eyebrow">BASE DO ROTEIRO AUTOMÁTICO</span><h2>Experiências cadastradas</h2></div></div>
- <div class="catalog-grid">${places.map(p=>`<article class="catalog-card"><div><span class="chip">${p.category||'Experiência'}</span>${p.priority==='Imperdível'?'<span class="chip orange">Imperdível</span>':''}</div><h3>${ipaEscape(p.name)}</h3><p>${ipaEscape([p.city,p.country].filter(Boolean).join(', '))}</p><div class="catalog-meta"><b>${ipaCatalogMoney(p.cost,p.currency)}</b><span>${Number(p.durationMinutes||120)} min</span></div><small>${(p.interests||[]).join(' · ')}</small>${p.tip?`<em>💡 ${ipaEscape(p.tip)}</em>`:''}<div class="lead-actions"><button class="btn btn-light" data-admin-edit-place="${p.id}">✏️ Editar</button><button class="btn btn-light" data-admin-delete-place="${p.id}">🗑️ Excluir</button></div></article>`).join('')||'<div class="smart-empty"><b>Seu banco ainda está vazio.</b><small>Cadastre os primeiros lugares para o app começar a montar roteiros personalizados.</small></div>'}</div></section>`;
+ <div class="catalog-toolbar"><label class="catalog-search"><span>🔎</span><input id="catalogSearch" class="v2-concierge-input" placeholder="Pesquisar nome, cidade, país ou categoria..."></label><select id="catalogGeoFilter" class="v2-concierge-input"><option value="all">Todos os lugares</option><option value="missing">⚠️ Sem localização</option><option value="located">📍 Localização confirmada</option></select><button class="btn btn-light" id="catalogLocateMissing">📍 Localizar pendentes</button></div>
+ <div id="catalogDuplicateHint" class="catalog-search-hint"></div>
+ <div class="catalog-grid" id="catalogGrid">${places.map(p=>{const geo=Number.isFinite(Number(p.lat))&&Number.isFinite(Number(p.lng));return `<article class="catalog-card" data-catalog-card data-search="${ipaEscape(`${p.name||''} ${p.city||''} ${p.country||''} ${p.category||''}`.toLowerCase())}" data-geo="${geo?'located':'missing'}"><div><span class="chip">${p.category||'Experiência'}</span>${p.priority==='Imperdível'?'<span class="chip orange">Imperdível</span>':''}<span class="chip ${geo?'geo-ok':'geo-missing'}">${geo?'📍 Localização confirmada':'⚠️ Localização pendente'}</span></div><h3>${ipaEscape(p.name)}</h3><p>${ipaEscape([p.city,p.country].filter(Boolean).join(', '))}</p><div class="catalog-meta"><b>${ipaCatalogMoney(p.cost,p.currency)}</b><span>${Number(p.durationMinutes||120)} min</span></div><small>${(p.interests||[]).join(' · ')}</small>${p.tip?`<em>💡 ${ipaEscape(p.tip)}</em>`:''}<div class="lead-actions">${!geo?`<button class="btn btn-light" data-admin-locate-place="${p.id}">📍 Atualizar localização</button>`:''}<button class="btn btn-light" data-admin-edit-place="${p.id}">✏️ Editar</button><button class="btn btn-light" data-admin-delete-place="${p.id}">🗑️ Excluir</button></div></article>`}).join('')||'<div class="smart-empty"><b>Seu banco ainda está vazio.</b><small>Cadastre os primeiros lugares para o app começar a montar roteiros personalizados.</small></div>'}</div></section>`;
 }
 function adminTemplates(){
  const d=adminData();
@@ -1678,12 +1702,15 @@ function ipaGenerateCuratedRoute(input){
  let candidates=(d.placeCatalog||[]).filter(p=>!dest||`${p.city||''} ${p.destination||''} ${p.country||''}`.toLowerCase().includes(dest));
  candidates=candidates.filter(p=>Number(input.children||0)===0||p.kidsFriendly!==false);
  candidates=candidates.map(p=>{const tags=p.interests||[];const match=tags.filter(t=>interests.includes(t)).length;const pri=p.priority==='Imperdível'?5:p.priority==='Recomendado'?2:0;return {...p,_score:match*8+pri+(Number(p.cost||0)===0?1:0)}}).sort((a,b)=>b._score-a._score);
- const perDay=input.pace==='leve'?3:input.pace==='intenso'?5:4, max=Number(input.days||1)*perDay, budget=Number(input.budget||0);
- let spent=0,chosen=[];
- for(const p of candidates){const c=Number(p.cost||0);if(chosen.length>=max)break;if(budget>0&&spent+c>budget)continue;chosen.push(p);spent+=c}
- const days=Array.from({length:Number(input.days||1)},(_,i)=>({day:i+1,places:[]}));
- chosen.forEach((p,i)=>days[i%days.length].places.push(p));
- return {days,spent,budget,currency:input.currency||'EUR',count:chosen.length};
+ const perDay=input.pace==='leve'?3:input.pace==='intenso'?5:4, dayMinutes=input.pace==='leve'?360:input.pace==='intenso'?600:480, budget=Number(input.budget||0), dayCount=Math.max(1,Number(input.days||1));
+ let spent=0,chosen=[];for(const p of candidates){const c=Number(p.cost||0);if(chosen.length>=dayCount*perDay)break;if(budget>0&&spent+c>budget)continue;chosen.push(p);spent+=c}
+ const days=Array.from({length:dayCount},(_,i)=>({day:i+1,places:[],usedMinutes:0}));
+ // Agrupa por proximidade quando há coordenadas e respeita a duração cadastrada + margem de deslocamento.
+ let remaining=[...chosen],cursor=null;
+ for(const day of days){cursor=null;while(day.places.length<perDay&&remaining.length){let pool=[...remaining];if(cursor&&Number.isFinite(Number(cursor.lat))&&Number.isFinite(Number(cursor.lng)))pool.sort((a,b)=>{const da=ipaDistanceKm(cursor,a),db=ipaDistanceKm(cursor,b);return (Number.isFinite(da)?da:9999)-(Number.isFinite(db)?db:9999)||(b._score-a._score)});else pool.sort((a,b)=>b._score-a._score);let pick=null;for(const p of pool){const attraction=Math.max(15,Number(p.durationMinutes||120));const dist=cursor?ipaDistanceKm(cursor,p):0;const transfer=Number.isFinite(dist)?Math.max(10,Math.round(dist/20*60)):25;if(day.usedMinutes+attraction+(day.places.length?transfer:0)<=dayMinutes){pick=p;break}}if(!pick)break;const dist=cursor?ipaDistanceKm(cursor,pick):0,transfer=day.places.length?(Number.isFinite(dist)?Math.max(10,Math.round(dist/20*60)):25):0;day.usedMinutes+=Math.max(15,Number(pick.durationMinutes||120))+transfer;day.places.push({...pick,estimatedTransferMinutes:transfer});remaining=remaining.filter(x=>x.id!==pick.id);cursor=pick}}
+ // Sem coordenadas suficientes, os itens restantes ainda entram por relevância se couberem.
+ for(const p of remaining){const target=days.slice().sort((a,b)=>a.usedMinutes-b.usedMinutes).find(x=>x.places.length<perDay&&x.usedMinutes+Number(p.durationMinutes||120)<=dayMinutes);if(target){target.places.push(p);target.usedMinutes+=Number(p.durationMinutes||120)}}
+ return {days,spent,budget,currency:input.currency||'EUR',count:days.reduce((n,x)=>n+x.places.length,0),optimizedByLocation:true};
 }
 function ipaRequestCode(){return 'IPA-'+String(Date.now()).slice(-6)}
 function ipaLeadWhatsappText(lead){
@@ -2395,3 +2422,5 @@ function showTravelDiary(){
 function showAdminPreview(){
  showModal(`<div class="v2-admin-preview"><span class="eyebrow">Modo administrador</span><h2>Portugal 2026</h2><div class="v2-admin-metrics"><div><strong>32</strong><small>viajantes</small></div><div><strong>29</strong><small>online</small></div><div><strong>6</strong><small>avisos</small></div></div><div class="v2-admin-actions"><button onclick="toast('Aviso enviado ao grupo');modal.close()">📣 Enviar aviso</button><button onclick="toast('Van marcada como a caminho');modal.close()">🚐 Atualizar van</button><button onclick="toast('Roteiro aberto para edição');modal.close()">🗓️ Editar roteiro</button><button onclick="window.location.href='live-real.html'">🔴 Iniciar Live</button></div></div>`);
 }
+
+/* Beta 6.29.11 */

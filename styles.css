@@ -639,3 +639,7 @@ body{min-height:100vh}.app-shell{width:min(100%,520px);min-height:100vh;margin:a
   .admin-stage-row label:nth-of-type(3),
   .admin-stage-row label:nth-of-type(4){grid-column:1 / -1}
 }
+
+/* Beta 6.29.11 — Busca, geolocalização e roteiro inteligente */
+.catalog-toolbar{display:grid;grid-template-columns:minmax(260px,1fr) 220px auto;gap:12px;align-items:center;margin:14px 0 18px}.catalog-search{position:relative;margin:0}.catalog-search>span{position:absolute;left:14px;top:50%;transform:translateY(-50%);z-index:2}.catalog-search input{padding-left:42px!important;width:100%}.catalog-search-hint{font-size:13px;color:#657b83;margin:-8px 0 12px}.chip.geo-ok{background:#e7f8ef;color:#18794e}.chip.geo-missing{background:#fff4df;color:#9a6200}.catalog-geo-edit{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 14px;border-radius:14px;background:#f3f8f8;margin:10px 0 14px}
+@media(max-width:720px){.catalog-toolbar{grid-template-columns:1fr}.catalog-toolbar .btn,.catalog-toolbar select{width:100%}.catalog-search{width:100%}}
