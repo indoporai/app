@@ -72,7 +72,7 @@ async function remoteHasData(){
 }
 
 async function pullAll(){
-  const [clients,trips,payments,benefits,itineraryTemplates,paymentPlans,recommendations,tripDocuments,memories,conciergeRequests,placeCatalog,hotelCatalog,travelLeads] = await Promise.all([
+  const [clients,trips,payments,benefits,itineraryTemplates,paymentPlans,recommendations,tripDocuments,memories,conciergeRequests,placeCatalog,travelLeads] = await Promise.all([
     readCollection("clients"),
     readCollection("trips"),
     readCollection("payments"),
@@ -84,7 +84,6 @@ async function pullAll(){
     readCollection("memories"),
     readCollection("conciergeRequests"),
     readCollection("placeCatalog"),
-    readCollection("hotelCatalog"),
     readCollection("travelLeads")
   ]);
 
@@ -104,7 +103,7 @@ async function pullAll(){
     memories,
     conciergeRequests,
     placeCatalog,
-    hotelCatalog,
+    hotelCatalog:Array.isArray(settings.hotelCatalog)?settings.hotelCatalog:[],
     travelLeads
   };
 
@@ -140,7 +139,6 @@ async function syncAll(data){
       upsertCollection("memories",data.memories),
       upsertCollection("conciergeRequests",data.conciergeRequests),
       upsertCollection("placeCatalog",data.placeCatalog),
-      upsertCollection("hotelCatalog",data.hotelCatalog),
       upsertCollection("travelLeads",data.travelLeads)
     ]);
 
@@ -151,6 +149,7 @@ async function syncAll(data){
       prep:data.prep||{},
       visitReviews:data.visitReviews||{},
       ratings:data.ratings||{},
+      hotelCatalog:Array.isArray(data.hotelCatalog)?data.hotelCatalog:[],
       updatedAt:serverTimestamp()
     },{merge:true});
 

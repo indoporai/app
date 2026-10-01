@@ -2453,4 +2453,4 @@ function showAdminPreview(){
  showModal(`<div class="v2-admin-preview"><span class="eyebrow">Modo administrador</span><h2>Portugal 2026</h2><div class="v2-admin-metrics"><div><strong>32</strong><small>viajantes</small></div><div><strong>29</strong><small>online</small></div><div><strong>6</strong><small>avisos</small></div></div><div class="v2-admin-actions"><button onclick="toast('Aviso enviado ao grupo');modal.close()">📣 Enviar aviso</button><button onclick="toast('Van marcada como a caminho');modal.close()">🚐 Atualizar van</button><button onclick="toast('Roteiro aberto para edição');modal.close()">🗓️ Editar roteiro</button><button onclick="window.location.href='live-real.html'">🔴 Iniciar Live</button></div></div>`);
 }
 
-/* Beta 6.29.13 — Link da Hospedagem / Anúncio */
+/* Beta 6.29.14 — Link da Hospedagem / Anúncio */
