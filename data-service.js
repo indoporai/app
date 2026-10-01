@@ -38,6 +38,7 @@ const IPA_DEFAULT_DATA = {
     Groups:["Experiência para grandes grupos","Avisos do guia","Lista de presença","Subgrupos","Live","Álbum e filme compartilhados","Gestão de grupos"]
   },
   placeCatalog:[],
+  hotelCatalog:[],
   travelLeads:[],
   benefits:[],
   exchange:{requestedEuro:0,buyRate:0,sellRate:0,status:"",partner:""},
@@ -99,6 +100,9 @@ window.IPAData={
  addCatalogPlace(place){const d=readData();d.placeCatalog=d.placeCatalog||[];place.id=place.id||("catalog-"+Date.now());place.createdAt=place.createdAt||new Date().toISOString();place.updatedAt=new Date().toISOString();d.placeCatalog.unshift(place);writeData(d);return place},
  updateCatalogPlace(id,patch){const d=readData();d.placeCatalog=d.placeCatalog||[];const place=d.placeCatalog.find(x=>x.id===id);if(place)Object.assign(place,patch,{updatedAt:new Date().toISOString()});writeData(d);return place},
  removeCatalogPlace(id){const d=readData();d.placeCatalog=(d.placeCatalog||[]).filter(x=>x.id!==id);writeData(d);return true},
+ addHotel(hotel){const d=readData();d.hotelCatalog=d.hotelCatalog||[];hotel.id=hotel.id||("hotel-"+Date.now());hotel.createdAt=hotel.createdAt||new Date().toISOString();hotel.updatedAt=new Date().toISOString();d.hotelCatalog.unshift(hotel);writeData(d);return hotel},
+ updateHotel(id,patch){const d=readData();d.hotelCatalog=d.hotelCatalog||[];const h=d.hotelCatalog.find(x=>x.id===id);if(h)Object.assign(h,patch,{updatedAt:new Date().toISOString()});writeData(d);return h},
+ removeHotel(id){const d=readData();d.hotelCatalog=(d.hotelCatalog||[]).filter(x=>x.id!==id);writeData(d);return true},
  addTravelLead(lead){const d=readData();d.travelLeads=d.travelLeads||[];lead.id=lead.id||("lead-"+Date.now());lead.createdAt=new Date().toISOString();d.travelLeads.unshift(lead);writeData(d);return lead},
  updateTravelLead(id,patch){const d=readData();d.travelLeads=d.travelLeads||[];const lead=d.travelLeads.find(x=>x.id===id);if(lead)Object.assign(lead,patch,{updatedAt:new Date().toISOString()});writeData(d);return lead},
  createPaymentPlan(plan){const d=readData();d.paymentPlans=d.paymentPlans||[];plan.id=plan.id||("plan-"+Date.now());plan.installments=Math.max(1,Number(plan.installments)||1);plan.createdAt=new Date().toISOString();d.paymentPlans.unshift(plan);const total=Number(plan.totalAmount)||0;const base=Math.floor((total/plan.installments)*100)/100;const start=new Date((plan.firstDueDate||new Date().toISOString().slice(0,10))+"T12:00:00");for(let i=1;i<=plan.installments;i++){const due=new Date(start);due.setMonth(start.getMonth()+i-1);const amount=i===plan.installments?Math.round((total-base*(plan.installments-1))*100)/100:base;d.payments.unshift({id:"pay-"+Date.now()+"-"+i,paymentPlanId:plan.id,installmentNumber:i,installmentTotal:plan.installments,clientId:plan.clientId,clientName:plan.clientName,tripId:plan.tripId,trip:plan.trip,title:`${i}ª parcela · ${plan.title||"Viagem"}`,description:plan.description||"",amount,dueDate:due.toISOString().slice(0,10),methods:plan.methods||["PIX"],status:"Pendente",createdAt:new Date().toISOString().slice(0,10),paidAt:null})}writeData(d);return plan},
@@ -144,7 +148,8 @@ window.IPAData={
     conciergeRequests:Array.isArray(incoming.conciergeRequests)?incoming.conciergeRequests:[],
     benefits:Array.isArray(incoming.benefits)?incoming.benefits:[],
     itineraryTemplates:Array.isArray(incoming.itineraryTemplates)?incoming.itineraryTemplates:[],
-    placeCatalog:Array.isArray(incoming.placeCatalog)?incoming.placeCatalog:[]
+    placeCatalog:Array.isArray(incoming.placeCatalog)?incoming.placeCatalog:[],
+    hotelCatalog:Array.isArray(incoming.hotelCatalog)?incoming.hotelCatalog:[]
   };
   writeData(clean,"cloud");
   return clean
