@@ -1,16 +1,16 @@
-const CACHE = "indo-por-ai-v2-beta-6-29-19-login-live-weather";
+const CACHE = "indo-por-ai-v2-beta-6-29-21-login-live-weather";
 const CORE = [
   "./",
   "index.html",
-  "styles.css?v=v2-beta-6-29-19",
-  "app.js?v=v2-beta-6-29-19",
-  "data-service.js?v=v2-beta-6-29-19",
-  "firebase-service.js?v=v2-beta-6-29-19",
+  "styles.css?v=v2-beta-6-29-21",
+  "app.js?v=v2-beta-6-29-21",
+  "data-service.js?v=v2-beta-6-29-21",
+  "firebase-service.js?v=v2-beta-6-29-21",
   "admin.html",
-  "admin.js?v=v2-beta-6-29-19",
+  "admin.js?v=v2-beta-6-29-21",
   "admin.css",
   "manifest.webmanifest",
-  "pwa-install.js?v=v2-beta-6-29-19",
+  "pwa-install.js?v=v2-beta-6-29-21",
   "assets/apple-touch-icon.png",
   "assets/icon-192.png",
   "assets/icon-512.png"
