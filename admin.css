@@ -9,7 +9,19 @@
 .catalog-summary-visual{grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:12px!important}.catalog-summary-visual>div{position:relative;min-height:108px;display:flex;flex-direction:column;justify-content:center;padding:16px 16px 15px 18px!important;overflow:hidden}.catalog-summary-visual>div>span{position:absolute;right:13px;top:12px;font-size:22px}.catalog-summary-visual strong{font-size:28px!important;line-height:1;color:#173b40}.catalog-summary-visual small{margin-top:7px;font-size:12px}.catalog-summary-visual small em{display:block;font-style:normal;font-size:10px;margin-top:2px;color:#94a3b8}.catalog-summary-visual .summary-rating{grid-column:auto}
 .country-dashboard{padding:18px!important;box-shadow:0 8px 28px rgba(20,70,72,.06);border-color:#e4eeec!important}.country-dashboard-head{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;margin-bottom:14px}.country-dashboard-head h3{margin:4px 0 0;font-size:18px}.country-dashboard-head>small{color:#81908f;font-size:11px}.country-chips{gap:10px!important;padding:2px 2px 8px!important}.country-chip{display:inline-flex;align-items:center;gap:7px;border:1px solid #dfeae7!important;background:#f7faf9!important;border-radius:15px!important;padding:10px 12px!important;color:#36585b!important;box-shadow:0 2px 7px rgba(20,70,72,.03);transition:.15s}.country-chip:hover{transform:translateY(-1px);border-color:#a9d8cf!important}.country-chip.active{background:#e8f8f5!important;border-color:#58b9aa!important;color:#087765!important;box-shadow:0 5px 14px rgba(15,127,134,.10)}.country-flag{font-size:20px;line-height:1}.country-chip b{display:grid;place-items:center;min-width:25px;height:25px;padding:0 6px;margin-left:3px!important;border-radius:999px;background:#fff;color:#173b40;font-size:11px}.country-chip.active b{color:#087765}.country-city-area{border-top:1px solid #edf2f1;margin-top:6px;padding-top:12px}.country-city-label{display:block;color:#718184;font-size:11px;font-weight:800;margin-bottom:8px}.country-city-summary{margin-top:0!important;gap:7px!important}.city-chip{border:0;background:#eef5f3;color:#36585b;border-radius:999px;padding:7px 10px;font-size:12px;cursor:pointer}.city-chip b{margin-left:4px}.city-chip.active,.city-chip:hover{background:#0f7f86;color:#fff}
 @media(max-width:700px){.catalog-summary-visual{grid-template-columns:repeat(2,minmax(0,1fr))!important;overflow:visible!important}.catalog-summary-visual .summary-rating{grid-column:1/-1;min-height:86px}.country-dashboard{padding:15px!important}.country-dashboard-head{align-items:flex-start}.country-dashboard-head>small{display:none}.country-chip{padding:9px 11px!important}.country-flag{font-size:18px}.country-city-summary{display:flex!important}.catalog-summary-visual>div{min-height:102px}}
-\n/* Beta 6.29.18 — desktop country dashboard hardening */\n@media(min-width:701px){\n.country-dashboard{display:block!important;width:100%!important;padding:20px!important;border:1px solid #e4eeec!important;border-radius:20px!important;background:#fff!important;box-shadow:0 8px 28px rgba(20,70,72,.06)!important}\n.country-chips{display:flex!important;flex-wrap:wrap!important;align-items:center!important;gap:10px!important;overflow:visible!important;padding:2px 0 10px!important}\n.country-chips .country-chip{appearance:none!important;-webkit-appearance:none!important;display:inline-flex!important;align-items:center!important;justify-content:flex-start!important;gap:8px!important;min-height:46px!important;width:auto!important;border:1px solid #dfeae7!important;background:#f7faf9!important;border-radius:16px!important;padding:9px 12px!important;color:#36585b!important;font-weight:800!important;line-height:1!important;box-shadow:0 2px 7px rgba(20,70,72,.04)!important}\n.country-chips .country-chip.active{background:#e8f8f5!important;border-color:#58b9aa!important;color:#087765!important;box-shadow:0 5px 14px rgba(15,127,134,.10)!important}\n.country-chips .country-chip b{display:inline-grid!important;place-items:center!important;min-width:28px!important;height:28px!important;margin:0 0 0 3px!important;padding:0 7px!important;border-radius:999px!important;background:#fff!important;color:#173b40!important;font-size:12px!important}\n.country-flag{display:inline-flex!important;align-items:center!important;justify-content:center!important;width:25px!important;height:20px!important;overflow:hidden!important;border-radius:4px!important;box-shadow:0 0 0 1px rgba(15,23,42,.08)!important;font-size:18px!important}\n.country-flag img{display:block!important;width:100%!important;height:100%!important;object-fit:cover!important}\n.country-city-summary{display:flex!important;flex-wrap:wrap!important;gap:8px!important}\n}\n
+
+/* Beta 6.29.18 — desktop country dashboard hardening */
+@media(min-width:701px){
+.country-dashboard{display:block!important;width:100%!important;padding:20px!important;border:1px solid #e4eeec!important;border-radius:20px!important;background:#fff!important;box-shadow:0 8px 28px rgba(20,70,72,.06)!important}
+.country-chips{display:flex!important;flex-wrap:wrap!important;align-items:center!important;gap:10px!important;overflow:visible!important;padding:2px 0 10px!important}
+.country-chips .country-chip{appearance:none!important;-webkit-appearance:none!important;display:inline-flex!important;align-items:center!important;justify-content:flex-start!important;gap:8px!important;min-height:46px!important;width:auto!important;border:1px solid #dfeae7!important;background:#f7faf9!important;border-radius:16px!important;padding:9px 12px!important;color:#36585b!important;font-weight:800!important;line-height:1!important;box-shadow:0 2px 7px rgba(20,70,72,.04)!important}
+.country-chips .country-chip.active{background:#e8f8f5!important;border-color:#58b9aa!important;color:#087765!important;box-shadow:0 5px 14px rgba(15,127,134,.10)!important}
+.country-chips .country-chip b{display:inline-grid!important;place-items:center!important;min-width:28px!important;height:28px!important;margin:0 0 0 3px!important;padding:0 7px!important;border-radius:999px!important;background:#fff!important;color:#173b40!important;font-size:12px!important}
+.country-flag{display:inline-flex!important;align-items:center!important;justify-content:center!important;width:25px!important;height:20px!important;overflow:hidden!important;border-radius:4px!important;box-shadow:0 0 0 1px rgba(15,23,42,.08)!important;font-size:18px!important}
+.country-flag img{display:block!important;width:100%!important;height:100%!important;object-fit:cover!important}
+.country-city-summary{display:flex!important;flex-wrap:wrap!important;gap:8px!important}
+}
+
 /* Beta 6.29.19 — country cards approved visual */
 .country-dashboard-head{align-items:flex-start!important;margin-bottom:18px!important}
 .country-dashboard-head h3{font-size:22px!important;margin:5px 0 4px!important;color:#173b40!important}
@@ -36,4 +48,91 @@
   .country-dashboard-head h3{font-size:19px!important}
   .country-dashboard-head p{font-size:12px!important}
   .country-name{font-weight:800}
+}
+
+
+/* Beta 6.29.20 — approved country cards, definitive renderer styling */
+@media (min-width: 701px) {
+  [data-country-dashboard] .country-chips {
+    display:grid !important;
+    grid-template-columns:repeat(3,minmax(220px,1fr)) !important;
+    gap:16px !important;
+    overflow:visible !important;
+    padding:0 0 16px !important;
+  }
+  [data-country-dashboard] button.country-chip {
+    appearance:none !important;
+    -webkit-appearance:none !important;
+    display:flex !important;
+    align-items:center !important;
+    justify-content:flex-start !important;
+    width:100% !important;
+    min-width:0 !important;
+    min-height:96px !important;
+    margin:0 !important;
+    padding:17px 18px !important;
+    gap:16px !important;
+    border:1px solid #dbe8e5 !important;
+    border-radius:20px !important;
+    background:#fff !important;
+    color:#173b40 !important;
+    box-shadow:0 5px 18px rgba(20,70,72,.06) !important;
+    font:inherit !important;
+    cursor:pointer !important;
+  }
+  [data-country-dashboard] button.country-chip.active {
+    background:linear-gradient(135deg,#0f7f86,#1597a1) !important;
+    border-color:#0f7f86 !important;
+    color:#fff !important;
+    box-shadow:0 10px 24px rgba(15,127,134,.20) !important;
+  }
+  [data-country-dashboard] .country-flag {
+    display:flex !important;
+    align-items:center !important;
+    justify-content:center !important;
+    flex:0 0 56px !important;
+    width:56px !important;
+    height:42px !important;
+    border-radius:10px !important;
+    overflow:hidden !important;
+    background:#fff !important;
+    box-shadow:0 2px 8px rgba(15,23,42,.12) !important;
+  }
+  [data-country-dashboard] .country-flag-world {
+    height:56px !important;
+    border-radius:50% !important;
+    font-size:34px !important;
+    background:rgba(255,255,255,.16) !important;
+    box-shadow:none !important;
+  }
+  [data-country-dashboard] .country-flag img { width:100% !important; height:100% !important; object-fit:cover !important; }
+  [data-country-dashboard] .country-name {
+    display:block !important;
+    flex:1 1 auto !important;
+    min-width:0 !important;
+    font-size:20px !important;
+    line-height:1.15 !important;
+    font-weight:900 !important;
+    text-align:left !important;
+    color:inherit !important;
+  }
+  [data-country-dashboard] button.country-chip > b {
+    display:flex !important;
+    align-items:center !important;
+    justify-content:center !important;
+    flex:0 0 auto !important;
+    min-width:56px !important;
+    height:40px !important;
+    margin:0 !important;
+    padding:0 12px !important;
+    border-radius:999px !important;
+    background:#edf3f6 !important;
+    color:#173b40 !important;
+    font-size:17px !important;
+    font-weight:900 !important;
+  }
+  [data-country-dashboard] button.country-chip.active > b { background:#fff !important; color:#173b40 !important; }
+}
+@media (min-width:701px) and (max-width:1100px) {
+  [data-country-dashboard] .country-chips { grid-template-columns:repeat(2,minmax(220px,1fr)) !important; }
 }
