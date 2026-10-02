@@ -655,6 +655,12 @@ window.IPAFirebase = {
     if(!currentUser) throw new Error("Faça login primeiro.");
     return pullAll();
   },
+  async deleteCatalogPlace(id){
+    if(!currentUser || currentUser.uid!==ADMIN_UID) throw new Error("Somente o ADM pode excluir lugares.");
+    if(!id) throw new Error("Lugar inválido.");
+    await deleteDoc(doc(firestore,"placeCatalog",id));
+    return true;
+  },
   async syncNow(){
     if(!currentUser) throw new Error("Faça login primeiro.");
     return syncAll(window.IPAData?.getAll?.());
