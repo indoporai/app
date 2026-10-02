@@ -1076,6 +1076,11 @@ function countryFlag(country){
  const map={"Portugal":"🇵🇹","Brasil":"🇧🇷","Espanha":"🇪🇸","França":"🇫🇷","Itália":"🇮🇹","Reino Unido":"🇬🇧","Inglaterra":"🇬🇧","Estados Unidos":"🇺🇸","Argentina":"🇦🇷","Alemanha":"🇩🇪","Holanda":"🇳🇱","Países Baixos":"🇳🇱","Suíça":"🇨🇭","Áustria":"🇦🇹","Grécia":"🇬🇷","Irlanda":"🇮🇪","Bélgica":"🇧🇪","Croácia":"🇭🇷","Japão":"🇯🇵","Canadá":"🇨🇦","México":"🇲🇽","Chile":"🇨🇱","Uruguai":"🇺🇾"};
  return map[String(country||"").trim()]||"🌍";
 }
+function countryFlagCode(country){
+ const map={"Portugal":"pt","Brasil":"br","Espanha":"es","França":"fr","Itália":"it","Reino Unido":"gb","Inglaterra":"gb","Estados Unidos":"us","Argentina":"ar","Alemanha":"de","Holanda":"nl","Países Baixos":"nl","Suíça":"ch","Áustria":"at","Grécia":"gr","Irlanda":"ie","Bélgica":"be","Croácia":"hr","Japão":"jp","Canadá":"ca","México":"mx","Chile":"cl","Uruguai":"uy"};
+ return map[String(country||"").trim()]||"";
+}
+function countryFlagMarkup(country){const code=countryFlagCode(country);return code?`<img src="https://flagcdn.com/40x30/${code}.png" alt="${ipaEscape(country)}" loading="lazy" referrerpolicy="no-referrer">`:countryFlag(country)}
 function tripCountry(t){
  if(t?.country)return t.country;
  const txt=String(t?.destination||"");
@@ -1646,7 +1651,7 @@ function ipaCountryStats(items){
 }
 function ipaCountryDashboard(items,kind){
  const stats=ipaCountryStats(items);if(!stats.length)return '';
- return `<div class="country-dashboard" data-country-dashboard="${kind}"><div class="country-dashboard-head"><div><span class="eyebrow">VISÃO DO ACERVO</span><h3>🌎 Distribuição por país</h3></div><small>Clique para filtrar</small></div><div class="country-chips"><button class="country-chip active" data-country-filter="all"><span class="country-flag">🌎</span><span>Todos</span><b>${items.length}</b></button>${stats.map(([c,v])=>`<button class="country-chip" data-country-filter="${ipaEscape(c)}"><span class="country-flag">${countryFlag(c)}</span><span>${ipaEscape(c)}</span><b>${v.count}</b></button>`).join('')}</div><div class="country-city-area"><small class="country-city-label" data-country-city-label="${kind}">Selecione um país para ver os destinos</small><div class="country-city-summary" data-country-cities="${kind}"></div></div></div>`;
+ return `<div class="country-dashboard" data-country-dashboard="${kind}"><div class="country-dashboard-head"><div><span class="eyebrow">VISÃO DO ACERVO</span><h3>🌎 Distribuição por país</h3></div><small>Clique para filtrar</small></div><div class="country-chips"><button class="country-chip active" data-country-filter="all"><span class="country-flag">🌎</span><span>Todos</span><b>${items.length}</b></button>${stats.map(([c,v])=>`<button class="country-chip" data-country-filter="${ipaEscape(c)}"><span class="country-flag">${countryFlagMarkup(c)}</span><span>${ipaEscape(c)}</span><b>${v.count}</b></button>`).join('')}</div><div class="country-city-area"><small class="country-city-label" data-country-city-label="${kind}">Selecione um país para ver os destinos</small><div class="country-city-summary" data-country-cities="${kind}"></div></div></div>`;
 }
 function ipaBindCountryDashboards(){
  document.querySelectorAll('[data-country-dashboard]').forEach(dash=>{
