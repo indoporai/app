@@ -145,3 +145,12 @@
 [data-country-dashboard] .country-scroll-list::-webkit-scrollbar{width:7px}
 [data-country-dashboard] .country-scroll-list::-webkit-scrollbar-thumb{background:#9bcacb;border-radius:10px}
 @media(min-width:701px){[data-country-dashboard] .country-chips{display:flex!important;flex-direction:column!important}}
+
+/* 6.29.23 - scrolling list: fixed All, five visible country cards */
+.country-dashboard .country-chips{display:flex!important;flex-direction:column!important;gap:12px!important;grid-template-columns:none!important;align-items:stretch!important}
+.country-dashboard .country-all-fixed{display:block!important;flex:none!important;width:100%!important}
+.country-dashboard .country-scroll-list{display:flex!important;flex-direction:column!important;gap:12px!important;height:auto!important;max-height:calc(5 * 94px + 4 * 12px + 8px)!important;overflow-y:auto!important;overflow-x:hidden!important;overscroll-behavior:contain!important;scrollbar-width:thin;scrollbar-color:#82bdc1 #eef6f6;padding:1px 8px 8px 1px!important}
+.country-dashboard .country-all-fixed>.country-chip,.country-dashboard .country-scroll-list>.country-chip{width:100%!important;min-height:94px!important;height:94px!important;max-height:94px!important;flex:0 0 94px!important;margin:0!important}
+.country-dashboard .country-scroll-list::-webkit-scrollbar{width:8px}
+.country-dashboard .country-scroll-list::-webkit-scrollbar-thumb{background:#82bdc1;border-radius:10px}
+.country-dashboard .country-scroll-list::-webkit-scrollbar-track{background:#eef6f6;border-radius:10px}
