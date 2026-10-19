@@ -927,12 +927,32 @@ function bind(){
    setTimeout(()=>document.querySelector('#saveParticipant').onclick=async()=>{
      const d=adminData(),t=d.trips.find(x=>x.id===tripId);if(!t)return;
      const name=document.querySelector('#partName').value.trim();if(!name)return toast('Informe o nome');
+     const email=document.querySelector('#partEmail').value.trim().toLowerCase();
      const list=[...(t.participants||[])];
-     list.push({id:'part-'+Date.now(),name,email:document.querySelector('#partEmail').value.trim().toLowerCase(),seat:document.querySelector('#partSeat').value.trim(),minor:document.querySelector('#partMinor').checked,status:'pending'});
-     IPAData.updateTrip(tripId,{participants:list});
-     if(window.IPAFirebase?.user)await window.IPAFirebase.syncNow();
-     toast('Participante adicionado ✓');modal.close();view.innerHTML=adminTripEditor(tripId);bind();
+     if(email&&list.some(p=>(p.email||'').trim().toLowerCase()===email))return toast('Este e-mail já está cadastrado nesta viagem.');
+     if(!email&&list.some(p=>!(p.email||'').trim()&&(p.name||'').trim().toLowerCase()===name.toLowerCase()))return toast('Este participante já está cadastrado nesta viagem.');
+     const saveBtn=document.querySelector('#saveParticipant');if(saveBtn.disabled)return;
+     saveBtn.disabled=true;saveBtn.textContent='Salvando...';
+     try{
+       list.push({id:'part-'+Date.now(),name,email,seat:document.querySelector('#partSeat').value.trim(),minor:document.querySelector('#partMinor').checked,status:'pending'});
+       IPAData.updateTrip(tripId,{participants:list});
+       if(window.IPAFirebase?.user)await window.IPAFirebase.syncNow();
+       toast('Participante adicionado ✓');modal.close();view.innerHTML=adminTripEditor(tripId);bind();
+     }catch(e){console.error(e);toast('Erro ao salvar participante');saveBtn.disabled=false;saveBtn.textContent='Adicionar participante'}
    },0);
+ });
+ document.querySelectorAll('[data-admin-delete-participant]').forEach(b=>b.onclick=async()=>{
+   const tripId=b.dataset.participantTrip,partId=b.dataset.adminDeleteParticipant;
+   const t=adminData().trips.find(x=>x.id===tripId);if(!t)return;
+   const participants=[...(t.participants||[])];
+   const target=participants.find(p=>String(p.id)===partId);if(!target)return toast('Participante não encontrado.');
+   if(!confirm('Excluir o participante '+(target.name||target.email)+' desta viagem? O acesso e os convites associados podem ser afetados.'))return;
+   b.disabled=true;
+   try{
+     IPAData.updateTrip(tripId,{participants:participants.filter(p=>String(p.id)!==partId)});
+     if(window.IPAFirebase?.user)await window.IPAFirebase.syncNow();
+     toast('Participante excluído ✓');view.innerHTML=adminTripEditor(tripId);bind();
+   }catch(e){console.error(e);toast('Erro ao excluir participante');b.disabled=false}
  });
  document.querySelectorAll('[data-admin-save-flight]').forEach(b=>b.onclick=async()=>{
    const flight={};document.querySelectorAll('[data-flight-field]').forEach(x=>flight[x.dataset.flightField]=x.value.trim());
@@ -1747,7 +1767,7 @@ function adminTripEditor(id){
 
  <section class="ipa-admin-panel"><div class="section-head"><div><span class="eyebrow">👥 PARTICIPANTES</span><h2>Quem vai nessa viagem?</h2></div><button class="btn btn-light" data-admin-add-participant="${t.id}">+ Participante</button></div>
  <p>Cada viajante pode ter login próprio. O roteiro é compartilhado; assento, memórias, avaliações e progresso são individuais.</p>
- <div class="participant-list">${(t.participants||[]).map((p,i)=>`<div><span>${p.minor?'🧒':'👤'}</span><div><b>${p.name}</b><small>${p.email||'Vinculado ao responsável'} · ${p.seat?`Assento ${p.seat} · `:''}${p.status==='accepted'?'✓ Aceito':'⏳ Pendente'}</small></div></div>`).join('')||'<small>Nenhum acompanhante cadastrado ainda.</small>'}</div></section>
+ <div class="participant-list">${(t.participants||[]).map((p,i)=>`<div><span>${p.minor?'🧒':'👤'}</span><div><b>${p.name}</b><small>${p.email||'Vinculado ao responsável'} · ${p.seat?`Assento ${p.seat} · `:''}${p.status==='accepted'?'✓ Aceito':'⏳ Pendente'}</small></div><button type="button" class="btn btn-light participant-delete-btn" data-admin-delete-participant="${ipaEscape(p.id)}" data-participant-trip="${ipaEscape(t.id)}" aria-label="Excluir ${ipaEscape(p.name||'participante')}">🗑 Excluir</button></div>`).join('')||'<small>Nenhum acompanhante cadastrado ainda.</small>'}</div></section>
  <section class="ipa-admin-panel"><div class="section-head"><div><span class="eyebrow">✈️ DADOS DO VOO</span><h2>Informação controlada pelo ADM</h2></div><span class="chip">Sem API externa</span></div>
  <p>Estes dados aparecem no cartão de voo do cliente. O assento geral pode ser substituído pelo assento individual do participante.</p>
  <div class="flight-admin-grid">${[['airline','Companhia'],['flightNumber','Número do voo'],['date','Data'],['origin','Origem'],['destination','Destino'],['time','Horário'],['terminal','Terminal'],['gate','Portão'],['seat','Assento']].map(([k,l])=>`<label>${l}<input data-flight-field="${k}" value="${t.flight?.[k]||''}" ${k==='date'?'type="date"':k==='time'?'type="time"':''}></label>`).join('')}</div>

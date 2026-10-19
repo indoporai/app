@@ -683,3 +683,8 @@ body{min-height:100vh}.app-shell{width:min(100%,520px);min-height:100vh;margin:a
 .admin-doc-list>div>div{flex:1 1 210px;min-width:0}
 .admin-doc-list .doc-delete-btn{font-size:13px;min-height:38px;border:1px solid #f0c6c6;color:#a42e2e;background:#fff;white-space:nowrap}
 @media(max-width:600px){.admin-doc-list .doc-delete-btn{margin-left:auto}}
+
+/* Beta 6.29.28 - exclusão segura de participantes */
+.participant-list>div{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.participant-list>div>div{flex:1 1 180px;min-width:0}
+.participant-delete-btn{margin-left:auto;color:#a42e2e!important;border:1px solid #efc6c6!important;background:white!important;white-space:nowrap}
