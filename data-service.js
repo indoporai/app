@@ -114,6 +114,7 @@ window.IPAData={
  updateClientById(id,patch){const d=readData();const c=(d.clients||[]).find(x=>x.id===id);if(c)Object.assign(c,patch);writeData(d);return c},
  createTrip(trip){const d=readData();trip.id=trip.id||("trip-"+Date.now());trip.status=trip.status||"Em preparação";trip.published=false;trip.country=trip.country||"";trip.plan=trip.plan||"Explore";trip.modules=trip.modules||ipaPlanModules(trip.plan);trip.itinerary=trip.itinerary||[];trip.stages=Array.isArray(trip.stages)?trip.stages:[];if(!trip.stages.length&&trip.destination){trip.stages=[{id:"stage-"+Date.now(),destination:trip.destination,country:trip.country||"",startDate:trip.startDate||"",endDate:trip.endDate||"",order:1}]};d.trips=d.trips||[];d.trips.push(trip);writeData(d);return trip},
  applyPlanPreset(id,plan){const d=readData();const t=(d.trips||[]).find(x=>x.id===id);if(!t)return null;t.plan=plan;t.modules=ipaPlanModules(plan);writeData(d);return t},
+ removeTrip(id){const d=readData();d.trips=(d.trips||[]).filter(t=>t.id!==id);writeData(d);return true},
  updateTrip(id,patch){const d=readData();const t=(d.trips||[]).find(x=>x.id===id);if(t)Object.assign(t,patch);writeData(d);return t},
  toggleTripModule(tripId,module,enabled){const d=readData();const t=(d.trips||[]).find(x=>x.id===tripId);if(t){t.modules=t.modules||{};t.modules[module]=enabled}writeData(d);return t},
  publishTrip(id,published=true){return this.updateTrip(id,{published,status:published?"Publicado":"Em preparação"})},

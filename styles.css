@@ -705,3 +705,16 @@ button.ipa-save-complete{opacity:1;background:#d9f4e9!important;color:#176044!im
 @media(max-width:680px){.ipa-admin-head>.lead-actions{width:100%}.ipa-admin-head>.lead-actions .btn{width:100%}}
 
 .smart-manual-add{margin:18px 0;padding:18px;background:#f3faf9;border:1px solid #dcebe8;border-radius:18px}.smart-manual-add h3{margin:0 0 8px}.smart-manual-add label{display:block;margin:12px 0}.smart-manual-add input,.smart-manual-add select{display:block;width:100%;min-width:0;box-sizing:border-box;min-height:46px;margin-top:6px;padding:9px;border:1px solid #cddfdd;border-radius:10px;background:white}.smart-manual-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}@media(max-width:480px){.smart-manual-grid{grid-template-columns:1fr}}
+
+/* 6.29.34 — busca no acervo durante curadoria */
+#smartCatalogSearch,#smartCatalogSelect{width:100%;max-width:100%;min-width:0;box-sizing:border-box}
+#smartCatalogInfo{display:block;margin:7px 0 12px;color:#497179}
+
+/* Beta 6.29.35 — ações por viagem */
+.ipa-admin-trip-list .trip-list-row{display:flex;flex-wrap:wrap;align-items:center;gap:10px;border-bottom:1px solid #e6eeee;padding:8px 0}
+.ipa-admin-trip-list .trip-list-row:last-child{border-bottom:0}
+.ipa-admin-trip-list .trip-list-open{flex:1 1 280px;min-width:0;border:0!important;padding:12px!important;text-align:left}
+.ipa-admin-trip-list .trip-list-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-left:auto}
+.ipa-admin-trip-list .trip-list-actions button{font-size:13px;min-height:40px;padding:9px 12px;white-space:nowrap}
+.ipa-admin-trip-list .trip-list-actions .trip-delete-action{color:#a32d2d;border:1px solid #f0c7c7;background:#fff}
+@media(max-width:650px){.ipa-admin-trip-list .trip-list-row{display:block}.ipa-admin-trip-list .trip-list-actions{margin:0 0 8px 12px}.ipa-admin-trip-list .trip-list-actions button{flex:1}}

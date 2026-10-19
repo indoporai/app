@@ -424,9 +424,11 @@ function bind(){
   const clients=adminData().clients||[];
   if(!clients.length){toast('Cadastre um cliente primeiro');adminSection='clients';render();return}
   const preferred=btn.dataset.adminSmartClientTrip||'';
-  showModal(`<span class="eyebrow">✨ CRIAÇÃO INTELIGENTE · ADM</span><h2>Planejar viagem para cliente cadastrado</h2><p>Use o mesmo motor de curadoria dos pedidos externos, sem criar um pedido fictício.</p>
-   <label>Cliente<select id="smartClient">${clients.map(c=>`<option value="${ipaEscape(c.id)}" ${c.id===preferred?'selected':''}>${ipaEscape(c.name)} · ${ipaEscape(c.email||'')}</option>`).join('')}</select></label>
-   <label>Destino (cidade ou país)<input id="smartDestination" placeholder="Ex.: Lisboa" required></label>
+  const existingTripId=btn.dataset.smartExistingTrip||'';
+  const existingTrip=(adminData().trips||[]).find(t=>t.id===existingTripId);
+  showModal(`<span class="eyebrow">✨ CRIAÇÃO INTELIGENTE · ADM</span><h2>${existingTrip?"Criar roteiro para viagem existente":"Planejar viagem para cliente cadastrado"}</h2><p>${existingTrip?`O roteiro será vinculado a <b>${ipaEscape(existingTrip.name)}</b>, sem criar outra viagem. Os demais dados serão preservados.`:"Use o mesmo motor de curadoria dos pedidos externos, sem criar um pedido fictício."}</p>
+   <label>Cliente<select id="smartClient" ${existingTrip?"disabled":""}>${clients.map(c=>`<option value="${ipaEscape(c.id)}" ${c.id===preferred?'selected':''}>${ipaEscape(c.name)} · ${ipaEscape(c.email||'')}</option>`).join('')}</select></label>
+   <label>Destino (cidade ou país)<input id="smartDestination" placeholder="Ex.: Lisboa" value="${existingTrip?ipaEscape(existingTrip.destination||""):""}" required></label>
    <div class="smart-client-form-grid"><label>Dias<input id="smartDays" type="number" min="1" max="45" value="5"></label><label>Adultos<input id="smartAdults" type="number" min="1" value="2"></label><label>Crianças<input id="smartChildren" type="number" min="0" value="0"></label><label>Ritmo<select id="smartPace"><option value="equilibrado">Equilibrado</option><option value="leve">Leve</option><option value="intenso">Intenso</option></select></label><label>Orçamento por pessoa<input id="smartBudget" type="number" min="0" value="0"></label><label>Moeda<select id="smartCurrency"><option>EUR</option><option>USD</option><option>BRL</option></select></label></div>
    <label>Interesses (separados por vírgula)<input id="smartInterests" placeholder="Ex.: cultura, gastronomia, natureza"></label>
    <button class="btn btn-primary btn-block" id="smartPreview">✨ Gerar sugestão inteligente</button><div id="smartPreviewResult" aria-live="polite"></div>`);
@@ -439,7 +441,27 @@ function bind(){
     generated=ipaGenerateCuratedRoute(input);
     const box=document.querySelector('#smartPreviewResult');
     if(!generated.count){box.innerHTML='<div class="planner-empty"><b>Não encontramos atrações para esse destino no Banco de Lugares.</b><small>Cadastre lugares correspondentes e tente novamente.</small></div>';return}
-    box.innerHTML=ipaAdminSuggestionHtml({...input,requestCode:'ADM',id:'',tripId:'preview'},generated).replace(/<div class="lead-actions">[\s\S]*?<\/div><\/div>$/,'</div>')+`<section class="smart-manual-add"><h3>📍 Incluir lugar manualmente</h3><p>Adicione lugares antes de criar a viagem.</p><label>Nome do lugar<input id="smartManualName" placeholder="Ex.: Castelo de São Jorge"></label><div class="smart-manual-grid"><label>Dia<select id="smartManualDay">${generated.days.map(d=>`<option value="${d.day}">Dia ${d.day}</option>`).join('')}</select></label><label>Categoria<input id="smartManualCategory" placeholder="Ex.: Atração"></label></div><button class="btn btn-light btn-block" id="smartManualAdd" type="button" data-no-save-feedback>+ Incluir lugar no roteiro</button><small id="smartManualFeedback" aria-live="polite"></small><div id="smartManualList"></div></section><button class="btn btn-primary btn-block" id="smartCreateTrip" data-no-save-feedback>✓ Aprovar e criar viagem para este cliente</button>`;
+    box.innerHTML=ipaAdminSuggestionHtml({...input,requestCode:'ADM',id:'',tripId:'preview'},generated).replace(/<div class="lead-actions">[\s\S]*?<\/div><\/div>$/,'</div>')+`<section class="smart-manual-add"><h3>📍 Incluir lugar no roteiro</h3><p>Busque no Banco de Lugares ou cadastre um local manualmente.</p><label>Buscar no Banco de Lugares<input id="smartCatalogSearch" placeholder="Digite o nome, cidade ou país" autocomplete="off"></label><label>Selecionar lugar<select id="smartCatalogSelect"><option value="">Escolha um lugar do banco ou preencha manualmente</option></select></label><small id="smartCatalogInfo" aria-live="polite"></small><label>Nome do lugar<input id="smartManualName" placeholder="Ex.: Castelo de São Jorge"></label><div class="smart-manual-grid"><label>Dia<select id="smartManualDay">${generated.days.map(d=>`<option value="${d.day}">Dia ${d.day}</option>`).join('')}</select></label><label>Categoria<input id="smartManualCategory" placeholder="Ex.: Atração"></label></div><button class="btn btn-light btn-block" id="smartManualAdd" type="button" data-no-save-feedback>+ Incluir lugar no roteiro</button><small id="smartManualFeedback" aria-live="polite"></small><div id="smartManualList"></div></section><button class="btn btn-primary btn-block" id="smartCreateTrip" data-no-save-feedback>${existingTrip?"✓ Vincular roteiro à viagem existente":"✓ Aprovar e criar viagem para este cliente"}</button>`;
+    const catalog=adminData().placeCatalog||[];
+    const search=document.querySelector('#smartCatalogSearch');
+    const select=document.querySelector('#smartCatalogSelect');
+    const info=document.querySelector('#smartCatalogInfo');
+    const norm=v=>String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
+    const updateCatalog=()=>{
+      const term=norm(search.value);
+      const matches=catalog.filter(p=>!term||norm([p.name,p.city,p.country,p.category].join(' ')).includes(term)).slice(0,100);
+      select.innerHTML='<option value="">'+(matches.length?'Escolha um lugar do banco ou preencha manualmente':'Nenhum lugar encontrado — use cadastro manual')+'</option>'+matches.map(p=>`<option value="${ipaEscape(p.id)}">${ipaEscape(p.name)} · ${ipaEscape(p.city||'')} · ${ipaEscape(p.country||'')}</option>`).join('');
+      info.textContent=catalog.length?`${matches.length} lugar(es) encontrado(s) no acervo`:'Banco de Lugares vazio. Você pode incluir manualmente.';
+    };
+    search.addEventListener('input',updateCatalog);
+    select.addEventListener('change',()=>{
+      const place=catalog.find(p=>String(p.id)===select.value);
+      if(!place)return;
+      document.querySelector('#smartManualName').value=place.name||'';
+      document.querySelector('#smartManualCategory').value=place.category||'';
+      info.textContent=`✓ ${place.name} · ${place.city||''} ${place.country||''} · ${place.durationMinutes||120} min`;
+    });
+    updateCatalog();
     document.querySelector('#smartManualAdd').onclick=()=>{
       const name=document.querySelector('#smartManualName').value.trim();
       const day=Number(document.querySelector('#smartManualDay').value);
@@ -448,21 +470,31 @@ function bind(){
       if(!name){feedback.textContent='Informe o nome do lugar.';return}
       const target=generated.days.find(x=>Number(x.day)===day);if(!target)return;
       if(target.places.some(x=>String(x.name||'').trim().toLowerCase()===name.toLowerCase())){feedback.textContent='Este lugar já está neste dia.';return}
-      target.places.push({name,category,cost:0,currency:generated.currency||input.currency,interests:['Adicionado manualmente'],manual:true});
+      const selected=catalog.find(p=>String(p.id)===select.value);
+      const fromCatalog=selected&&norm(selected.name)===norm(name);
+      target.places.push(fromCatalog?{...selected,name,category:category||selected.category,catalogPlaceId:selected.id,manual:true,selectedDay:day}:{name,category,cost:0,currency:generated.currency||input.currency,interests:['Adicionado manualmente'],manual:true,selectedDay:day});
+      select.value='';search.value='';updateCatalog();
       document.querySelector('#smartManualName').value='';
       feedback.textContent='✓ Lugar incluído no Dia '+day+'.';
       const li=document.createElement('p');li.textContent='📍 Dia '+day+' · '+name;document.querySelector('#smartManualList').appendChild(li);
     };
     const create=document.querySelector('#smartCreateTrip');create.onclick=async()=>{
-      if(create.disabled)return;create.disabled=true;create.innerHTML='<span class="ipa-save-spinner" aria-hidden="true"></span> Criando viagem, aguarde...';
+      if(create.disabled)return;create.disabled=true;create.innerHTML='<span class="ipa-save-spinner" aria-hidden="true"></span> Salvando roteiro, aguarde...';
       try{
        const client=adminData().clients.find(c=>c.id===input.clientId);if(!client)throw Error('Cliente não encontrado');
        const itinerary=generated.days.map(day=>({day:Number(day.day),title:`Dia ${day.day}`,places:(day.places||[]).map((place,i)=>({...place,id:`trip-place-${Date.now()}-${day.day}-${i}`,catalogPlaceId:place.catalogPlaceId||place.id}))}));
+       if(existingTrip){
+         if(existingTrip.clientId!==client.id)throw Error('O cliente da viagem foi alterado. Atualize a página.');
+         if((existingTrip.itinerary||[]).length&&!confirm('Esta viagem já possui um roteiro. Substituir o roteiro atual pelo novo?')){create.disabled=false;create.textContent='✓ Vincular roteiro à viagem existente';return}
+         IPAData.updateTrip(existingTrip.id,{itinerary,smartRouteApprovedAt:new Date().toISOString()});
+         if(window.IPAFirebase?.user)await window.IPAFirebase.syncNow();
+         modal.close();adminSection='trips';adminTripId=existingTrip.id;render();toast('Roteiro vinculado à viagem existente ✓');return;
+       }
        const trip=IPAData.createTrip({clientId:client.id,name:`${input.destination} · ${client.name}`,destination:input.destination,country:'',plan:client.plan||'Explore',itinerary,smartRouteApprovedAt:new Date().toISOString(),status:'Em preparação'});
        IPAData.updateClientById(client.id,{activeTripId:trip.id,lastConfiguredTripId:trip.id});
        if(window.IPAFirebase?.user)await window.IPAFirebase.syncNow();
        modal.close();adminSection='trips';adminTripId=trip.id;render();toast('Viagem inteligente criada e vinculada ✓');
-      }catch(err){console.error(err);toast(err.message||'Erro ao criar viagem');create.disabled=false;create.textContent='✓ Aprovar e criar viagem para este cliente'}
+      }catch(err){console.error(err);toast(err.message||'Erro ao criar viagem');create.disabled=false;create.textContent=existingTrip?'✓ Vincular roteiro à viagem existente':'✓ Aprovar e criar viagem para este cliente'}
     };
    };
   },0);
@@ -562,6 +594,22 @@ function bind(){
  document.querySelectorAll('[data-payment]').forEach(btn=>btn.onclick=()=>openPayment(btn.dataset.payment));
  document.querySelectorAll('[data-open-plan]').forEach(btn=>btn.onclick=()=>openPlanDetails(btn.dataset.openPlan));
  document.querySelectorAll('[data-admin-section]').forEach(b=>b.onclick=()=>{adminSection=b.dataset.adminSection;state.route='admin';render()});
+ document.querySelectorAll('[data-admin-delete-trip]').forEach(b=>b.onclick=async()=>{
+   const id=b.dataset.adminDeleteTrip,trip=(adminData().trips||[]).find(t=>t.id===id);
+   if(!trip)return toast('Viagem não encontrada');
+   const associated=(adminData().tripDocuments||[]).filter(x=>x.tripId===id).length;
+   const warning=associated?`\nAtenção: existem ${associated} documento(s) vinculados. Eles não serão apagados automaticamente e precisarão de revisão.`:'';
+   if(!confirm(`Excluir definitivamente a viagem "${trip.name}"?\nEsta ação não pode ser desfeita.${warning}`))return;
+   b.disabled=true;b.textContent='Excluindo...';
+   try{
+     if(window.IPAFirebase?.user){
+       if(!window.IPAFirebase.deleteTrip)throw Error('Exclusão no Firebase indisponível');
+       await window.IPAFirebase.deleteTrip(id);
+     }
+     IPAData.removeTrip(id);
+     adminTripId=null;adminSection='trips';render();toast('Viagem excluída ✓');
+   }catch(e){console.error(e);b.disabled=false;b.textContent='🗑 Excluir';toast(e.message||'Não foi possível excluir a viagem')}
+ });
  document.querySelectorAll('[data-admin-trip]').forEach(b=>b.onclick=()=>{view.innerHTML=adminTripEditor(b.dataset.adminTrip);bind();window.scrollTo({top:0})});
  document.querySelectorAll('[data-client-preview]').forEach(b=>b.onclick=()=>{
    const tripId=b.dataset.clientPreview;
@@ -1699,7 +1747,7 @@ ${benefitsPersonalized()}`}
 function adminData(){const d=ipaDB()||{};d.clients=Array.isArray(d.clients)?d.clients:[];d.trips=Array.isArray(d.trips)?d.trips:[];d.payments=Array.isArray(d.payments)?d.payments:[];d.benefits=Array.isArray(d.benefits)?d.benefits:[];d.itineraryTemplates=Array.isArray(d.itineraryTemplates)?d.itineraryTemplates:[];d.placeCatalog=Array.isArray(d.placeCatalog)?d.placeCatalog:[];d.hotelCatalog=Array.isArray(d.hotelCatalog)?d.hotelCatalog:[];d.travelLeads=Array.isArray(d.travelLeads)?d.travelLeads:[];return d}
 function adminMoney(v){return new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(Number(v||0))}
 function adminMetric(icon,label,value,sub=''){return `<div class="ipa-admin-metric"><span>${icon}</span><div><small>${label}</small><strong>${value}</strong><em>${sub}</em></div></div>`}
-function adminTripList(){const d=adminData();return `<div class="ipa-admin-trip-list">${d.trips.map(t=>{const c=d.clients.find(x=>x.id===t.clientId);return `<button data-admin-trip="${t.id}"><span>${countryFlag(tripCountry(t))}</span><div><b>${t.name}</b><small>${c?.name||'Cliente'} · ${t.destination}</small></div><em>${t.plan}</em><i>${t.published?'Publicado':t.status}</i><strong>›</strong></button>`}).join('')||'<p>Nenhuma viagem cadastrada.</p>'}</div>`}
+function adminTripList(){const d=adminData();return `<div class="ipa-admin-trip-list">${d.trips.map(t=>{const c=d.clients.find(x=>x.id===t.clientId);return `<div class="trip-list-row"><button class="trip-list-open" data-admin-trip="${ipaEscape(t.id)}"><span>${countryFlag(tripCountry(t))}</span><div><b>${ipaEscape(t.name)}</b><small>${ipaEscape(c?.name||'Cliente')} · ${ipaEscape(t.destination||'')}</small></div><em>${ipaEscape(t.plan||'')}</em><i>${t.published?'Publicado':ipaEscape(t.status||'')}</i><strong>›</strong></button><div class="trip-list-actions"><button type="button" class="btn btn-light" data-admin-smart-client-trip="${ipaEscape(t.clientId||'')}" data-smart-existing-trip="${ipaEscape(t.id)}">✨ Criar roteiro</button><button type="button" class="btn btn-light trip-delete-action" data-admin-delete-trip="${ipaEscape(t.id)}">🗑 Excluir</button></div></div>`}).join('')||'<p>Nenhuma viagem cadastrada.</p>'}</div>`}
 function adminDashboard(){const d=adminData(),open=d.payments.filter(p=>p.status!=='Pago').reduce((s,p)=>s+Number(p.amount||0),0);return `<div class="ipa-admin-head"><div><span class="eyebrow">INDO POR AÍ BUSINESS</span><h1>Dashboard</h1><p>Gerencie clientes, viagens e receita em um só lugar.</p></div><button class="btn btn-primary" data-admin-new-trip>+ Nova viagem</button></div><div class="ipa-admin-metrics">${adminMetric('👤','Clientes',d.clients.length,'ativos')}${adminMetric('✈️','Viagens',d.trips.length,'cadastradas')}${adminMetric('💳','Em aberto',adminMoney(open),'a receber')}${adminMetric('🔴','Live',d.trips.filter(t=>t.modules?.live).length,'habilitadas')}</div><section class="ipa-admin-panel"><div class="section-head"><div><span class="eyebrow">OPERAÇÃO</span><h2>Viagens</h2></div><button class="btn btn-light" data-admin-section="trips">Ver todas</button></div>${adminTripList()}</section><section class="ipa-admin-panel"><span class="eyebrow">PRÓXIMAS AÇÕES</span><h2>O que precisa da sua atenção</h2><div class="ipa-admin-attention"><div>💳 <span><b>Cobranças em aberto</b><small>Envie lembretes pelo Financeiro.</small></span></div><div>👁️ <span><b>Confira como cliente</b><small>Revise a experiência antes de publicar.</small></span></div><div>🔴 <span><b>Live</b><small>Ative apenas quando quiser transmissão.</small></span></div></div></section>`}
 function ipaPlanLimit(plan){return {Explore:1,Signature:3,Elite:5,Groups:Infinity}[plan]??1}
 function ipaAccessUsage(client,d=adminData()){
