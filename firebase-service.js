@@ -655,6 +655,12 @@ window.IPAFirebase = {
     if(!currentUser) throw new Error("Faça login primeiro.");
     return pullAll();
   },
+  async deleteTripDocument(id){
+    if(!currentUser || currentUser.uid!==ADMIN_UID) throw new Error("Somente o ADM pode excluir documentos.");
+    if(!id) throw new Error("Documento inválido.");
+    await deleteDoc(doc(firestore,"tripDocuments",id));
+    return true;
+  },
   async deleteCatalogPlace(id){
     if(!currentUser || currentUser.uid!==ADMIN_UID) throw new Error("Somente o ADM pode excluir lugares.");
     if(!id) throw new Error("Lugar inválido.");
