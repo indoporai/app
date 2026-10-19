@@ -420,6 +420,40 @@ function bind(){
  });
  const openPlanner=document.querySelector('#openTravelPlanner');if(openPlanner)openPlanner.onclick=()=>{showModal(ipaPlannerForm(ipaProspectPlan));setTimeout(()=>ipaBindProspectForm(),0)};
  document.querySelectorAll('[data-choose-prospect-plan]').forEach(btn=>btn.onclick=()=>{ipaProspectPlan=btn.dataset.chooseProspectPlan||'';modal.close();showModal(ipaPlannerForm(ipaProspectPlan));setTimeout(()=>ipaBindProspectForm(),0)});
+ document.querySelectorAll('[data-admin-smart-client-trip]').forEach(btn=>btn.onclick=()=>{
+  const clients=adminData().clients||[];
+  if(!clients.length){toast('Cadastre um cliente primeiro');adminSection='clients';render();return}
+  const preferred=btn.dataset.adminSmartClientTrip||'';
+  showModal(`<span class="eyebrow">✨ CRIAÇÃO INTELIGENTE · ADM</span><h2>Planejar viagem para cliente cadastrado</h2><p>Use o mesmo motor de curadoria dos pedidos externos, sem criar um pedido fictício.</p>
+   <label>Cliente<select id="smartClient">${clients.map(c=>`<option value="${ipaEscape(c.id)}" ${c.id===preferred?'selected':''}>${ipaEscape(c.name)} · ${ipaEscape(c.email||'')}</option>`).join('')}</select></label>
+   <label>Destino (cidade ou país)<input id="smartDestination" placeholder="Ex.: Lisboa" required></label>
+   <div class="smart-client-form-grid"><label>Dias<input id="smartDays" type="number" min="1" max="45" value="5"></label><label>Adultos<input id="smartAdults" type="number" min="1" value="2"></label><label>Crianças<input id="smartChildren" type="number" min="0" value="0"></label><label>Ritmo<select id="smartPace"><option value="equilibrado">Equilibrado</option><option value="leve">Leve</option><option value="intenso">Intenso</option></select></label><label>Orçamento por pessoa<input id="smartBudget" type="number" min="0" value="0"></label><label>Moeda<select id="smartCurrency"><option>EUR</option><option>USD</option><option>BRL</option></select></label></div>
+   <label>Interesses (separados por vírgula)<input id="smartInterests" placeholder="Ex.: cultura, gastronomia, natureza"></label>
+   <button class="btn btn-primary btn-block" id="smartPreview">✨ Gerar sugestão inteligente</button><div id="smartPreviewResult" aria-live="polite"></div>`);
+  setTimeout(()=>{const generate=document.querySelector('#smartPreview');if(!generate)return;
+   let generated=null,input=null;
+   generate.onclick=()=>{
+    const value=id=>document.querySelector(id)?.value?.trim()||'';
+    input={clientId:value('#smartClient'),destination:value('#smartDestination'),days:Number(value('#smartDays')),adults:Number(value('#smartAdults')),children:Number(value('#smartChildren')),pace:value('#smartPace'),budget:Number(value('#smartBudget')),currency:value('#smartCurrency'),interests:value('#smartInterests').split(',').map(x=>x.trim()).filter(Boolean)};
+    if(!input.clientId||!input.destination||!input.days||input.days<1){toast('Informe cliente, destino e quantidade de dias');return}
+    generated=ipaGenerateCuratedRoute(input);
+    const box=document.querySelector('#smartPreviewResult');
+    if(!generated.count){box.innerHTML='<div class="planner-empty"><b>Não encontramos atrações para esse destino no Banco de Lugares.</b><small>Cadastre lugares correspondentes e tente novamente.</small></div>';return}
+    box.innerHTML=ipaAdminSuggestionHtml({...input,requestCode:'ADM',id:'',tripId:'preview'},generated).replace(/<div class="lead-actions">[\s\S]*?<\/div><\/div>$/,'</div>')+'<button class="btn btn-primary btn-block" id="smartCreateTrip">✓ Aprovar e criar viagem para este cliente</button>';
+    const create=document.querySelector('#smartCreateTrip');create.onclick=async()=>{
+      if(create.disabled)return;create.disabled=true;create.textContent='Criando viagem...';
+      try{
+       const client=adminData().clients.find(c=>c.id===input.clientId);if(!client)throw Error('Cliente não encontrado');
+       const itinerary=generated.days.map(day=>({day:Number(day.day),title:`Dia ${day.day}`,places:(day.places||[]).map((place,i)=>({...place,id:`trip-place-${Date.now()}-${day.day}-${i}`,catalogPlaceId:place.catalogPlaceId||place.id}))}));
+       const trip=IPAData.createTrip({clientId:client.id,name:`${input.destination} · ${client.name}`,destination:input.destination,country:'',plan:client.plan||'Explore',itinerary,smartRouteApprovedAt:new Date().toISOString(),status:'Em preparação'});
+       IPAData.updateClientById(client.id,{activeTripId:trip.id,lastConfiguredTripId:trip.id});
+       if(window.IPAFirebase?.user)await window.IPAFirebase.syncNow();
+       modal.close();adminSection='trips';adminTripId=trip.id;render();toast('Viagem inteligente criada e vinculada ✓');
+      }catch(err){console.error(err);toast(err.message||'Erro ao criar viagem');create.disabled=false;create.textContent='✓ Aprovar e criar viagem para este cliente'}
+    };
+   };
+  },0);
+ });
  document.querySelectorAll('[data-lead-generate]').forEach(btn=>btn.onclick=async()=>{const d=adminData(),lead=(d.travelLeads||[]).find(x=>x.id===btn.dataset.leadGenerate);if(!lead)return;const result=ipaGenerateCuratedRoute(lead);IPAData.updateTravelLead(lead.id,{adminSuggestion:result,status:'Em análise'});const box=document.querySelector(`[data-lead-result="${lead.id}"]`);if(box)box.innerHTML=ipaAdminSuggestionHtml(lead,result);btn.textContent='↻ Gerar novamente';try{if(window.IPAFirebase?.user)await window.IPAFirebase.syncNow()}catch(e){console.warn(e)};bind()});
  document.querySelectorAll('[data-lead-create-trip]').forEach(btn=>btn.onclick=async()=>{
    const d=adminData(),lead=(d.travelLeads||[]).find(x=>x.id===btn.dataset.leadCreateTrip);if(!lead?.adminSuggestion)return toast('Gere a sugestão antes de criar a viagem');
@@ -1662,10 +1696,10 @@ function ipaAccessUsage(client,d=adminData()){
 }
 function adminClients(){
  const d=adminData();
- return `<div class="ipa-admin-head"><div><span class="eyebrow">CRM</span><h1>Clientes</h1><p>Cadastros manuais e solicitações do Quero viajar.</p></div><button class="btn btn-primary" data-admin-new-client>+ Novo cliente</button></div><div class="catalog-summary ipa-access-summary"><div><strong>1</strong><small>Explore · acesso</small></div><div><strong>3</strong><small>Signature · acessos</small></div><div><strong>5</strong><small>Elite · acessos</small></div><div><strong>∞</strong><small>Groups · acessos</small></div></div><div class="ipa-admin-client-grid">${d.clients.map(c=>{const a=ipaAccessUsage(c,d),pending=(c.approvalStatus||'Aprovado')!=='Aprovado';return `<div class="ipa-admin-client"><div class="ipa-admin-avatar">${(c.name||'C').split(' ').map(x=>x[0]).slice(0,2).join('')}</div><div><b>${ipaEscape(c.name)}</b><small>${ipaEscape(c.email||'')} ${c.phone?' · '+ipaEscape(c.phone):''}</small><em>${ipaEscape(c.plan||'Explore')} · ${ipaEscape(c.clientType||'Titular')} · ${pending?'🟠 Aguardando aprovação':'🟢 Aprovado'}</em><small>Acessos: ${a.used} de ${a.total===Infinity?'ilimitados':a.total}</small><div class="lead-actions"><button class="btn btn-light" data-admin-edit-client="${c.id}">✏️ Editar</button>${pending?`<button class="btn btn-primary" data-admin-approve-client="${c.id}">✓ Aprovar cliente</button>`:`<button class="btn btn-light" data-admin-resend-access="${c.id}">📲 Reenviar acesso</button>`}</div></div></div>`}).join('')||'<div class="smart-empty"><b>Nenhum cliente cadastrado.</b></div>'}</div>`
+ return `<div class="ipa-admin-head"><div><span class="eyebrow">CRM</span><h1>Clientes</h1><p>Cadastros manuais e solicitações do Quero viajar.</p></div><div class="lead-actions"><button class="btn btn-primary" data-admin-new-client>+ Novo cliente</button><button class="btn btn-light" data-admin-smart-client-trip>✨ Criar viagem inteligente</button></div></div><div class="catalog-summary ipa-access-summary"><div><strong>1</strong><small>Explore · acesso</small></div><div><strong>3</strong><small>Signature · acessos</small></div><div><strong>5</strong><small>Elite · acessos</small></div><div><strong>∞</strong><small>Groups · acessos</small></div></div><div class="ipa-admin-client-grid">${d.clients.map(c=>{const a=ipaAccessUsage(c,d),pending=(c.approvalStatus||'Aprovado')!=='Aprovado';return `<div class="ipa-admin-client"><div class="ipa-admin-avatar">${(c.name||'C').split(' ').map(x=>x[0]).slice(0,2).join('')}</div><div><b>${ipaEscape(c.name)}</b><small>${ipaEscape(c.email||'')} ${c.phone?' · '+ipaEscape(c.phone):''}</small><em>${ipaEscape(c.plan||'Explore')} · ${ipaEscape(c.clientType||'Titular')} · ${pending?'🟠 Aguardando aprovação':'🟢 Aprovado'}</em><small>Acessos: ${a.used} de ${a.total===Infinity?'ilimitados':a.total}</small><div class="lead-actions"><button class="btn btn-light" data-admin-edit-client="${c.id}">✏️ Editar</button><button class="btn btn-light" data-admin-smart-client-trip="${c.id}">✨ Criar viagem inteligente</button>${pending?`<button class="btn btn-primary" data-admin-approve-client="${c.id}">✓ Aprovar cliente</button>`:`<button class="btn btn-light" data-admin-resend-access="${c.id}">📲 Reenviar acesso</button>`}</div></div></div>`}).join('')||'<div class="smart-empty"><b>Nenhum cliente cadastrado.</b></div>'}</div>`
 }
 
-function adminTrips(){return `<div class="ipa-admin-head"><div><span class="eyebrow">EXPERIÊNCIAS</span><h1>Viagens</h1><p>Escolha uma viagem para personalizar o app.</p></div><button class="btn btn-primary" data-admin-new-trip>+ Nova viagem</button></div><section class="ipa-admin-panel">${adminTripList()}</section>`}
+function adminTrips(){return `<div class="ipa-admin-head"><div><span class="eyebrow">EXPERIÊNCIAS</span><h1>Viagens</h1><p>Escolha uma viagem para personalizar o app.</p></div><div class="lead-actions"><button class="btn btn-primary" data-admin-new-trip>+ Nova viagem</button><button class="btn btn-light" data-admin-smart-client-trip>✨ Criação inteligente</button></div></div><section class="ipa-admin-panel">${adminTripList()}</section>`}
 function adminFinance(){
  const d=adminData();
  const total=d.payments.reduce((s,p)=>s+Number(p.amount||0),0);

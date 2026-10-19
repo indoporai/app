@@ -695,3 +695,5 @@ button.ipa-save-complete{opacity:1;background:#d9f4e9!important;color:#176044!im
 .ipa-save-spinner{width:17px;height:17px;display:inline-block;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:ipa-save-spin .75s linear infinite;flex:none}
 @keyframes ipa-save-spin{to{transform:rotate(360deg)}}
 @media(prefers-reduced-motion:reduce){.ipa-save-spinner{animation:none}}
+
+.smart-client-form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.smart-client-form-grid input,.smart-client-form-grid select{width:100%;box-sizing:border-box;min-height:44px}@media(max-width:560px){.smart-client-form-grid{grid-template-columns:1fr}}
