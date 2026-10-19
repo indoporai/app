@@ -439,9 +439,22 @@ function bind(){
     generated=ipaGenerateCuratedRoute(input);
     const box=document.querySelector('#smartPreviewResult');
     if(!generated.count){box.innerHTML='<div class="planner-empty"><b>Não encontramos atrações para esse destino no Banco de Lugares.</b><small>Cadastre lugares correspondentes e tente novamente.</small></div>';return}
-    box.innerHTML=ipaAdminSuggestionHtml({...input,requestCode:'ADM',id:'',tripId:'preview'},generated).replace(/<div class="lead-actions">[\s\S]*?<\/div><\/div>$/,'</div>')+'<button class="btn btn-primary btn-block" id="smartCreateTrip">✓ Aprovar e criar viagem para este cliente</button>';
+    box.innerHTML=ipaAdminSuggestionHtml({...input,requestCode:'ADM',id:'',tripId:'preview'},generated).replace(/<div class="lead-actions">[\s\S]*?<\/div><\/div>$/,'</div>')+`<section class="smart-manual-add"><h3>📍 Incluir lugar manualmente</h3><p>Adicione lugares antes de criar a viagem.</p><label>Nome do lugar<input id="smartManualName" placeholder="Ex.: Castelo de São Jorge"></label><div class="smart-manual-grid"><label>Dia<select id="smartManualDay">${generated.days.map(d=>`<option value="${d.day}">Dia ${d.day}</option>`).join('')}</select></label><label>Categoria<input id="smartManualCategory" placeholder="Ex.: Atração"></label></div><button class="btn btn-light btn-block" id="smartManualAdd" type="button" data-no-save-feedback>+ Incluir lugar no roteiro</button><small id="smartManualFeedback" aria-live="polite"></small><div id="smartManualList"></div></section><button class="btn btn-primary btn-block" id="smartCreateTrip" data-no-save-feedback>✓ Aprovar e criar viagem para este cliente</button>`;
+    document.querySelector('#smartManualAdd').onclick=()=>{
+      const name=document.querySelector('#smartManualName').value.trim();
+      const day=Number(document.querySelector('#smartManualDay').value);
+      const category=document.querySelector('#smartManualCategory').value.trim()||'Atração';
+      const feedback=document.querySelector('#smartManualFeedback');
+      if(!name){feedback.textContent='Informe o nome do lugar.';return}
+      const target=generated.days.find(x=>Number(x.day)===day);if(!target)return;
+      if(target.places.some(x=>String(x.name||'').trim().toLowerCase()===name.toLowerCase())){feedback.textContent='Este lugar já está neste dia.';return}
+      target.places.push({name,category,cost:0,currency:generated.currency||input.currency,interests:['Adicionado manualmente'],manual:true});
+      document.querySelector('#smartManualName').value='';
+      feedback.textContent='✓ Lugar incluído no Dia '+day+'.';
+      const li=document.createElement('p');li.textContent='📍 Dia '+day+' · '+name;document.querySelector('#smartManualList').appendChild(li);
+    };
     const create=document.querySelector('#smartCreateTrip');create.onclick=async()=>{
-      if(create.disabled)return;create.disabled=true;create.textContent='Criando viagem...';
+      if(create.disabled)return;create.disabled=true;create.innerHTML='<span class="ipa-save-spinner" aria-hidden="true"></span> Criando viagem, aguarde...';
       try{
        const client=adminData().clients.find(c=>c.id===input.clientId);if(!client)throw Error('Cliente não encontrado');
        const itinerary=generated.days.map(day=>({day:Number(day.day),title:`Dia ${day.day}`,places:(day.places||[]).map((place,i)=>({...place,id:`trip-place-${Date.now()}-${day.day}-${i}`,catalogPlaceId:place.catalogPlaceId||place.id}))}));

@@ -703,3 +703,5 @@ button.ipa-save-complete{opacity:1;background:#d9f4e9!important;color:#176044!im
 .ipa-admin-head>.lead-actions .btn{white-space:normal;min-height:48px;text-align:center}
 .smart-empty>[data-admin-smart-client-trip]{margin-top:14px}
 @media(max-width:680px){.ipa-admin-head>.lead-actions{width:100%}.ipa-admin-head>.lead-actions .btn{width:100%}}
+
+.smart-manual-add{margin:18px 0;padding:18px;background:#f3faf9;border:1px solid #dcebe8;border-radius:18px}.smart-manual-add h3{margin:0 0 8px}.smart-manual-add label{display:block;margin:12px 0}.smart-manual-add input,.smart-manual-add select{display:block;width:100%;min-width:0;box-sizing:border-box;min-height:46px;margin-top:6px;padding:9px;border:1px solid #cddfdd;border-radius:10px;background:white}.smart-manual-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}@media(max-width:480px){.smart-manual-grid{grid-template-columns:1fr}}
