@@ -12,6 +12,33 @@ const state={route:'today',mode:'during',profile:savedProfile,scenarioChosen:fal
  {type:'other',name:'Juliana',text:'Perfeito! Já estamos a caminho ☀️',time:'08:47'},
  {type:'other',name:'Carlos',text:'Alguém sabe se vai chover à tarde?',time:'08:50'}
 ]};
+
+/* Beta 6.29.30: global write-action feedback. No simulated success. */
+(function ipaWriteFeedback(){
+ const pending=new Map();
+ const writes=/(salvar|gravar|cadastrar|criar|adicionar|incluir|vincular|alterar vínculo|atualizar|publicar|enviar convite|confirmar|finalizar|excluir|remover|apagar|deletar|registrar|avaliar|check.in|favoritar|concluir)/i;
+ const reads=/(cancelar|abrir|visualizar|voltar|fechar|editar|filtro|pesquisar|ver como|explorar|navegar|ver mais|adicionar destino à rota)/i;
+ const errors=/(erro|falh|não foi|nao foi|inválid|informe|obrigat|já existe|ja existe|selecione|não é poss|nao e poss|negad|permiss|indisponível)/i;
+ const successes=/(salv|cadastrad|criad|atualizad|vinculad|publicad|enviad|adicionad|excluíd|removid|apagado|registrad|concluíd|sucesso|✓)/i;
+ function restore(btn){const p=pending.get(btn);if(!p)return;clearTimeout(p.timer);btn.disabled=p.disabled;btn.innerHTML=p.html;btn.classList.remove('ipa-is-saving','ipa-save-complete');btn.removeAttribute('aria-busy');pending.delete(btn)}
+ function finish(btn,ok){const p=pending.get(btn);if(!p)return;if(!ok){restore(btn);return}btn.innerHTML='✓ Concluído!';btn.classList.add('ipa-save-complete');clearTimeout(p.timer);p.timer=setTimeout(()=>restore(btn),1000)}
+ document.addEventListener('click',e=>{
+  const btn=e.target.closest('button,input[type="submit"]');if(!btn||btn.disabled||pending.has(btn)||btn.hasAttribute('data-no-save-feedback'))return;
+  const label=(btn.textContent||btn.value||'').trim();if(!writes.test(label)||reads.test(label))return;
+  const previous={html:btn.innerHTML,disabled:btn.disabled,timer:null};
+  // Defer disabling until after existing click handlers run; never prevent their action.
+  queueMicrotask(()=>{if(!btn.isConnected||btn.disabled)return;pending.set(btn,previous);btn.disabled=true;btn.classList.add('ipa-is-saving');btn.setAttribute('aria-busy','true');btn.innerHTML='<span class="ipa-save-spinner" aria-hidden="true"></span> Processando...';
+   previous.timer=setTimeout(()=>{if(!pending.has(btn))return;restore(btn);const note=document.createElement('div');note.className='toast';note.textContent='Não foi possível confirmar a operação. Verifique os dados antes de tentar novamente.';document.body.appendChild(note);setTimeout(()=>note.remove(),4000)},20000);
+  });
+ },true);
+ const observer=new MutationObserver(ms=>{
+  for(const m of ms)for(const n of m.addedNodes){if(n.nodeType!==1)continue;const notices=n.matches?.('.toast')?[n]:[...(n.querySelectorAll?.('.toast')||[])];
+   for(const note of notices){const message=(note.textContent||'').toLowerCase();for(const btn of [...pending.keys()]){if(!btn.isConnected){restore(btn);continue}if(errors.test(message))finish(btn,false);else if(successes.test(message))finish(btn,true)}}
+  }
+  for(const btn of [...pending.keys()])if(!btn.isConnected)restore(btn);
+ });observer.observe(document.body,{childList:true,subtree:true});
+})();
+
 const titles={today:'Hoje',trip:'Minha Viagem',explore:'Explorar',community:'Grupo da viagem',memories:'Memórias',diary:'Diário da Viagem',payments:'Pagamentos',prospect:'Planejar viagem',admin:'Indo por Aí Business'};
 
 document.addEventListener('click', event => {

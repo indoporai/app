@@ -688,3 +688,10 @@ body{min-height:100vh}.app-shell{width:min(100%,520px);min-height:100vh;margin:a
 .participant-list>div{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
 .participant-list>div>div{flex:1 1 180px;min-width:0}
 .participant-delete-btn{margin-left:auto;color:#a42e2e!important;border:1px solid #efc6c6!important;background:white!important;white-space:nowrap}
+
+/* Beta 6.29.30 - Estado visual de gravação */
+button.ipa-is-saving{opacity:.84;cursor:progress!important;pointer-events:none;display:inline-flex;align-items:center;justify-content:center;gap:9px;min-height:44px}
+button.ipa-save-complete{opacity:1;background:#d9f4e9!important;color:#176044!important}
+.ipa-save-spinner{width:17px;height:17px;display:inline-block;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:ipa-save-spin .75s linear infinite;flex:none}
+@keyframes ipa-save-spin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.ipa-save-spinner{animation:none}}
