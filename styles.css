@@ -887,3 +887,12 @@ dialog:has(#routeCatalogPlace) .smart-place-actions button{
 .ipa-concierge-messages{max-height:45vh;min-height:160px;overflow:auto;display:flex;flex-direction:column;gap:12px;padding:14px;background:#f5f9fc;border-radius:14px;margin:12px 0}
 .ipa-concierge-bubble{max-width:88%;padding:12px;border-radius:13px;background:white;align-self:flex-start;border:1px solid #e0e8f1}
 .ipa-concierge-bubble.client{align-self:flex-end;background:#dcefff}.ipa-concierge-bubble p{margin:6px 0;white-space:pre-wrap;overflow-wrap:anywhere}.ipa-concierge-bubble small,.ipa-concierge-private{color:#64748b;font-size:12px}
+
+.ipa-concierge-completed-head{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.ipa-concierge-completed-head>div{display:flex;flex-direction:column;gap:3px}
+.ipa-concierge-completed-head small{color:#6a7880}
+.ipa-concierge-completed-summary{font-size:13px;color:#596e79;margin:8px 0;line-height:1.35}
+.ipa-concierge-completed-actions{display:flex;gap:8px;flex-wrap:wrap}
+.ipa-concierge-completed-actions .btn{font-size:12px;padding:7px 11px}
+.ipa-concierge-completed-details{padding-top:12px;border-top:1px solid #e7ecef;margin-top:12px}
+.ipa-concierge-completed-details[hidden]{display:none!important}
