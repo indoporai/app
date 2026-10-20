@@ -26,7 +26,9 @@ import {
   limit,
   addDoc,
   orderBy,
-  onSnapshot
+  onSnapshot,
+  updateDoc,
+  arrayUnion
 } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-firestore.js";
 import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-storage.js";
 
@@ -507,7 +509,7 @@ window.IPAFirebase = {
   async submitConciergeRequest(request){
     if(!currentUser || currentUser.uid===ADMIN_UID)throw new Error('Entre com o login do viajante.');
     if(!request?.tripId || !String(request.text||'').trim())throw new Error('Informe a viagem e os detalhes do pedido.');
-    const item={id:'conc-'+currentUser.uid+'-'+Date.now(),tripId:String(request.tripId),clientId:String(request.clientId||''),type:String(request.type||'Outro').slice(0,80),text:String(request.text).trim().slice(0,3000),requesterUid:currentUser.uid,requesterEmail:currentUser.email||'',status:'Enviado',createdAt:new Date().toISOString()};
+    const item={id:'conc-'+currentUser.uid+'-'+Date.now(),tripId:String(request.tripId),clientId:String(request.clientId||''),type:String(request.type||'Outro').slice(0,80),text:String(request.text).trim().slice(0,3000),requesterUid:currentUser.uid,requesterEmail:currentUser.email||'',status:'Enviado',createdAt:new Date().toISOString(),messages:[{sender:'client',text:String(request.text).trim().slice(0,3000),createdAt:new Date().toISOString()}]};
     await setDoc(doc(firestore,'conciergeRequests',item.id),item);
     return item;
   },
@@ -518,6 +520,26 @@ window.IPAFirebase = {
   async updateConciergeRequest(id,fields){
     if(!currentUser || currentUser.uid!==ADMIN_UID)throw new Error('Somente o ADM pode atualizar pedidos.');
     await setDoc(doc(firestore,'conciergeRequests',id),{status:fields.status||'Em análise',adminReply:String(fields.adminReply||'').slice(0,3000),answeredAt:new Date().toISOString()},{merge:true});
+  },
+  listenConciergeRequest(id,onChange,onError){
+    if(!currentUser||!id)return ()=>{};
+    return onSnapshot(doc(firestore,'conciergeRequests',String(id)),snap=>onChange?.(snap.exists()?{id:snap.id,...snap.data()}:null),err=>onError?.(err));
+  },
+  async getMyConciergeRequests(tripId){
+    if(!currentUser||currentUser.uid===ADMIN_UID)throw new Error('Entre como viajante.');
+    const q=query(collection(firestore,'conciergeRequests'),where('requesterUid','==',currentUser.uid),limit(100));
+    const snap=await getDocs(q);
+    return snap.docs.map(d=>({id:d.id,...d.data()})).filter(r=>String(r.tripId)===String(tripId)).sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
+  },
+  async sendConciergeMessage(id,text){
+    if(!currentUser)throw new Error('Faça login.');
+    const clean=String(text||'').trim();if(!clean)throw new Error('Digite uma mensagem.');
+    const ref=doc(firestore,'conciergeRequests',String(id));
+    const snap=await getDoc(ref);if(!snap.exists())throw new Error('Atendimento não encontrado.');
+    const item=snap.data();
+    if(currentUser.uid!==ADMIN_UID && item.requesterUid!==currentUser.uid)throw new Error('Sem acesso a este atendimento.');
+    const sender=currentUser.uid===ADMIN_UID?'admin':'client';
+    await updateDoc(ref,{messages:arrayUnion({sender,text:clean.slice(0,3000),createdAt:new Date().toISOString(),uid:currentUser.uid}),status:sender==='admin'?'Respondido':'Em análise',updatedAt:new Date().toISOString()});
   },
   async submitProspectRequest(lead,client){
     if(!lead?.id || !client?.id) throw new Error("Pedido inválido.");

@@ -880,3 +880,10 @@ dialog:has(#routeCatalogPlace) .smart-place-actions button{
 .ipa-reorder-hint{font-size:12px;color:#667b81;margin:0 0 12px}
 
 .ipa-concierge-access{margin-top:14px}
+
+/* Beta 6.29.53: chat privado do Concierge */
+.ipa-concierge-thread{display:flex;flex-wrap:wrap;align-items:center;gap:8px;width:100%;text-align:left;border:1px solid #dce6ef;border-radius:12px;background:white;padding:13px;margin:8px 0;cursor:pointer;color:#163764}
+.ipa-concierge-thread strong{flex:1}.ipa-concierge-thread span{font-size:12px;color:#0079aa}.ipa-concierge-thread small{flex-basis:100%;color:#607387}
+.ipa-concierge-messages{max-height:45vh;min-height:160px;overflow:auto;display:flex;flex-direction:column;gap:12px;padding:14px;background:#f5f9fc;border-radius:14px;margin:12px 0}
+.ipa-concierge-bubble{max-width:88%;padding:12px;border-radius:13px;background:white;align-self:flex-start;border:1px solid #e0e8f1}
+.ipa-concierge-bubble.client{align-self:flex-end;background:#dcefff}.ipa-concierge-bubble p{margin:6px 0;white-space:pre-wrap;overflow-wrap:anywhere}.ipa-concierge-bubble small,.ipa-concierge-private{color:#64748b;font-size:12px}
