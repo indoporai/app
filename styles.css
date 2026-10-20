@@ -851,3 +851,11 @@ dialog:has(#routeCatalogPlace) .smart-place-actions button{
 .ipa-invite-results{display:grid;gap:8px}.ipa-invite-results>div{display:grid;gap:4px;padding:10px;background:#f3f8f8;border-radius:10px}
 #docFlightFields[hidden],#docEndDateLabel[hidden]{display:none!important}
 @media(max-width:580px){.trip-hotel-list>div.ipa-booking-card{grid-template-columns:78px minmax(0,1fr)}.ipa-booking-cover{width:78px;height:78px}.trip-hotel-list>div.ipa-booking-card>button{grid-column:2;justify-self:end}}
+
+/* Beta 6.29.40: links de mídia visíveis no ADM e no cliente */
+.climate-admin-grid .ipa-stream-links,.climate-grid .ipa-stream-links{display:flex!important;flex-wrap:wrap!important;gap:7px!important;margin:12px 0 4px!important}
+.climate-admin-grid .ipa-stream-link,.climate-grid .ipa-stream-link{display:inline-flex!important;align-items:center!important;justify-content:flex-start!important;gap:6px!important;margin:0!important;padding:7px 9px!important;min-height:36px!important;border:1px solid #dceae8!important;border-radius:10px!important;background:#f4f9f8!important;color:#124e5a!important;font:700 12px/1.3 system-ui,sans-serif!important;letter-spacing:0!important;text-transform:none!important;box-shadow:none!important;width:auto!important;white-space:nowrap!important;cursor:pointer!important}
+.ipa-provider-mark{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;flex:0 0 22px;border-radius:6px;background:#164d5a;color:#fff;font-size:13px;font-weight:900;letter-spacing:-.05em}
+.ipa-provider-netflix{background:#e50914}.ipa-provider-primevideo{background:#00a8e1}.ipa-provider-disney{background:#172d69}.ipa-provider-appletv{background:#222}.ipa-provider-spotify{background:#1db954;color:#08230d}.ipa-provider-deezer{background:#7b39ca}.ipa-provider-applemusic{background:#e63b63}.ipa-provider-kindle{background:#e9a23b;color:#242424}.ipa-provider-googlelivros{background:#4285f4}.ipa-provider-applebooks{background:#f27130}
+.climate-admin-grid .ipa-stream-note,.climate-grid .ipa-stream-note{font-size:11px!important;line-height:1.35!important;font-weight:400!important;letter-spacing:0!important;text-transform:none!important;color:#72838a!important}
+.climate-admin-grid>div>button[data-admin-edit-climate]{margin-top:auto!important}
