@@ -1014,6 +1014,29 @@ function bind(){
 
 
  document.querySelectorAll('[data-admin-new-hotel]').forEach(b=>b.onclick=()=>ipaHotelModal());
+ document.querySelectorAll('[data-admin-sync-hotel-photos]').forEach(b=>b.onclick=async()=>{
+  if(!window.IPAFirebase?.user){toast('Entre como administrador para atualizar as fotos.');return}
+  const d=adminData();let changed=0,stays=0;
+  const updates=[];
+  for(const trip of d.trips){
+   let dirty=false;
+   const bookings=(trip.hotelBookings||[]).map(st=>{
+    const h=ipaFindBookedHotel(st,d.hotelCatalog);
+    const url=h.photoUrl||st.photoUrl||'';
+    if(url&&url!==st.photoUrl){dirty=true;stays++;return {...st,photoUrl:url}}
+    return st;
+   });
+   if(dirty)updates.push({trip,bookings});
+  }
+  if(!updates.length){toast('As fotos já estão vinculadas às reservas disponíveis.');return}
+  b.disabled=true;b.textContent='Atualizando fotos...';
+  try{
+   for(const {trip,bookings} of updates){IPAData.updateTrip(trip.id,{hotelBookings:bookings});changed++}
+   await window.IPAFirebase.syncNow();
+   toast(`${stays} foto(s) atualizada(s) em ${changed} viagem(ns).`);
+   render();
+  }catch(e){console.error('Erro ao sincronizar fotos',e);toast('Não foi possível salvar as fotos: '+(e.message||'erro de permissão'));b.disabled=false;b.textContent='📷 Atualizar fotos nas viagens'}
+ });
  document.querySelectorAll('[data-admin-edit-hotel]').forEach(b=>b.onclick=()=>{const h=(adminData().hotelCatalog||[]).find(x=>x.id===b.dataset.adminEditHotel);if(h)ipaHotelModal(h)});
  document.querySelectorAll('[data-admin-locate-hotel]').forEach(b=>b.onclick=async()=>{const h=(adminData().hotelCatalog||[]).find(x=>x.id===b.dataset.adminLocateHotel);if(!h)return;b.disabled=true;b.textContent='Localizando...';try{await ipaLocateHotel(h);if(window.IPAFirebase?.user)await window.IPAFirebase.syncNow();toast('Hospedagem localizada no Google ✓');render()}catch(e){toast(e.message||'Não foi possível localizar');b.disabled=false;b.textContent='📍 Localizar'}});
  document.querySelectorAll('[data-admin-delete-hotel]').forEach(b=>b.onclick=async()=>{const h=(adminData().hotelCatalog||[]).find(x=>x.id===b.dataset.adminDeleteHotel);if(!h)return;if(!confirm(`Excluir “${h.name}” do Banco de Hospedagens?`))return;IPAData.removeHotel(h.id);if(window.IPAFirebase?.user)await window.IPAFirebase.syncNow();render();toast('Hospedagem excluída ✓')});
@@ -1879,7 +1902,7 @@ function ipaFindBookedHotel(st,catalog){
  return byName||byId||list.find(h=>ipaNormText(h.name)===name&&(!city||ipaNormText(h.city)===city))||{};
 }
 function ipaBookedHotelImage(h,st){
- const url=h.photoUrl||st.photoUrl||'';
+ const url=st.photoUrl||h.photoUrl||'';
  const city=st.city||h.city||'Destino';
  const fallback=`<div class="ipa-city-postcard" role="img" aria-label="Sem foto cadastrada para ${ipaEscape(city)}"><span>🏙️</span><small>${ipaEscape(city)}</small></div>`;
  return url?`<img src="${ipaEscape(url)}" alt="Foto de ${ipaEscape(h.name||st.hotelName||'hospedagem')}" loading="lazy" onerror="this.style.display='none';this.parentNode.classList.add('ipa-photo-error')">`:fallback;
@@ -1922,7 +1945,7 @@ function adminHotels(){
  const avg=hotels.filter(h=>Number(h.ipaRating)>0);const avgRating=avg.length?(avg.reduce((a,h)=>a+Number(h.ipaRating),0)/avg.length).toFixed(1):'—';
  const located=hotels.filter(h=>Number.isFinite(Number(h.lat))&&Number.isFinite(Number(h.lng))).length;
  const countries=[...new Set(hotels.map(h=>h.country).filter(Boolean))],cities=[...new Set(hotels.map(h=>h.city).filter(Boolean))];
- return `<div class="ipa-admin-head"><div><span class="eyebrow">CURADORIA & VENDAS</span><h1>Banco de Hospedagens</h1><p>Cadastre hotéis, pousadas, hostels e apartamentos uma vez e reutilize em qualquer viagem.</p></div><button class="btn btn-primary" data-admin-new-hotel>+ Nova hospedagem</button></div>
+ return `<div class="ipa-admin-head"><div><span class="eyebrow">CURADORIA & VENDAS</span><h1>Banco de Hospedagens</h1><p>Cadastre hotéis, pousadas, hostels e apartamentos uma vez e reutilize em qualquer viagem.</p></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-light" data-admin-sync-hotel-photos>📷 Atualizar fotos nas viagens</button><button class="btn btn-primary" data-admin-new-hotel>+ Nova hospedagem</button></div></div>
  <div class="catalog-summary catalog-summary-visual"><div><span>🏨</span><strong>${hotels.length}</strong><small>Hospedagens</small></div><div><span>🌎</span><strong>${countries.length}</strong><small>Países</small></div><div><span>🏙️</span><strong>${cities.length}</strong><small>Destinos</small></div><div><span>🎯</span><strong>${hotels.length?Math.round(located/hotels.length*100):0}%</strong><small>Geolocalizadas <em>${located}/${hotels.length}</em></small></div><div class="summary-rating"><span>⭐</span><strong>${avgRating}</strong><small>Nota média Indo por Aí</small></div></div>
  ${ipaCountryDashboard(hotels,'hotels')}
  <div class="catalog-toolbar"><label class="catalog-search"><span>🔎</span><input id="hotelSearch" class="v2-concierge-input" placeholder="Pesquisar hotel, cidade, país ou tipo..."></label></div>
