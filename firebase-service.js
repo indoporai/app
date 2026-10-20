@@ -139,7 +139,6 @@ async function syncAll(data){
       upsertCollection("recommendations",data.recommendations),
       upsertCollection("tripDocuments",data.tripDocuments),
       upsertCollection("memories",data.memories),
-      upsertCollection("conciergeRequests",data.conciergeRequests),
       upsertCollection("placeCatalog",data.placeCatalog),
       upsertCollection("travelLeads",data.travelLeads)
     ]);
@@ -522,6 +521,13 @@ window.IPAFirebase = {
   async getConciergeRequests(){
     if(!currentUser || currentUser.uid!==ADMIN_UID)throw new Error('Somente o ADM pode consultar pedidos.');
     return readCollection('conciergeRequests');
+  },
+  async deleteConciergeRequest(id){
+    if(!currentUser || currentUser.uid!==ADMIN_UID)throw new Error('Somente o ADM pode excluir atendimentos.');
+    const ref=doc(firestore,'conciergeRequests',String(id));
+    await deleteDoc(ref);
+    const check=await getDoc(ref);
+    if(check.exists())throw new Error('O atendimento ainda consta no Firebase.');
   },
   async updateConciergeRequest(id,fields){
     if(!currentUser || currentUser.uid!==ADMIN_UID)throw new Error('Somente o ADM pode atualizar pedidos.');

@@ -600,6 +600,25 @@ function bind(){
  });
 
  const refreshConcierge=document.querySelector('#refreshConcierge');if(refreshConcierge)refreshConcierge.onclick=async()=>{refreshConcierge.disabled=true;refreshConcierge.textContent='Consultando Firebase...';try{ipaConciergeAdminRequests=(await window.IPAFirebase.getConciergeRequests()).sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||'')));render()}catch(e){console.error(e);toast('Não foi possível consultar os pedidos: '+(e.message||'erro'));refreshConcierge.disabled=false;refreshConcierge.textContent='↻ Atualizar pedidos'}};
+ document.querySelectorAll('[data-concierge-delete]').forEach(b=>b.onclick=async()=>{
+  const id=b.dataset.conciergeDelete;
+  const r=ipaConciergeAdminRequests.find(x=>x.id===id);
+  if(!r)return;
+  if(!confirm('Excluir permanentemente este atendimento e todo o histórico de mensagens? Ele também desaparecerá da visão do cliente. Esta ação não pode ser desfeita.'))return;
+  b.disabled=true;b.textContent='Excluindo...';
+  try{
+   await window.IPAFirebase.deleteConciergeRequest(id);
+   ipaConciergeAdminRequests=ipaConciergeAdminRequests.filter(x=>x.id!==id);
+   // Evita que uma sincronização posterior recrie o documento excluído.
+   const d=IPAData.getAll();
+   if(Array.isArray(d.conciergeRequests)){
+    d.conciergeRequests=d.conciergeRequests.filter(x=>x.id!==id);
+    if(typeof IPAData.replaceAll==='function')IPAData.replaceAll(d);
+   }
+   toast('Atendimento excluído do Firebase e removido da visão do cliente.');
+   render();
+  }catch(e){toast('Não foi possível excluir: '+(e.message||'erro'));b.disabled=false;b.textContent='🗑 Excluir'}
+ });
  document.querySelectorAll('[data-concierge-save]').forEach(b=>b.onclick=async()=>{const id=b.dataset.conciergeSave,status=document.querySelector('[data-concierge-status="'+id+'"]')?.value,adminReply=document.querySelector('[data-concierge-reply="'+id+'"]')?.value;b.disabled=true;try{await window.IPAFirebase.updateConciergeRequest(id,{status,adminReply});const r=ipaConciergeAdminRequests.find(x=>x.id===id);if(r)Object.assign(r,{status,adminReply});toast('Atendimento salvo no Firebase ✓');render()}catch(e){toast('Falha ao salvar atendimento: '+(e.message||'erro'));b.disabled=false}});
  document.querySelectorAll('[data-admin-section]').forEach(b=>b.onclick=()=>{adminSection=b.dataset.adminSection;state.route='admin';render()});
  document.querySelectorAll('[data-admin-delete-trip]').forEach(b=>b.onclick=async()=>{
@@ -2161,7 +2180,7 @@ function adminConcierge(){
  return `<div class="card ipa-concierge-completed" style="padding:12px 16px;margin:8px 0">
   <div class="ipa-concierge-completed-head"><div><strong>✓ ${ipaEscape(r.type||'Pedido')}</strong><small>${ipaEscape(client?.name||r.requesterEmail||'Viajante')} · ${ipaEscape(trip?.name||r.tripId||'Viagem')}</small></div><span class="chip">Concluído</span></div>
   <p class="ipa-concierge-completed-summary">${ipaEscape(summary)}${summary.length>=135?'…':''}</p>
-  <div class="ipa-concierge-completed-actions"><button class="btn btn-light" data-concierge-chat="${ipaEscape(r.id)}">💬 Ver conversa</button><button class="btn btn-light" data-concierge-expand="${ipaEscape(r.id)}">Ver detalhes</button></div>
+  <div class="ipa-concierge-completed-actions"><button class="btn btn-light" data-concierge-chat="${ipaEscape(r.id)}">💬 Ver conversa</button><button class="btn btn-light" data-concierge-expand="${ipaEscape(r.id)}">Ver detalhes</button><button class="btn btn-light" data-concierge-delete="${ipaEscape(r.id)}">🗑 Excluir</button></div>
   <div class="ipa-concierge-completed-details" id="concierge-details-${ipaEscape(r.id)}" hidden>
    <p>${ipaEscape(r.text||'')}</p>
    <label>Status<select data-concierge-status="${ipaEscape(r.id)}" class="v2-concierge-input">${['Enviado','Em análise','Respondido','Concluído'].map(x=>`<option ${x===r.status?'selected':''}>${x}</option>`).join('')}</select></label>
@@ -2169,7 +2188,7 @@ function adminConcierge(){
    <button class="btn btn-light" data-concierge-save="${ipaEscape(r.id)}">Salvar status / observação</button>
   </div></div>`;
 }
-return `<div class="card" style="padding:18px;margin:12px 0"><div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap"><strong>${ipaEscape(r.type||'Pedido')}</strong><span class="chip">${ipaEscape(r.status||'Enviado')}</span></div><small>${ipaEscape(client?.name||r.requesterEmail||'Viajante')} · ${ipaEscape(trip?.name||r.tripId||'Viagem')} · ${ipaEscape(String(r.createdAt||'').slice(0,16).replace('T',' '))}</small><p>${ipaEscape(r.text||'')}</p><label>Status<select data-concierge-status="${ipaEscape(r.id)}" class="v2-concierge-input">${['Enviado','Em análise','Respondido','Concluído'].map(x=>`<option ${x===r.status?'selected':''}>${x}</option>`).join('')}</select></label><label>Observação interna (não enviada ao cliente)<textarea data-concierge-reply="${ipaEscape(r.id)}" class="rating-text">${ipaEscape(r.adminReply||'')}</textarea></label><button class="btn btn-primary" data-concierge-chat="${ipaEscape(r.id)}">💬 Abrir conversa</button><button class="btn btn-light" data-concierge-save="${ipaEscape(r.id)}">Salvar status / observação</button></div>`}).join('')||'<div class="card" style="padding:18px">Nenhum pedido recebido até o momento.</div>'}</section>`;
+return `<div class="card" style="padding:18px;margin:12px 0"><div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap"><strong>${ipaEscape(r.type||'Pedido')}</strong><span class="chip">${ipaEscape(r.status||'Enviado')}</span></div><small>${ipaEscape(client?.name||r.requesterEmail||'Viajante')} · ${ipaEscape(trip?.name||r.tripId||'Viagem')} · ${ipaEscape(String(r.createdAt||'').slice(0,16).replace('T',' '))}</small><p>${ipaEscape(r.text||'')}</p><label>Status<select data-concierge-status="${ipaEscape(r.id)}" class="v2-concierge-input">${['Enviado','Em análise','Respondido','Concluído'].map(x=>`<option ${x===r.status?'selected':''}>${x}</option>`).join('')}</select></label><label>Observação interna (não enviada ao cliente)<textarea data-concierge-reply="${ipaEscape(r.id)}" class="rating-text">${ipaEscape(r.adminReply||'')}</textarea></label><button class="btn btn-primary" data-concierge-chat="${ipaEscape(r.id)}">💬 Abrir conversa</button><button class="btn btn-light" data-concierge-save="${ipaEscape(r.id)}">Salvar status / observação</button><button class="btn btn-light" data-concierge-delete="${ipaEscape(r.id)}">🗑 Excluir</button></div>`}).join('')||'<div class="card" style="padding:18px">Nenhum pedido recebido até o momento.</div>'}</section>`;
 }
 function adminIntegratedView(){
  const service=window.IPAFirebase;
@@ -2920,7 +2939,7 @@ function openConciergeConversation(id,isAdmin=false){
  showModal(`<div class="ipa-concierge-chat"><span class="eyebrow">👑 Atendimento privado</span><h2>Conversa com o concierge</h2><p class="ipa-concierge-private">Somente o viajante deste pedido e a equipe Indo por Aí.</p><div id="ipaConciergeMessages" class="ipa-concierge-messages">${existing?ipaConciergeMessagesHtml(existing):'Carregando conversa...'}</div><label for="ipaConciergeText">Sua mensagem</label><textarea id="ipaConciergeText" class="rating-text" rows="3" placeholder="Escreva sua mensagem..."></textarea><button class="btn btn-primary btn-block" id="ipaConciergeSend">Enviar mensagem</button><small id="ipaConciergeStatus" aria-live="polite"></small></div>`);
  const box=document.querySelector('#ipaConciergeMessages'),status=document.querySelector('#ipaConciergeStatus'),btn=document.querySelector('#ipaConciergeSend');
  btn.onclick=async()=>{const input=document.querySelector('#ipaConciergeText'),value=input.value.trim();if(!value)return;btn.disabled=true;status.textContent='Enviando...';try{await window.IPAFirebase.sendConciergeMessage(id,value);input.value='';status.textContent='Mensagem enviada ✓'}catch(e){status.textContent='Não enviada: '+(e.message||'erro de permissão')}finally{btn.disabled=false}};
- ipaConciergeUnsubscribe=window.IPAFirebase.listenConciergeRequest(id,r=>{if(!modal.open){ipaConciergeCloseListener();return}if(box){box.innerHTML=r?ipaConciergeMessagesHtml(r):'Atendimento indisponível.';box.scrollTop=box.scrollHeight}},e=>{if(status)status.textContent='Não foi possível carregar a conversa: '+(e.message||'permissão negada')});
+ ipaConciergeUnsubscribe=window.IPAFirebase.listenConciergeRequest(id,r=>{if(!modal.open){ipaConciergeCloseListener();return}if(box){box.innerHTML=r?ipaConciergeMessagesHtml(r):'Este atendimento foi excluído pelo Concierge.';if(!r){btn.disabled=true;document.querySelector('#ipaConciergeText').disabled=true;}box.scrollTop=box.scrollHeight}},e=>{if(status)status.textContent='Não foi possível carregar a conversa: '+(e.message||'permissão negada')});
  modal.addEventListener('close',ipaConciergeCloseListener,{once:true});
 }
 async function openConcierge(){
