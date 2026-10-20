@@ -124,7 +124,7 @@ function render(){
  view.innerHTML=routes[state.route]();
  document.querySelectorAll('.nav-item').forEach(b=>b.classList.toggle('active',b.dataset.route===state.route));
  document.body.classList.toggle('hidden-nav',state.profile==='prospect');
- bind(); ipaUpdateProfileButton(); window.scrollTo({top:0,behavior:'smooth'});
+ bind(); ipaUpdateProfileButton(); if(state.route==='admin'&&state.profile==='admin')ipaEnsureAdminConciergeListener(); window.scrollTo({top:0,behavior:'smooth'});
 }
 
 function ipaParticipantKey(p){return p?.id||p?.participantId||p?.email||p?.name||''}
@@ -2120,9 +2120,42 @@ function adminCloudBadge(){
  return `<span class="firebase-badge ${cls}">● ${label}</span>`;
 }
 let ipaConciergeAdminRequests=[];
+let ipaConciergeAdminStop=null;
+let ipaConciergeAdminUid=null;
+function ipaConciergePendingCount(){
+ return ipaConciergeAdminRequests.filter(r=>{
+   if(r.status==='Concluído')return false;
+   const messages=Array.isArray(r.messages)?r.messages:[];
+   return messages.length ? messages[messages.length-1]?.sender==='client' : r.status==='Enviado';
+ }).length;
+}
+function ipaEnsureAdminConciergeListener(){
+ const firebase=window.IPAFirebase,uid=firebase?.user?.uid;
+ if(state.profile!=='admin'||!uid){
+  if(ipaConciergeAdminStop){ipaConciergeAdminStop();ipaConciergeAdminStop=null}
+  ipaConciergeAdminUid=null;return;
+ }
+ if(ipaConciergeAdminStop&&ipaConciergeAdminUid===uid)return;
+ if(ipaConciergeAdminStop)ipaConciergeAdminStop();
+ ipaConciergeAdminUid=uid;
+ ipaConciergeAdminStop=firebase.listenAdminConciergeRequests?.(rows=>{
+  const sorted=rows.sort((a,b)=>String(b.updatedAt||b.createdAt||'').localeCompare(String(a.updatedAt||a.createdAt||'')));
+  const changed=JSON.stringify(sorted)!==JSON.stringify(ipaConciergeAdminRequests);
+  ipaConciergeAdminRequests=sorted;
+  if(!changed||state.profile!=='admin'||state.route!=='admin')return;
+  // Atualiza os indicadores sem fechar um chat aberto ou reiniciar a página.
+  const nav=document.querySelector('[data-admin-section="concierge"] span');
+  if(nav)nav.textContent='Concierge'+(ipaConciergePendingCount()?` (${ipaConciergePendingCount()})`:'');
+  if(adminSection==='concierge'){
+    const content=document.querySelector('.ipa-admin-content');
+    if(content){content.innerHTML=adminConcierge();bind()}
+  }
+ },e=>{console.error('Concierge em tempo real',e);toast('Não foi possível atualizar o Concierge: '+(e.message||'erro'))});
+}
+
 function adminConcierge(){
  const list=ipaConciergeAdminRequests;
- return `<section class="section"><div class="section-head"><h2>Pedidos do concierge</h2><button class="btn btn-light" id="refreshConcierge">↻ Atualizar pedidos</button></div><p>Solicitações enviadas pelos viajantes autenticados. Atualize para consultar o Firebase.</p>${list.map(r=>{const trip=(adminData().trips||[]).find(t=>t.id===r.tripId);const client=(adminData().clients||[]).find(c=>c.id===r.clientId);if(r.status==='Concluído'){
+ return `<section class="section"><div class="section-head"><h2>Pedidos do concierge</h2><button class="btn btn-light" id="refreshConcierge">↻ Atualizar pedidos</button></div><p>Solicitações sincronizadas automaticamente com o Firebase.</p>${list.map(r=>{const trip=(adminData().trips||[]).find(t=>t.id===r.tripId);const client=(adminData().clients||[]).find(c=>c.id===r.clientId);if(r.status==='Concluído'){
  const last=(Array.isArray(r.messages)?r.messages:[]).slice(-1)[0];
  const summary=String(last?.text||r.adminReply||r.text||'').slice(0,135);
  return `<div class="card ipa-concierge-completed" style="padding:12px 16px;margin:8px 0">
@@ -2136,7 +2169,7 @@ function adminConcierge(){
    <button class="btn btn-light" data-concierge-save="${ipaEscape(r.id)}">Salvar status / observação</button>
   </div></div>`;
 }
-return `<div class="card" style="padding:18px;margin:12px 0"><div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap"><strong>${ipaEscape(r.type||'Pedido')}</strong><span class="chip">${ipaEscape(r.status||'Enviado')}</span></div><small>${ipaEscape(client?.name||r.requesterEmail||'Viajante')} · ${ipaEscape(trip?.name||r.tripId||'Viagem')} · ${ipaEscape(String(r.createdAt||'').slice(0,16).replace('T',' '))}</small><p>${ipaEscape(r.text||'')}</p><label>Status<select data-concierge-status="${ipaEscape(r.id)}" class="v2-concierge-input">${['Enviado','Em análise','Respondido','Concluído'].map(x=>`<option ${x===r.status?'selected':''}>${x}</option>`).join('')}</select></label><label>Observação interna (não enviada ao cliente)<textarea data-concierge-reply="${ipaEscape(r.id)}" class="rating-text">${ipaEscape(r.adminReply||'')}</textarea></label><button class="btn btn-primary" data-concierge-chat="${ipaEscape(r.id)}">💬 Abrir conversa</button><button class="btn btn-light" data-concierge-save="${ipaEscape(r.id)}">Salvar status / observação</button></div>`}).join('')||'<div class="card" style="padding:18px">Nenhum pedido carregado. Clique em Atualizar pedidos.</div>'}</section>`;
+return `<div class="card" style="padding:18px;margin:12px 0"><div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap"><strong>${ipaEscape(r.type||'Pedido')}</strong><span class="chip">${ipaEscape(r.status||'Enviado')}</span></div><small>${ipaEscape(client?.name||r.requesterEmail||'Viajante')} · ${ipaEscape(trip?.name||r.tripId||'Viagem')} · ${ipaEscape(String(r.createdAt||'').slice(0,16).replace('T',' '))}</small><p>${ipaEscape(r.text||'')}</p><label>Status<select data-concierge-status="${ipaEscape(r.id)}" class="v2-concierge-input">${['Enviado','Em análise','Respondido','Concluído'].map(x=>`<option ${x===r.status?'selected':''}>${x}</option>`).join('')}</select></label><label>Observação interna (não enviada ao cliente)<textarea data-concierge-reply="${ipaEscape(r.id)}" class="rating-text">${ipaEscape(r.adminReply||'')}</textarea></label><button class="btn btn-primary" data-concierge-chat="${ipaEscape(r.id)}">💬 Abrir conversa</button><button class="btn btn-light" data-concierge-save="${ipaEscape(r.id)}">Salvar status / observação</button></div>`}).join('')||'<div class="card" style="padding:18px">Nenhum pedido recebido até o momento.</div>'}</section>`;
 }
 function adminIntegratedView(){
  const service=window.IPAFirebase;
@@ -2147,7 +2180,7 @@ function adminIntegratedView(){
     <div><b>Indo por Aí</b><small>BUSINESS</small></div>
     <div class="firebase-admin-actions">${adminCloudBadge()}<button data-firebase-sync>↻ Sincronizar</button><button data-firebase-logout>Sair</button><button data-admin-exit>← Voltar</button></div>
    </div>
-   <div class="ipa-admin-nav">${[['dashboard','⌂','Dashboard'],['leads','📩',`Pedidos${(adminData().travelLeads||[]).filter(x=>(x.status||'Novo')==='Novo').length?' ('+(adminData().travelLeads||[]).filter(x=>(x.status||'Novo')==='Novo').length+')':''}`],['concierge','💬','Concierge'],['clients','👤','Clientes'],['trips','✈️','Viagens'],['places','📍','Lugares'],['hotels','🏨','Hospedagens'],['templates','🗺️','Roteiros'],['finance','💳','Financeiro'],['live','🔴','Live'],['partners','☆','Parceiros']].map(([k,i,l])=>`<button data-admin-section="${k}" class="${adminSection===k?'active':''}">${i}<span>${l}</span></button>`).join('')}</div>
+   <div class="ipa-admin-nav">${[['dashboard','⌂','Dashboard'],['leads','📩',`Pedidos${(adminData().travelLeads||[]).filter(x=>(x.status||'Novo')==='Novo').length?' ('+(adminData().travelLeads||[]).filter(x=>(x.status||'Novo')==='Novo').length+')':''}`],['concierge','💬',`Concierge${ipaConciergePendingCount()?` (${ipaConciergePendingCount()})`:''}`],['clients','👤','Clientes'],['trips','✈️','Viagens'],['places','📍','Lugares'],['hotels','🏨','Hospedagens'],['templates','🗺️','Roteiros'],['finance','💳','Financeiro'],['live','🔴','Live'],['partners','☆','Parceiros']].map(([k,i,l])=>`<button data-admin-section="${k}" class="${adminSection===k?'active':''}">${i}<span>${l}</span></button>`).join('')}</div>
    <div class="ipa-admin-content">${(views[adminSection]||adminDashboard)()}</div>
   </div>`;
 }
@@ -2877,8 +2910,9 @@ function showJourneyRating(tripId,dayNo,placeId,placeName){
 let ipaConciergeUnsubscribe=null;
 function ipaConciergeCloseListener(){if(ipaConciergeUnsubscribe){ipaConciergeUnsubscribe();ipaConciergeUnsubscribe=null}}
 function ipaConciergeMessagesHtml(r){
+ const name=String(r?.requesterName||adminData().clients.find(c=>c.id===r?.clientId)?.name||r?.requesterEmail?.split('@')[0]||'Viajante');
  const messages=Array.isArray(r?.messages)&&r.messages.length?r.messages:[{sender:'client',text:r?.text||'',createdAt:r?.createdAt||''},...(r?.adminReply?[{sender:'admin',text:r.adminReply,createdAt:r.answeredAt||''}]:[])];
- return messages.map(m=>`<div class="ipa-concierge-bubble ${m.sender==='admin'?'admin':'client'}"><strong>${m.sender==='admin'?'👑 Concierge':'Você'}</strong><p>${ipaEscape(m.text||'')}</p><small>${ipaEscape(String(m.createdAt||'').slice(0,16).replace('T',' '))}</small></div>`).join('');
+ return messages.map(m=>`<div class="ipa-concierge-bubble ${m.sender==='admin'?'admin':'client'}"><strong>${m.sender==='admin'?'👑 Concierge':ipaEscape(name)}</strong><p>${ipaEscape(m.text||'')}</p><small>${ipaEscape(String(m.createdAt||'').slice(0,16).replace('T',' '))}</small></div>`).join('');
 }
 function openConciergeConversation(id,isAdmin=false){
  ipaConciergeCloseListener();
@@ -2902,7 +2936,7 @@ async function openConcierge(){
 function openConciergeNewRequest(t){
  showModal(`<div class="v2-concierge"><span class="eyebrow">Concierge Elite</span><h2>Novo atendimento</h2><div class="v2-concierge-grid"><button data-concierge-type="Restaurante">🍽️ Restaurante</button><button data-concierge-type="Ingresso">🎟️ Ingresso</button><button data-concierge-type="Compra">🛍️ Compra</button><button data-concierge-type="Transporte">🚕 Transporte</button><button data-concierge-type="Experiência">✨ Experiência</button><button data-concierge-type="Outro">💬 Outro</button></div><label>Seu pedido</label><textarea id="conciergeRequestText" class="rating-text" placeholder="Conte o que você precisa..."></textarea><input type="hidden" id="conciergeRequestType" value="Outro"><button id="sendConciergeRequest" class="btn btn-primary btn-block">Abrir atendimento</button><small id="conciergeSendStatus"></small></div>`);
  document.querySelectorAll('[data-concierge-type]').forEach(b=>b.onclick=()=>{document.querySelector('#conciergeRequestType').value=b.dataset.conciergeType;document.querySelectorAll('[data-concierge-type]').forEach(x=>x.classList.toggle('selected',x===b))});
- document.querySelector('#sendConciergeRequest').onclick=async()=>{const value=document.querySelector('#conciergeRequestText').value.trim();if(!value){toast('Conte o que você precisa');return}const btn=document.querySelector('#sendConciergeRequest');btn.disabled=true;try{const item=await window.IPAFirebase.submitConciergeRequest({tripId:t.id,clientId:t.clientId||'',type:document.querySelector('#conciergeRequestType').value,text:value});IPAData.createConciergeRequest(item);openConciergeConversation(item.id)}catch(e){document.querySelector('#conciergeSendStatus').textContent='Não enviado: '+(e.message||'permissão do Firebase');btn.disabled=false}};
+ document.querySelector('#sendConciergeRequest').onclick=async()=>{const value=document.querySelector('#conciergeRequestText').value.trim();if(!value){toast('Conte o que você precisa');return}const btn=document.querySelector('#sendConciergeRequest');btn.disabled=true;try{const item=await window.IPAFirebase.submitConciergeRequest({tripId:t.id,clientId:t.clientId||'',requesterName:ipaClientDisplayName(),type:document.querySelector('#conciergeRequestType').value,text:value});IPAData.createConciergeRequest(item);openConciergeConversation(item.id)}catch(e){document.querySelector('#conciergeSendStatus').textContent='Não enviado: '+(e.message||'permissão do Firebase');btn.disabled=false}};
 }
 
 function showConciergeResult(choice){
