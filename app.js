@@ -1023,17 +1023,17 @@ function bind(){
    const bookings=(trip.hotelBookings||[]).map(st=>{
     const h=ipaFindBookedHotel(st,d.hotelCatalog);
     const url=h.photoUrl||st.photoUrl||'';
-    if(url&&url!==st.photoUrl){dirty=true;stays++;return {...st,photoUrl:url}}
+    if(url){dirty=true;stays++;return {...st,photoUrl:url}}
     return st;
    });
    if(dirty)updates.push({trip,bookings});
   }
-  if(!updates.length){toast('As fotos já estão vinculadas às reservas disponíveis.');return}
+  if(!updates.length){toast('Nenhuma reserva com URL de foto encontrada. Confira se os hotéis estão vinculados à viagem.');return}
   b.disabled=true;b.textContent='Atualizando fotos...';
   try{
    const saved=await window.IPAFirebase.saveHotelPhotosToTrips(updates.map(({trip,bookings})=>({tripId:trip.id,hotelBookings:bookings})));
    for(const {trip,bookings} of updates){IPAData.updateTrip(trip.id,{hotelBookings:bookings});changed++}
-   toast(`${stays} foto(s) confirmada(s) no Firebase em ${saved.length} viagem(ns).`);
+   toast(`${stays} foto(s) gravada(s) e conferida(s) no Firebase em ${saved.length} viagem(ns). Entre novamente no login do cliente para atualizar.`);
    render();
   }catch(e){console.error('Erro ao sincronizar fotos',e);toast('Não foi possível salvar as fotos: '+(e.message||'erro de permissão'));b.disabled=false;b.textContent='📷 Atualizar fotos nas viagens'}
  });
