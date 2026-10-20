@@ -504,6 +504,21 @@ onAuthStateChanged(auth,async user=>{
 });
 
 window.IPAFirebase = {
+  async submitConciergeRequest(request){
+    if(!currentUser || currentUser.uid===ADMIN_UID)throw new Error('Entre com o login do viajante.');
+    if(!request?.tripId || !String(request.text||'').trim())throw new Error('Informe a viagem e os detalhes do pedido.');
+    const item={id:'conc-'+currentUser.uid+'-'+Date.now(),tripId:String(request.tripId),clientId:String(request.clientId||''),type:String(request.type||'Outro').slice(0,80),text:String(request.text).trim().slice(0,3000),requesterUid:currentUser.uid,requesterEmail:currentUser.email||'',status:'Enviado',createdAt:new Date().toISOString()};
+    await setDoc(doc(firestore,'conciergeRequests',item.id),item);
+    return item;
+  },
+  async getConciergeRequests(){
+    if(!currentUser || currentUser.uid!==ADMIN_UID)throw new Error('Somente o ADM pode consultar pedidos.');
+    return readCollection('conciergeRequests');
+  },
+  async updateConciergeRequest(id,fields){
+    if(!currentUser || currentUser.uid!==ADMIN_UID)throw new Error('Somente o ADM pode atualizar pedidos.');
+    await setDoc(doc(firestore,'conciergeRequests',id),{status:fields.status||'Em análise',adminReply:String(fields.adminReply||'').slice(0,3000),answeredAt:new Date().toISOString()},{merge:true});
+  },
   async submitProspectRequest(lead,client){
     if(!lead?.id || !client?.id) throw new Error("Pedido inválido.");
     // Grava somente os dois documentos necessários. As regras do Firestore 6.28.1
