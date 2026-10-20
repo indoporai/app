@@ -869,3 +869,12 @@ dialog:has(#routeCatalogPlace) .smart-place-actions button{
 #clientPasswordMeterFill[data-level="Média"]{background:#e6a536}
 #clientPasswordMeterFill[data-level="Forte"]{background:#19846a}
 #clientPasswordStrength,#clientPasswordMatch{font-size:12px;line-height:1.45}
+
+/* Beta 6.29.47 — roteiro do cliente */
+.itinerary-days{margin-top:16px!important;margin-bottom:20px!important;padding-top:12px!important;padding-bottom:8px!important}
+.ipa-reorder-item{grid-template-columns:26px 16px 42px minmax(0,1fr) 34px 32px!important;gap:8px}
+.ipa-order-number{font-weight:800;color:#54727b;text-align:center}
+.ipa-move-controls{display:flex;flex-direction:column;gap:3px}
+.ipa-move-controls button{border:1px solid #d8e6e5;background:#edf7f5;color:#087e85;border-radius:7px;min-height:26px;cursor:pointer;font-size:16px}
+.ipa-move-controls button:disabled{opacity:.25;cursor:default}
+.ipa-reorder-hint{font-size:12px;color:#667b81;margin:0 0 12px}

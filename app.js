@@ -924,7 +924,16 @@ function bind(){
  };
  document.querySelectorAll('[data-firebase-logout]').forEach(b=>b.onclick=async()=>{await window.IPAFirebase.logout();render()});
  document.querySelectorAll('[data-firebase-sync]').forEach(b=>b.onclick=async()=>{toast('Sincronizando com Firebase...');try{await window.IPAFirebase.syncNow();toast('Firebase sincronizado')}catch(e){toast(e.message||'Erro ao sincronizar')}});
- document.querySelectorAll('[data-external-route]').forEach(b=>b.onclick=()=>window.open(b.dataset.externalRoute,'_blank'));
+ document.querySelectorAll('[data-external-route]').forEach(b=>b.onclick=()=>{const url=b.dataset.externalRoute;if(url)window.location.assign(url)});
+ document.querySelectorAll('[data-move-place]').forEach(b=>b.onclick=()=>{
+  const t=activeTrip();if(!t)return;
+  const day=(t.itinerary||[]).find(d=>Number(d.day)===Number(state.tripDay||t.itinerary?.[0]?.day||1));if(!day)return;
+  const arr=ipaClientDayPlaces(t,day);const [pos,dir]=b.dataset.movePlace.split(':');const i=Number(pos),j=i+(dir==='up'?-1:1);if(j<0||j>=arr.length)return;
+  [arr[i],arr[j]]=[arr[j],arr[i]];
+  const keys=arr.map((p,k)=>String(p.id||p.placeId||p.name+'|'+p.address||k));
+  try{localStorage.setItem('ipa-order-'+(window.IPAFirebase?.user?.uid||'visitor')+'-'+t.id+'-'+day.day,JSON.stringify(keys))}catch(e){toast('Não foi possível salvar a ordem');return}
+  render();
+ });
  document.querySelectorAll('[data-admin-add-stage]').forEach(b=>b.onclick=()=>ipaEditStageModal(b.dataset.adminAddStage,-1));
  document.querySelectorAll('[data-admin-edit-stage]').forEach(b=>b.onclick=()=>{const [id,i]=b.dataset.adminEditStage.split(':');ipaEditStageModal(id,Number(i))});
  document.querySelectorAll('[data-admin-delete-stage]').forEach(b=>b.onclick=async()=>{const [id,ix]=b.dataset.adminDeleteStage.split(':'),d=adminData(),t=d.trips.find(x=>x.id===id);if(!t)return;const stages=tripStages(t);if(stages.length<=1)return;if(!confirm('Excluir esta etapa da viagem?'))return;stages.splice(Number(ix),1);stages.forEach((x,i)=>x.order=i+1);IPAData.updateTrip(id,{stages,destination:stages[0].destination,country:stages[0].country,startDate:stages[0].startDate,endDate:stages[stages.length-1].endDate});if(window.IPAFirebase?.user)await window.IPAFirebase.syncNow();view.innerHTML=adminTripEditor(id);bind();toast('Etapa excluída ✓')});
@@ -1316,6 +1325,21 @@ function googleMapsRouteUrl(day,t){
  const first=q(places[0]),last=q(places[places.length-1]);
  const middle=places.slice(1,-1).map(q).join("|");
  return `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(first)}&destination=${encodeURIComponent(last)}${middle?`&waypoints=${encodeURIComponent(middle)}`:''}&travelmode=walking`;
+}
+function ipaClientDayPlaces(t,day){
+ const official=normalizedPlaces(day);
+ const personal=ipaGetPersonalRoute(t,day.day).map((p,i)=>({id:p.id||`personal-${i}`,name:p.name||'Descoberta',address:p.address||'',note:'✨ Adicionado por você',personal:true}));
+ const all=[...official,...personal];
+ let saved=[];try{saved=JSON.parse(localStorage.getItem('ipa-order-'+(window.IPAFirebase?.user?.uid||'visitor')+'-'+t.id+'-'+day.day)||'[]')}catch(e){}
+ if(!Array.isArray(saved)||!saved.length)return all;
+ const id=(p,i)=>String(p.id||p.placeId||p.name+'|'+p.address||i);
+ return all.map((p,i)=>({p,k:id(p,i)})).sort((a,b)=>{const ia=saved.indexOf(a.k),ib=saved.indexOf(b.k);return (ia<0?9999:ia)-(ib<0?9999:ib)}).map(x=>x.p);
+}
+function ipaFullClientMapsUrl(places,t){
+ const list=places.filter(p=>p.name||p.address).map(p=>[p.name,p.address,tripDestination(t),tripCountry(t)].filter(Boolean).join(', '));
+ if(!list.length)return '';
+ if(list.length===1)return 'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(list[0]);
+ return 'https://www.google.com/maps/dir/?api=1&origin='+encodeURIComponent(list[0])+'&destination='+encodeURIComponent(list[list.length-1])+(list.length>2?'&waypoints='+encodeURIComponent(list.slice(1,-1).join('|')):'')+'&travelmode=walking';
 }
 function tripModule(name){const t=activeTrip();return t?.modules?.[name]!==false}
 function showPlanDetails(){
@@ -2336,15 +2360,13 @@ function tripView(){
  const days=(t.itinerary||[]).sort((a,b)=>Number(a.day)-Number(b.day));
  const dayNumber=state.tripDay&&days.some(x=>Number(x.day)===Number(state.tripDay))?Number(state.tripDay):Number(days[0]?.day||1);
  const day=days.find(x=>Number(x.day)===dayNumber)||{day:1,title:"Roteiro em preparação",places:[]};
- const officialPlaces=normalizedPlaces(day);
- const personalPlaces=ipaGetPersonalRoute(t,day.day).map((p,i)=>({id:p.id||`personal-${i}`,name:p.name||'Descoberta',address:p.address||'',note:'✨ Adicionado por você',personal:true}));
- const places=[...officialPlaces,...personalPlaces];
+ const places=ipaClientDayPlaces(t,day);
  const country=tripCountry(t),flag=countryFlag(country);
- const rows=places.map((p,index)=>`<div class="itinerary-item dynamic-itinerary-item"><span class="itinerary-time">${p.time||'--:--'}</span><span class="itinerary-line"><i></i></span><span class="itinerary-icon">${p.personal?'✨':(index===0?'📍':'•')}</span><span class="itinerary-copy"><b>${p.name}${p.personal?' · <em class="personal-route-inline">Sua descoberta</em>':''}</b><small>${p.address||p.note||'Detalhes no roteiro'}</small></span><button class="mini-map-open" data-map="${(p.address||p.name)+', '+country}">↗</button></div>`).join('');
- const route=googleMapsRouteUrl(day,t);
+ const rows=places.map((p,index)=>`<div class="itinerary-item dynamic-itinerary-item ipa-reorder-item"><span class="ipa-order-number">${index+1}</span><span class="itinerary-line"><i></i></span><span class="itinerary-icon">${p.personal?'✨':(index===0?'📍':'•')}</span><span class="itinerary-copy"><b>${ipaEscape(p.name)}${p.personal?' · <em class="personal-route-inline">Sua descoberta</em>':''}</b><small>${ipaEscape(p.address||p.note||'Detalhes no roteiro')}</small></span><span class="ipa-move-controls"><button type="button" data-move-place="${index}:up" ${index===0?'disabled':''} aria-label="Subir passeio">↑</button><button type="button" data-move-place="${index}:down" ${index===places.length-1?'disabled':''} aria-label="Descer passeio">↓</button></span><button class="mini-map-open" data-map="${ipaEscape((p.address||p.name)+', '+country)}">↗</button></div>`).join('');
+ const route=ipaFullClientMapsUrl(places,t);
  return `<section class="hero personalized-trip-hero"><span class="eyebrow">Minha viagem</span><h1>${t.name} ${flag}</h1><p>${tripDestination(t)}, ${country} · ${days.length} dias de roteiro</p><div class="hero-actions">${route?`<button class="btn btn-light" data-external-route="${route}">Abrir rota no Google Maps</button>`:''}<button class="btn btn-primary" data-go="explore">Ver mapa do dia</button></div></section>
  <section class="section itinerary-days"><div class="day-strip">${days.map(x=>`<button class="day-pill ${Number(x.day)===dayNumber?'active':''}" data-day="${x.day}"><small>Dia</small><strong>${x.day}</strong></button>`).join('')}</div></section>
- <section class="section"><div class="section-head"><div><span class="eyebrow">Roteiro do dia</span><h2>${day.title}</h2></div><span class="chip">${places.length} locais</span></div><div class="itinerary-list">${rows||'<p>Nenhum local cadastrado neste dia.</p>'}</div></section>`;
+ <section class="section"><div class="section-head"><div><span class="eyebrow">Roteiro do dia</span><h2>${day.title}</h2></div><span class="chip">${places.length} locais</span></div><div class="ipa-reorder-hint">Use as setas para mudar a ordem dos passeios. A rota acompanhará sua escolha.</div><div class="itinerary-list">${rows||'<p>Nenhum local cadastrado neste dia.</p>'}</div></section>`;
 }
 
 function ipaPersonalRouteKey(t,dayNo){
