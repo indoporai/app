@@ -862,3 +862,10 @@ dialog:has(#routeCatalogPlace) .smart-place-actions button{
 
 /* 6.29.43 — Falha de carregamento identificável, sem ocultar a hospedagem */
 .ipa-booking-cover.ipa-photo-error::after,.hotel-client-photo.ipa-photo-error::after{content:'Foto indisponível';display:grid;place-items:center;height:100%;padding:8px;text-align:center;font-size:11px;color:#49656a;background:#e7f3f4}
+
+/* Beta 6.29.45 - feedback visual de senha */
+.ipa-password-meter{height:9px;background:#e8eef0;border-radius:12px;overflow:hidden;margin:10px 0 5px}
+#clientPasswordMeterFill{height:100%;width:0;transition:width .2s;background:#e35e50;border-radius:12px}
+#clientPasswordMeterFill[data-level="Média"]{background:#e6a536}
+#clientPasswordMeterFill[data-level="Forte"]{background:#19846a}
+#clientPasswordStrength,#clientPasswordMatch{font-size:12px;line-height:1.45}
