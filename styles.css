@@ -733,3 +733,40 @@ dialog:has(.smart-planner-layout) .modal-content{width:100%;max-width:none;box-s
 .smart-planner-layout #smartPreview{min-height:56px;margin:10px 0 0!important;font-size:17px;white-space:normal}
 .smart-planner-layout #smartPreviewResult{min-width:0}
 @media(max-width:580px){dialog:has(.smart-planner-layout){width:calc(100vw - 18px)!important;max-height:calc(100dvh - 20px);border-radius:18px}.smart-planner-layout{padding:24px 18px}.smart-planner-layout .smart-client-form-grid{grid-template-columns:1fr!important;gap:16px!important}.smart-planner-layout>label{margin-bottom:16px!important}}
+
+/* 6.29.37 — Cards compactos no ADM: viagens e roteiro diário */
+.ipa-admin-trip-list .trip-list-row{display:grid!important;grid-template-columns:minmax(0,1fr) auto!important;align-items:center!important;gap:6px 12px!important;padding:11px 12px!important;background:#fff!important;border:1px solid #e5eeeb!important;border-radius:15px!important;margin:0 0 9px!important;min-width:0!important}
+.ipa-admin-trip-list .trip-list-open{display:grid!important;grid-template-columns:48px minmax(0,1fr) auto!important;gap:10px!important;align-items:center!important;min-width:0!important;width:100%!important;padding:4px!important;background:transparent!important;text-align:left!important;border:0!important;color:#0c3340!important}
+.ipa-admin-trip-list .trip-list-open>span{font-size:23px!important;line-height:1.3;overflow-wrap:anywhere}
+.ipa-admin-trip-list .trip-list-open>div{min-width:0!important}
+.ipa-admin-trip-list .trip-list-open b{font-size:15px!important;line-height:1.25!important;overflow-wrap:anywhere}
+.ipa-admin-trip-list .trip-list-open small{font-size:12px!important;line-height:1.4!important;margin-top:3px}
+.ipa-admin-trip-list .trip-list-open em,.ipa-admin-trip-list .trip-list-open i{display:inline-block!important;font-size:10px!important;padding:4px 7px!important;margin:5px 4px 0 0!important;white-space:normal!important}
+.ipa-admin-trip-list .trip-list-open strong{display:block!important;font-size:19px!important}
+.ipa-admin-trip-list .trip-list-actions{display:flex!important;gap:6px!important;margin:0!important;justify-content:flex-end!important}
+.ipa-admin-trip-list .trip-list-actions button{font-size:12px!important;min-height:34px!important;padding:6px 9px!important;border-radius:10px!important;white-space:normal!important}
+.admin-day-expanded{padding:12px!important;border-radius:14px!important;margin-top:10px!important}
+.admin-day-title{display:grid!important;grid-template-columns:38px minmax(0,1fr) auto!important;align-items:center!important;gap:9px!important}
+.admin-day-title>strong{grid-row:auto!important;width:38px!important;height:38px!important;flex:none!important;border-radius:11px!important;font-size:16px!important}
+.admin-day-title>span{width:auto!important;flex:none!important;min-width:0!important}
+.admin-day-title>span b{font-size:16px!important;line-height:1.2!important}
+.admin-day-title>span small{font-size:11px!important;margin-top:2px!important}
+.admin-add-place-btn{margin:0!important;max-width:none!important;font-size:12px!important;padding:8px 10px!important;white-space:nowrap!important}
+.admin-place-list{padding:0!important;margin-top:10px!important;gap:7px!important}
+.admin-place-list>div{display:grid!important;grid-template-columns:25px minmax(0,1fr) auto!important;gap:9px!important;align-items:center!important;padding:11px 12px!important;min-width:0!important}
+.admin-place-list>div>div{min-width:0!important;overflow-wrap:anywhere!important}
+.admin-place-list>div>div b{font-size:13px!important;line-height:1.35!important}
+.admin-place-list>div>div small{font-size:11px!important;line-height:1.35!important;margin-top:3px!important}
+.admin-place-list .admin-place-map{display:inline-flex!important;align-items:center!important;justify-content:center!important;min-width:76px!important;width:auto!important;max-width:none!important;padding:7px 9px!important;border:1px solid #d5e6e3!important;border-radius:9px!important;background:#eef7f5!important;color:#087a83!important;font-size:12px!important;white-space:nowrap!important;line-height:1.2!important;word-break:normal!important}
+@media(max-width:700px){
+ .ipa-admin-trip-list .trip-list-row{grid-template-columns:minmax(0,1fr)!important}
+ .ipa-admin-trip-list .trip-list-actions{justify-content:flex-end!important;flex-wrap:wrap!important}
+ .ipa-admin-trip-list .trip-list-actions button{flex:0 1 auto!important}
+ .admin-day-title{grid-template-columns:36px minmax(0,1fr)!important}
+ .admin-day-title>strong{width:36px!important;height:36px!important}
+ .admin-add-place-btn{grid-column:2!important;justify-self:start!important;margin:0!important}
+ .admin-place-list>div{grid-template-columns:24px minmax(0,1fr)!important}
+ .admin-place-list .admin-place-map{grid-column:2!important;justify-self:end!important;margin-top:2px!important}
+}
+/* Preserve access to final itinerary items above fixed bottom navigation */
+.ipa-admin-integrated{padding-bottom:110px!important}
