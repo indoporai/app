@@ -426,12 +426,12 @@ function bind(){
   const preferred=btn.dataset.adminSmartClientTrip||'';
   const existingTripId=btn.dataset.smartExistingTrip||'';
   const existingTrip=(adminData().trips||[]).find(t=>t.id===existingTripId);
-  showModal(`<span class="eyebrow">✨ CRIAÇÃO INTELIGENTE · ADM</span><h2>${existingTrip?"Criar roteiro para viagem existente":"Planejar viagem para cliente cadastrado"}</h2><p>${existingTrip?`O roteiro será vinculado a <b>${ipaEscape(existingTrip.name)}</b>, sem criar outra viagem. Os demais dados serão preservados.`:"Use o mesmo motor de curadoria dos pedidos externos, sem criar um pedido fictício."}</p>
+  showModal(`<div class="smart-planner-layout"><span class="eyebrow">✨ CRIAÇÃO INTELIGENTE · ADM</span><h2>${existingTrip?"Criar roteiro para viagem existente":"Planejar viagem para cliente cadastrado"}</h2><p>${existingTrip?`O roteiro será vinculado a <b>${ipaEscape(existingTrip.name)}</b>, sem criar outra viagem. Os demais dados serão preservados.`:"Use o mesmo motor de curadoria dos pedidos externos, sem criar um pedido fictício."}</p>
    <label>Cliente<select id="smartClient" ${existingTrip?"disabled":""}>${clients.map(c=>`<option value="${ipaEscape(c.id)}" ${c.id===preferred?'selected':''}>${ipaEscape(c.name)} · ${ipaEscape(c.email||'')}</option>`).join('')}</select></label>
    <label>Destino (cidade ou país)<input id="smartDestination" placeholder="Ex.: Lisboa" value="${existingTrip?ipaEscape(existingTrip.destination||""):""}" required></label>
    <div class="smart-client-form-grid"><label>Dias<input id="smartDays" type="number" min="1" max="45" value="5"></label><label>Adultos<input id="smartAdults" type="number" min="1" value="2"></label><label>Crianças<input id="smartChildren" type="number" min="0" value="0"></label><label>Ritmo<select id="smartPace"><option value="equilibrado">Equilibrado</option><option value="leve">Leve</option><option value="intenso">Intenso</option></select></label><label>Orçamento por pessoa<input id="smartBudget" type="number" min="0" value="0"></label><label>Moeda<select id="smartCurrency"><option>EUR</option><option>USD</option><option>BRL</option></select></label></div>
    <label>Interesses (separados por vírgula)<input id="smartInterests" placeholder="Ex.: cultura, gastronomia, natureza"></label>
-   <button class="btn btn-primary btn-block" id="smartPreview">✨ Gerar sugestão inteligente</button><div id="smartPreviewResult" aria-live="polite"></div>`);
+   <button class="btn btn-primary btn-block" id="smartPreview">✨ Gerar sugestão inteligente</button><div id="smartPreviewResult" aria-live="polite"></div></div>`);
   setTimeout(()=>{const generate=document.querySelector('#smartPreview');if(!generate)return;
    let generated=null,input=null;
    generate.onclick=()=>{

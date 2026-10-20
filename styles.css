@@ -718,3 +718,18 @@ button.ipa-save-complete{opacity:1;background:#d9f4e9!important;color:#176044!im
 .ipa-admin-trip-list .trip-list-actions button{font-size:13px;min-height:40px;padding:9px 12px;white-space:nowrap}
 .ipa-admin-trip-list .trip-list-actions .trip-delete-action{color:#a32d2d;border:1px solid #f0c7c7;background:#fff}
 @media(max-width:650px){.ipa-admin-trip-list .trip-list-row{display:block}.ipa-admin-trip-list .trip-list-actions{margin:0 0 8px 12px}.ipa-admin-trip-list .trip-list-actions button{flex:1}}
+
+/* 6.29.36 — Formulário inteligente confortável e responsivo, sem alterar lógica */
+dialog:has(.smart-planner-layout){width:min(920px,calc(100vw - 28px))!important;max-width:920px!important;max-height:calc(100dvh - 36px);box-sizing:border-box;overflow-y:auto;padding:0!important;border-radius:24px}
+dialog:has(.smart-planner-layout) .modal-content{width:100%;max-width:none;box-sizing:border-box}
+.smart-planner-layout{display:flex;flex-direction:column;gap:0;padding:clamp(20px,4vw,42px);min-width:0;box-sizing:border-box}
+.smart-planner-layout h2{font-size:clamp(1.55rem,3.4vw,2.25rem);line-height:1.2;margin:12px 0 10px;overflow-wrap:anywhere}
+.smart-planner-layout>p{line-height:1.55;color:#597278;margin:0 0 24px}
+.smart-planner-layout>label,.smart-planner-layout .smart-client-form-grid>label{display:flex!important;flex-direction:column;gap:8px;min-width:0!important;width:100%!important;box-sizing:border-box;font-size:15px;font-weight:650;line-height:1.4;margin:0!important}
+.smart-planner-layout>label{margin-bottom:20px!important}
+.smart-planner-layout input,.smart-planner-layout select{display:block!important;box-sizing:border-box!important;width:100%!important;max-width:100%!important;min-width:0!important;min-height:52px!important;padding:12px 14px!important;font-size:16px!important;line-height:1.3;border:1px solid #cbdedc;border-radius:12px;background:#fff;margin:0!important}
+.smart-planner-layout input:focus,.smart-planner-layout select:focus{outline:2px solid #0c8e9c;outline-offset:1px}
+.smart-planner-layout .smart-client-form-grid{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:20px 18px!important;width:100%;margin:0 0 22px!important;min-width:0}
+.smart-planner-layout #smartPreview{min-height:56px;margin:10px 0 0!important;font-size:17px;white-space:normal}
+.smart-planner-layout #smartPreviewResult{min-width:0}
+@media(max-width:580px){dialog:has(.smart-planner-layout){width:calc(100vw - 18px)!important;max-height:calc(100dvh - 20px);border-radius:18px}.smart-planner-layout{padding:24px 18px}.smart-planner-layout .smart-client-form-grid{grid-template-columns:1fr!important;gap:16px!important}.smart-planner-layout>label{margin-bottom:16px!important}}
