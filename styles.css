@@ -770,3 +770,67 @@ dialog:has(.smart-planner-layout) .modal-content{width:100%;max-width:none;box-s
 }
 /* Preserve access to final itinerary items above fixed bottom navigation */
 .ipa-admin-integrated{padding-bottom:110px!important}
+
+/* Beta 6.29.38 — Formulário de lugar/dica, isolado pelo seletor do modal */
+dialog:has(#routeCatalogPlace){
+ width:min(94vw,690px)!important;
+ max-width:690px!important;
+ max-height:min(92dvh,940px)!important;
+ box-sizing:border-box!important;
+ padding:clamp(18px,4vw,30px)!important;
+ overflow-y:auto!important;
+ overflow-x:hidden!important;
+}
+dialog:has(#routeCatalogPlace) .modal-content{
+ width:100%!important;max-width:100%!important;min-width:0!important;
+ box-sizing:border-box!important;
+}
+dialog:has(#routeCatalogPlace) h2{
+ font-size:clamp(1.4rem,4vw,1.9rem)!important;
+ line-height:1.2!important;margin:8px 0 22px!important;
+}
+dialog:has(#routeCatalogPlace) label{
+ display:block!important;
+ font-size:14px!important;font-weight:650!important;
+ line-height:1.4!important;margin:18px 0 7px!important;
+}
+dialog:has(#routeCatalogPlace) .route-helper{
+ display:block!important;position:static!important;
+ background:#f1f8f6!important;border-radius:12px!important;
+ padding:12px 14px!important;margin:2px 0 20px!important;
+ font-size:12px!important;line-height:1.6!important;
+ color:#547076!important;white-space:normal!important;
+}
+dialog:has(#routeCatalogPlace) :is(input,select,textarea).v2-concierge-input,
+dialog:has(#routeCatalogPlace) textarea.rating-text{
+ display:block!important;width:100%!important;max-width:100%!important;
+ min-width:0!important;box-sizing:border-box!important;
+ margin:0 0 10px!important;min-height:46px!important;
+ font-size:15px!important;
+}
+dialog:has(#routeCatalogPlace) .smart-place-search{
+ display:grid!important;grid-template-columns:minmax(0,1fr) auto!important;
+ align-items:stretch!important;gap:10px!important;margin:0 0 12px!important;
+}
+dialog:has(#routeCatalogPlace) .smart-place-search input{margin:0!important}
+dialog:has(#routeCatalogPlace) #openGoogleSearch{
+ min-width:100px!important;width:auto!important;white-space:nowrap!important;
+ border:1px solid #cce4e1!important;border-radius:12px!important;
+ padding:9px 14px!important;font-size:13px!important;
+}
+dialog:has(#routeCatalogPlace) .place-suggestions{
+ min-width:0!important;margin:8px 0 18px!important;
+}
+dialog:has(#routeCatalogPlace) .smart-place-actions{
+ display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;
+ gap:12px!important;margin:24px 0 8px!important;
+}
+dialog:has(#routeCatalogPlace) .smart-place-actions button{
+ min-height:46px!important;white-space:normal!important;
+}
+@media(max-width:480px){
+ dialog:has(#routeCatalogPlace){width:96vw!important;padding:18px!important}
+ dialog:has(#routeCatalogPlace) .smart-place-search{grid-template-columns:minmax(0,1fr)!important}
+ dialog:has(#routeCatalogPlace) #openGoogleSearch{width:100%!important}
+ dialog:has(#routeCatalogPlace) .smart-place-actions{grid-template-columns:minmax(0,1fr)!important}
+}
