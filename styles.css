@@ -859,3 +859,6 @@ dialog:has(#routeCatalogPlace) .smart-place-actions button{
 .ipa-provider-netflix{background:#e50914}.ipa-provider-primevideo{background:#00a8e1}.ipa-provider-disney{background:#172d69}.ipa-provider-appletv{background:#222}.ipa-provider-spotify{background:#1db954;color:#08230d}.ipa-provider-deezer{background:#7b39ca}.ipa-provider-applemusic{background:#e63b63}.ipa-provider-kindle{background:#e9a23b;color:#242424}.ipa-provider-googlelivros{background:#4285f4}.ipa-provider-applebooks{background:#f27130}
 .climate-admin-grid .ipa-stream-note,.climate-grid .ipa-stream-note{font-size:11px!important;line-height:1.35!important;font-weight:400!important;letter-spacing:0!important;text-transform:none!important;color:#72838a!important}
 .climate-admin-grid>div>button[data-admin-edit-climate]{margin-top:auto!important}
+
+/* 6.29.43 — Falha de carregamento identificável, sem ocultar a hospedagem */
+.ipa-booking-cover.ipa-photo-error::after,.hotel-client-photo.ipa-photo-error::after{content:'Foto indisponível';display:grid;place-items:center;height:100%;padding:8px;text-align:center;font-size:11px;color:#49656a;background:#e7f3f4}
