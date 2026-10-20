@@ -535,6 +535,20 @@ window.IPAFirebase = {
     const snap=await uploadBytes(storageRef(storage,path),file,{contentType:file.type||"application/octet-stream"});
     return {url:await getDownloadURL(snap.ref),path};
   },
+  async saveTripDocument(record){
+    if(!currentUser || currentUser.uid!==ADMIN_UID)throw new Error("Somente o ADM pode salvar documentos.");
+    if(!record?.id||!record.tripId||!record.clientId)throw new Error("Viagem ou cliente não identificado.");
+    await setDoc(doc(firestore,"tripDocuments",record.id),{...record,updatedAt:serverTimestamp()});
+    return record.id;
+  },
+  async uploadHotelPhoto(file,hotelId){
+    if(!currentUser || currentUser.uid!==ADMIN_UID)throw new Error("Somente o ADM pode enviar fotos de hospedagens.");
+    if(!file || !["image/jpeg","image/png","image/webp"].includes(file.type) || file.size>8*1024*1024)throw new Error("Use JPG, PNG ou WebP de até 8 MB.");
+    const safe=(file.name||"foto.jpg").replace(/[^a-zA-Z0-9._-]/g,"_");
+    const path=`hotels/${String(hotelId).replace(/[^a-zA-Z0-9_-]/g,"_")}/${Date.now()}-${safe}`;
+    const snap=await uploadBytes(storageRef(storage,path),file,{contentType:file.type});
+    return {url:await getDownloadURL(snap.ref),path};
+  },
   async uploadTripDocument(file,clientId,tripId){
     if(!currentUser || currentUser.uid!==ADMIN_UID)throw new Error("Somente o ADM pode enviar documentos.");
     const safe=(file.name||"documento").replace(/[^a-zA-Z0-9._-]/g,"_");
