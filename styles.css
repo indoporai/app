@@ -878,3 +878,5 @@ dialog:has(#routeCatalogPlace) .smart-place-actions button{
 .ipa-move-controls button{border:1px solid #d8e6e5;background:#edf7f5;color:#087e85;border-radius:7px;min-height:26px;cursor:pointer;font-size:16px}
 .ipa-move-controls button:disabled{opacity:.25;cursor:default}
 .ipa-reorder-hint{font-size:12px;color:#667b81;margin:0 0 12px}
+
+.ipa-concierge-access{margin-top:14px}
