@@ -16,7 +16,7 @@ const state={route:'today',mode:'during',profile:savedProfile,scenarioChosen:fal
 /* Beta 6.29.30: global write-action feedback. No simulated success. */
 (function ipaWriteFeedback(){
  const pending=new Map();
- const writes=/(salvar|gravar|cadastrar|criar|adicionar|incluir|vincular|alterar vínculo|atualizar|publicar|enviar convite|confirmar|finalizar|excluir|remover|apagar|deletar|registrar|avaliar|check.in|favoritar|concluir)/i;
+ const writes=/(salvar|gravar|cadastrar|criar|adicionar|incluir|vincular|alterar vínculo|atualizar|publicar|enviar convite|confirmar|finalizar|excluir|remover|apagar|deletar|registrar|avaliar|favoritar|concluir)/i;
  const reads=/(cancelar|abrir|visualizar|voltar|fechar|editar|filtro|pesquisar|ver como|explorar|navegar|ver mais|adicionar destino à rota)/i;
  const errors=/(erro|falh|não foi|nao foi|inválid|informe|obrigat|já existe|ja existe|selecione|não é poss|nao e poss|negad|permiss|indisponível)/i;
  const successes=/(salv|cadastrad|criad|atualizad|vinculad|publicad|enviad|adicionad|excluíd|removid|apagado|registrad|concluíd|sucesso|✓)/i;
@@ -1767,18 +1767,53 @@ function tripWeatherSection(t){
  if(!t?.startDate||!tripDestination(t))return '';
  return `<section class="section ipa-trip-weather" data-trip-weather><div class="section-head"><div><span class="eyebrow">🌦️ CLIMA DA SUA VIAGEM</span><h2>Preparando a previsão de ${ipaEscape(tripDestination(t))}</h2></div></div><div class="ipa-weather-loading">Consultando clima para os dias da viagem…</div></section>`;
 }
+async function ipaWeatherJSON(url){
+ const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),11000);
+ try{const r=await fetch(url,{signal:controller.signal});if(!r.ok)throw new Error('Serviço meteorológico indisponível');return await r.json()}finally{clearTimeout(timer)}
+}
+function ipaWeatherDaily(data){
+ const d=data?.daily||{};return (d.time||[]).map((date,i)=>({date,max:d.temperature_2m_max?.[i],min:d.temperature_2m_min?.[i],rain:d.precipitation_sum?.[i]||0,sun:d.sunshine_duration?.[i],code:d.weather_code?.[i]})).filter(x=>Number.isFinite(x.max)&&Number.isFinite(x.min));
+}
 async function ipaHydrateTripWeather(){
- const box=document.querySelector('[data-trip-weather]'),t=activeTrip(); if(!box||!t?.startDate)return;
- const ws=activeTripStage(t);const key=[ws?.destination||tripDestination(t),ws?.country||tripCountry(t),ws?.startDate||t.startDate,ws?.endDate||t.endDate||t.startDate].join('|');
+ const box=document.querySelector('[data-trip-weather]'),t=activeTrip();if(!box||!t?.startDate)return;
+ const ws=activeTripStage(t),destination=ws?.destination||tripDestination(t),country=ws?.country||tripCountry(t)||'',start=ws?.startDate||t.startDate,end=ws?.endDate||t.endDate||t.startDate;
+ const key=[destination,country,start,end].join('|');
+ const stillCurrent=()=>box.isConnected&&activeTrip()?.id===t.id;
+ const showError=()=>{if(stillCurrent())box.innerHTML=`<div class="section-head"><div><span class="eyebrow">🌦️ CLIMA DA SUA VIAGEM</span><h2>Clima de ${ipaEscape(destination)}</h2><p>Não foi possível consultar dados meteorológicos agora. Tente novamente mais tarde.</p></div></div><button class="btn btn-light" data-weather-retry>Tentar novamente</button>`;const retry=box.querySelector('[data-weather-retry]');if(retry)retry.onclick=()=>{ipaWeatherCache.delete(key);ipaHydrateTripWeather()}};
  try{
   let data=ipaWeatherCache.get(key);
-  if(!data){const q=new URLSearchParams({destination:ws?.destination||tripDestination(t),country:ws?.country||tripCountry(t)||'',start:ws?.startDate||t.startDate,end:ws?.endDate||t.endDate||t.startDate});const r=await fetch('/api/weather/trip?'+q,{cache:'no-store'});data=await r.json();if(!r.ok||!data.ok)throw new Error(data.error||'Clima indisponível');ipaWeatherCache.set(key,data)}
-  const days=(data.days||[]).slice(0,7);
-  const title=data.kind==='forecast'?'Previsão para sua viagem':'Clima esperado para sua viagem';
-  const note=data.kind==='forecast'?'Previsão meteorológica atualizada automaticamente.':'Estimativa sazonal baseada no histórico recente do destino. A previsão real aparecerá quando a viagem se aproximar.';
-  box.innerHTML=`<div class="section-head"><div><span class="eyebrow">${data.kind==='forecast'?'🌦️ PREVISÃO DO TEMPO':'🗓️ CLIMA ESPERADO'}</span><h2>${title} · ${ipaEscape(data.location||tripDestination(t))}</h2><p>${note}</p></div></div><div class="ipa-weather-days">${days.map(d=>{const [ic,lab]=ipaWeatherCode(d.code);return `<article><small>${new Date(d.date+'T12:00:00').toLocaleDateString('pt-BR',{weekday:'short',day:'2-digit',month:'2-digit'})}</small><span>${ic}</span><b>${Math.round(d.max)}° / ${Math.round(d.min)}°</b><em>${lab}</em>${Number(d.rain)>0?`<small>💧 ${Math.round(d.rain)} mm</small>`:''}</article>`}).join('')}</div>${data.tip?`<div class="ipa-weather-tip">💡 ${ipaEscape(data.tip)}</div>`:''}`;
- }catch(e){box.innerHTML=`<div class="section-head"><div><span class="eyebrow">🌦️ CLIMA DA SUA VIAGEM</span><h2>Clima de ${ipaEscape(tripDestination(t))}</h2><p>A previsão ainda não está disponível. Tentaremos atualizar automaticamente mais perto da viagem.</p></div></div>`;}
+  if(!data){
+   const geo=await ipaWeatherJSON('https://geocoding-api.open-meteo.com/v1/search?'+new URLSearchParams({name:destination,count:'8',language:'pt',format:'json'}));
+   const matches=geo.results||[];const norm=x=>String(x||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+   const loc=matches.find(x=>norm(x.country)===norm(country)||norm(x.country_code)===norm(country))||matches[0];
+   if(!loc)throw new Error('Destino não localizado');
+   const today=new Date().toISOString().slice(0,10),forecastLimit=new Date(Date.now()+15*86400000).toISOString().slice(0,10);
+   const inForecast=start<=forecastLimit&&end>=today;
+   const lat=loc.latitude,lon=loc.longitude;
+   const vars='temperature_2m_max,temperature_2m_min,precipitation_sum,sunshine_duration,weather_code';
+   let days=[],kind='historical';
+   if(inForecast){
+    const f=await ipaWeatherJSON('https://api.open-meteo.com/v1/forecast?'+new URLSearchParams({latitude:String(lat),longitude:String(lon),daily:vars,timezone:'auto',start_date:start<today?today:start,end_date:end>forecastLimit?forecastLimit:end}));
+    days=ipaWeatherDaily(f);kind='forecast';
+   }
+   if(!days.length){
+    // Historical sample from previous complete year, matching month/day of the journey.
+    // Not a forecast; explicitly labeled as a historical reference.
+    const yr=new Date().getUTCFullYear()-1;
+    const sampleStart=yr+start.slice(4),sampleEnd=yr+end.slice(4);
+    const safeEnd=sampleEnd<sampleStart?`${yr+1}${end.slice(4)}`:sampleEnd;
+    const h=await ipaWeatherJSON('https://archive-api.open-meteo.com/v1/archive?'+new URLSearchParams({latitude:String(lat),longitude:String(lon),daily:vars,timezone:'auto',start_date:sampleStart,end_date:safeEnd}));
+    days=ipaWeatherDaily(h);kind='historical';
+   }
+   if(!days.length)throw new Error('Dados indisponíveis');
+   data={days:days.slice(0,7),kind,location:[loc.name,loc.country].filter(Boolean).join(', '),sampleYear:new Date().getUTCFullYear()-1};ipaWeatherCache.set(key,data);
+  }
+  if(!stillCurrent())return;
+  const historical=data.kind==='historical',days=data.days;
+  box.innerHTML=`<div class="section-head"><div><span class="eyebrow">${historical?'📊 HISTÓRICO DO CLIMA':'🌦️ PREVISÃO DO TEMPO'}</span><h2>${historical?'Como costuma ser o clima':'Previsão para a viagem'} · ${ipaEscape(data.location)}</h2><p>${historical?`Referência de ${data.sampleYear}, nas datas equivalentes. Não é previsão e o clima real pode variar.`:'Previsão meteorológica atualizada, sujeita a mudanças.'}</p></div></div><div class="ipa-weather-days">${days.map(d=>{const [ic,lab]=ipaWeatherCode(d.code),sun=Number.isFinite(d.sun)?Math.round(d.sun/3600*10)/10:null;return `<article><small>${historical?ipaEscape(d.date.slice(5).split('-').reverse().join('/')):new Date(d.date+'T12:00:00').toLocaleDateString('pt-BR',{weekday:'short',day:'2-digit',month:'2-digit'})}</small><span>${ic}</span><b>${Math.round(d.max)}° / ${Math.round(d.min)}°</b><em>${lab}</em><small>☀️ ${sun===null?'—':sun.toLocaleString('pt-BR')+' h de sol'}</small><small>🌧️ ${Number(d.rain).toLocaleString('pt-BR',{maximumFractionDigits:1})} mm de chuva</small></article>`}).join('')}</div>${historical?'<p class="ipa-weather-tip">Valores observados no ano indicado, não médias climatológicas de vários anos.</p>':''}`;
+ }catch(e){console.warn('Clima da viagem:',e);showError()}
 }
+
 function beforeView(){
  const d=ipaDB(),t=activeTrip();
  const country=tripCountry(t)||"sua próxima viagem",flag=countryFlag(country),dest=tripDestination(t);
@@ -1797,10 +1832,10 @@ ${tripModule('itinerary')?`<section class="section"><div class="section-head"><d
 ${tripModule('payments')?`<section class="section"><button class="payment-alert-card" data-go="payments"><div class="payment-alert-icon">💳</div><div><span class="eyebrow">Pagamentos</span><h3>Acompanhe sua viagem</h3><p>${(d?.payments||[]).filter(p=>p.status!=='Pago'&&(!t||p.tripId===t.id||(!p.tripId&&p.trip===t.name))).length} cobrança(s) em aberto</p></div><span>›</span></button></section>`:''}
 <section class="section"><div class="section-head"><div><span class="eyebrow">Sua jornada até o embarque</span><h2>Preparação da viagem</h2></div></div>
  <div class="v2-journey">
-  ${tripModule('documents')?`<button class="v2-journey-step done" data-prep-section="documents"><span>✓</span><div><b>Documentos</b><small>Checklist necessário para ${country}</small></div></button>`:''}
-  ${tripModule('checkin')?`<button class="v2-journey-step active" data-prep-section="checkin"><span>✓</span><div><b>Check-in</b><small>Acompanhe quando estiver disponível</small></div></button>`:''}
-  ${tripModule('luggage')?`<button class="v2-journey-step" data-prep-section="luggage"><span>🧳</span><div><b>Mala inteligente</b><small>Itens recomendados para ${country}</small></div></button>`:''}
-  ${tripModule('exchange')?`<button class="v2-journey-step" data-prep-section="exchange"><span>💱</span><div><b>Indo por Aí Exchange</b><small>Oferta personalizada</small></div></button>`:''}
+  ${tripModule('documents')?`<button class="v2-journey-step done" data-no-save-feedback data-prep-section="documents"><span>✓</span><div><b>Documentos</b><small>Checklist necessário para ${country}</small></div></button>`:''}
+  ${tripModule('checkin')?`<button class="v2-journey-step active" data-no-save-feedback data-prep-section="checkin"><span>✓</span><div><b>Check-in</b><small>Acompanhe quando estiver disponível</small></div></button>`:''}
+  ${tripModule('luggage')?`<button class="v2-journey-step" data-no-save-feedback data-prep-section="luggage"><span>🧳</span><div><b>Mala inteligente</b><small>Itens recomendados para ${country}</small></div></button>`:''}
+  ${tripModule('exchange')?`<button class="v2-journey-step" data-no-save-feedback data-prep-section="exchange"><span>💱</span><div><b>Indo por Aí Exchange</b><small>Oferta personalizada</small></div></button>`:''}
  </div>
 </section>
 ${(tripModule('preboardingSupport')||tripModule('bookingSupport')||tripModule('exchange')||tripModule('community'))?`<section class="section"><div class="section-head"><div><span class="eyebrow">Serviços do seu pacote</span><h2>Incluídos na sua experiência</h2></div></div><div class="native-service-grid">${tripModule('preboardingSupport')?`<div><span>🧭</span><b>Suporte pré-embarque</b><small>Orientação antes da viagem</small></div>`:''}${tripModule('bookingSupport')?`<div><span>🏨</span><b>Hotel & passagens</b><small>Apoio nas compras e reservas</small></div>`:''}${tripModule('exchange')?`<div><span>💱</span><b>Exchange</b><small>Câmbio disponível no pacote</small></div>`:''}${tripModule('community')?`<div><span>💬</span><b>Comunidade</b><small>Comunicação durante a viagem</small></div>`:''}</div></section>`:''}
