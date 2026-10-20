@@ -687,6 +687,25 @@ window.IPAFirebase = {
     await deleteDoc(doc(firestore,"placeCatalog",id));
     return true;
   },
+  async saveHotelPhotosToTrips(updates){
+    if(!currentUser || currentUser.uid!==ADMIN_UID) throw new Error("Somente o ADM pode atualizar as fotos das viagens.");
+    const results=[];
+    for(const item of updates){
+      if(!item.tripId || !Array.isArray(item.hotelBookings)) continue;
+      const tripRef=doc(firestore,"trips",String(item.tripId));
+      await setDoc(tripRef,{hotelBookings:item.hotelBookings},{merge:true});
+      const confirmed=await getDoc(tripRef);
+      if(!confirmed.exists()) throw new Error("Viagem não encontrada após salvar: "+item.tripId);
+      const stored=confirmed.data().hotelBookings||[];
+      for(const booking of item.hotelBookings){
+        if(!booking.photoUrl) continue;
+        const found=stored.find(x=>String(x.id)===String(booking.id));
+        if(!found || found.photoUrl!==booking.photoUrl)throw new Error("A URL da foto não foi confirmada na viagem "+item.tripId);
+      }
+      results.push(item.tripId);
+    }
+    return results;
+  },
   async syncNow(){
     if(!currentUser) throw new Error("Faça login primeiro.");
     return syncAll(window.IPAData?.getAll?.());
