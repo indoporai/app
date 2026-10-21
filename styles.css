@@ -921,3 +921,46 @@ dialog:has(#routeCatalogPlace) .smart-place-actions button{
 .ipa-photo-job-bar{height:9px;border-radius:10px;background:#dce9ee;overflow:hidden}
 .ipa-photo-job-bar>div{height:100%;border-radius:10px;background:#087a99;transition:width .25s}
 .ipa-photo-job small,.ipa-photo-batch-note{color:#526d7a;font-size:12px}
+
+
+/* Beta 6.29.62 — roteiro do cliente mais visual e fotos resilientes */
+.itinerary-item{border:1px solid #e6eef1;background:linear-gradient(180deg,#ffffff 0%,#fbfdff 100%);border-radius:18px;padding:14px;align-items:flex-start;grid-template-columns:42px 94px minmax(0,1fr) 36px;gap:12px;box-shadow:0 8px 24px rgba(9,52,74,.05)}
+.itinerary-item+.itinerary-item{margin-top:12px}
+.itinerary-item .itinerary-line{display:none!important}
+.ipa-reorder-item{grid-template-columns:42px 94px minmax(0,1fr) 36px!important;gap:12px}
+.ipa-order-number{width:42px;height:42px;border-radius:14px;background:linear-gradient(135deg,#073f49,#0f7f86);color:#fff;display:grid;place-items:center;font-weight:900;box-shadow:0 10px 18px rgba(7,63,73,.18)}
+.ipa-itinerary-thumbnail{width:94px;height:94px;min-width:94px;margin:0;border-radius:16px}
+.itinerary-copy{display:flex;flex-direction:column;gap:8px;min-width:0}
+.ipa-itinerary-copy-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.ipa-itinerary-copy-head b{font-size:16px;line-height:1.25;color:#102a43}
+.ipa-itinerary-address{font-size:12px;color:#5f7280;line-height:1.4}
+.ipa-itinerary-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:2px}
+.ipa-itinerary-actions .mini-map-open{background:#e8f6ff;color:#0d5b8f;border-radius:12px;padding:10px 12px;font-size:12px;font-weight:800}
+.ipa-move-controls{display:flex;flex-direction:column;gap:8px;align-self:stretch;justify-content:center}
+.ipa-move-controls button{border:0;border-radius:12px;background:#eef4f6;color:#22485f;font-weight:900;padding:8px 0;min-width:34px}
+.ipa-move-controls button:disabled{opacity:.45}
+.during-place-list{gap:14px}
+.during-place-card{grid-template-columns:44px 96px minmax(0,1fr);gap:14px;background:linear-gradient(180deg,#ffffff 0%,#f8fbfd 100%);border-radius:20px;padding:15px;border:1px solid #e5eef2;box-shadow:0 10px 24px rgba(9,52,74,.06);align-items:flex-start}
+.during-place-number{width:42px;height:42px;border-radius:14px;box-shadow:0 10px 18px rgba(7,63,73,.18)}
+.ipa-during-thumbnail{width:96px;height:96px;min-width:96px;margin:0;border-radius:16px}
+.during-place-main{min-width:0}
+.during-place-card small{color:#6b7b86;font-size:12px}
+.during-place-card b{font-size:18px;margin-top:3px;line-height:1.2;color:#11283d}
+.during-place-card p{font-size:13px;color:#5f7280;margin:5px 0 10px;line-height:1.45}
+.during-place-actions{gap:8px;margin-top:8px}
+.during-place-actions button{border:0;border-radius:12px;background:#eef4f6;color:#0f5f78;padding:9px 12px;font-weight:800;font-size:12px}
+.ipa-place-client-note,.ipa-place-client-tip{margin-top:10px;padding:12px;border-radius:12px;font-size:12.5px;line-height:1.5}
+.ipa-place-photo,.ipa-place-photo-fallback{border-radius:16px;background:#edf6f5}
+.ipa-place-photo-empty{font-size:26px}
+.ipa-photo-auto-note{display:grid;gap:4px;background:#f5fafb;border:1px solid #ddecef;border-radius:14px;padding:12px 14px;margin:12px 0}
+.ipa-photo-auto-note strong{font-size:14px;color:#0f5f78}
+.ipa-photo-auto-note small{color:#5d7481;line-height:1.45}
+@media (max-width:760px){
+ .itinerary-item,.ipa-reorder-item{grid-template-columns:38px 78px minmax(0,1fr)!important;gap:10px}
+ .ipa-move-controls{grid-column:2/span 2;flex-direction:row;justify-content:flex-end}
+ .ipa-itinerary-thumbnail{width:78px;height:78px;min-width:78px}
+ .during-place-card{grid-template-columns:38px 78px minmax(0,1fr);gap:10px;padding:12px}
+ .ipa-during-thumbnail{width:78px;height:78px;min-width:78px}
+ .during-place-actions button,.ipa-itinerary-actions .mini-map-open{width:100%;justify-content:center}
+ .ipa-itinerary-copy-head{flex-direction:column;align-items:flex-start}
+}
