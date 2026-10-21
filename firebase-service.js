@@ -745,6 +745,15 @@ window.IPAFirebase = {
     if(!currentUser || currentUser.uid!==ADMIN_UID)throw new Error('Apenas o ADM pode atualizar roteiros.');
     const ref=doc(firestore,'trips',String(tripId));
     await updateDoc(ref,{itinerary,updatedAt:serverTimestamp()});
+    const verified=await getDoc(ref);
+    if(!verified.exists())throw new Error('Viagem não encontrada após salvar.');
+    const saved=verified.data().itinerary||[];
+    const expected=itinerary.flatMap(d=>(d.places||[]).filter(p=>p&&p.photoUrl).map(p=>({day:d.day,id:p.id,name:p.name,photoUrl:p.photoUrl})));
+    for(const pic of expected){
+      const day=saved.find(d=>String(d.day)===String(pic.day));
+      const found=(day?.places||[]).find(p=>pic.id?String(p.id)===String(pic.id):p.name===pic.name);
+      if(!found||found.photoUrl!==pic.photoUrl)throw new Error('Foto não confirmada na viagem.');
+    }
   },
   async deleteCatalogPlace(id){
     if(!currentUser || currentUser.uid!==ADMIN_UID) throw new Error("Somente o ADM pode excluir lugares.");

@@ -964,3 +964,7 @@ dialog:has(#routeCatalogPlace) .smart-place-actions button{
  .during-place-actions button,.ipa-itinerary-actions .mini-map-open{width:100%;justify-content:center}
  .ipa-itinerary-copy-head{flex-direction:column;align-items:flex-start}
 }
+
+.ipa-photo-sync-report{display:grid;gap:7px;background:#fff;border:1px solid #d6e5e8;border-radius:12px;padding:12px;margin-top:10px;color:#164358;font-size:13px;line-height:1.5}
+.ipa-photo-sync-report[hidden]{display:none!important}
+.ipa-photo-sync-report small{color:#647581;overflow-wrap:anywhere}

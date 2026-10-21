@@ -427,6 +427,83 @@ async function ipaCatalogPhotoLookup(place){
  const j=await r.json();if(!r.ok||!j.ok)throw new Error(j.error||'Falha ao pesquisar Google Places');
  return ipaCatalogPhotoMatch(place,j.places||[]);
 }
+// Sincroniza URLs de fotos já existentes no catálogo com os roteiros publicados.
+// O cliente não tem permissão de leitura da coleção placeCatalog.
+function ipaPhotoCatalogMatch(p,catalog){
+ const id=String(p?.catalogPlaceId||p?.catalogId||'');
+ if(id){const hit=catalog.find(x=>String(x.id)===id);if(hit)return hit}
+ const pid=String(p?.placeId||'');
+ if(pid){const hit=catalog.find(x=>x.placeId&&String(x.placeId)===pid);if(hit)return hit}
+ const name=ipaNormText(p?.name),address=ipaNormText(p?.address);
+ if(!name)return null;
+ const matches=catalog.filter(x=>ipaNormText(x.name)===name);
+ if(matches.length===1)return matches[0]; // unique name across catalog
+ if(address){
+  const exact=matches.filter(x=>ipaNormText(x.address)===address);
+  if(exact.length===1)return exact[0];
+  const cityMatched=matches.filter(x=>{
+   const city=ipaNormText(x.city),country=ipaNormText(x.country);
+   return city&&address.includes(city)&&(!country||address.includes(country));
+  });
+  if(cityMatched.length===1)return cityMatched[0];
+ }
+ return null; // never guess when ambiguous
+}
+
+function ipaCatalogPhotoSyncReport(total,trips,unmatched,examples=[],failed=0){
+ const box=document.querySelector('#catalogPhotoSyncReport');if(!box)return;
+ box.hidden=false;
+ box.innerHTML=`<b>Resultado da vinculação</b><span>${total} fotos enviadas às viagens · ${trips} viagens atualizadas · ${unmatched} passeios sem foto ou associação · ${failed} erro(s) de gravação.</span>${examples.length?`<small>Exemplos para conferir: ${examples.map(ipaEscape).join(' · ')}</small>`:''}<small>Se houver foto vinculada, mas ela não aparecer no cliente, use “Testar imagem do Google” para verificar o serviço de fotos.</small>`;
+}
+async function ipaTestPlacePhotoEndpoint(){
+ const box=document.querySelector('#catalogPhotoSyncReport');
+ const candidate=(adminData().placeCatalog||[]).find(p=>p.photoUrl);
+ if(!candidate){toast('O catálogo não possui fotos para testar.');return}
+ box.hidden=false;box.innerHTML='<b>Testando foto do Google Places...</b>';
+ const url=candidate.photoUrl;
+ const image=new Image();
+ image.onload=()=>{box.innerHTML=`<b>✓ Foto abriu neste navegador</b><small>${ipaEscape(candidate.name)}. Se ainda não aparecer no login do cliente, verifique a vinculação às viagens.</small>`};
+ image.onerror=()=>{box.innerHTML=`<b>⚠️ URL da foto não carregou</b><small>${ipaEscape(candidate.name)} · ${ipaEscape(url)}. Verifique a rota /api/places/photo, a chave Google Maps e se a API Places (New) está habilitada no ambiente publicado.</small>`};
+ image.src=url;
+}
+async function ipaSyncExistingCatalogPhotos(){
+ const btn=document.querySelector('#catalogPhotosToTrips');
+ if(!window.IPAFirebase?.user){toast('Entre como ADM para sincronizar as fotos.');return}
+ const data=adminData(),catalog=(data.placeCatalog||[]).filter(x=>x.photoUrl);
+ if(!catalog.length){toast('Nenhuma foto disponível no Banco de Lugares.');return}
+ let total=0,updatedTrips=0,unmatched=0,failed=0;const missingExamples=[];
+ const changes=[];
+ for(const trip of data.trips||[]){
+  if(!Array.isArray(trip.itinerary))continue;
+  let count=0;
+  const itinerary=trip.itinerary.map(day=>{
+   if(!Array.isArray(day.places))return day;
+   return {...day,places:day.places.map(p=>{
+    if(typeof p!=='object'||!p)return p;
+    if(p.photoUrl)return p;
+    const hit=ipaPhotoCatalogMatch(p,catalog);
+    if(!hit?.photoUrl){unmatched++;if(missingExamples.length<8)missingExamples.push(p.name||'Passeio sem nome');return p}
+    count++;return {...p,photoUrl:hit.photoUrl,catalogPlaceId:p.catalogPlaceId||hit.id,placeId:p.placeId||hit.placeId||''};
+   })};
+  });
+  if(count)changes.push({id:trip.id,itinerary,count});
+ }
+ if(!changes.length){ipaCatalogPhotoSyncReport(0,0,unmatched,missingExamples);toast(`Nenhuma foto nova. ${unmatched} passeio(s) sem foto ou associação.`);return}
+ if(btn){btn.disabled=true;btn.textContent='Sincronizando fotos...'}
+ try{
+  for(const [i,item] of changes.entries()){
+   if(btn)btn.textContent=`Sincronizando ${i+1}/${changes.length} viagens...`;
+   try{
+    await window.IPAFirebase.saveTripItineraryPhotos(item.id,item.itinerary);
+    IPAData.updateTrip(item.id,{itinerary:item.itinerary});
+    total+=item.count;updatedTrips++;
+   }catch(err){failed++;console.error('Erro ao gravar fotos no roteiro',item.id,err)}
+  }
+  ipaCatalogPhotoSyncReport(total,updatedTrips,unmatched,missingExamples,failed);toast(`${total} foto(s) gravada(s) em ${updatedTrips} viagem(ns). Consulte o relatório abaixo.`);
+ }finally{
+  if(btn){btn.disabled=false;btn.textContent='🖼️ Aplicar fotos nos roteiros'}
+ }
+}
 function ipaUpdateRoutePhotosForCatalog(place,photoUrl){
  const updates=[];
  for(const trip of adminData().trips||[]){
@@ -500,6 +577,7 @@ function ipaBindCatalogTools(){
  const apply=()=>{const q=ipaNormText(search?.value),f=filter?.value||'all';document.querySelectorAll('[data-catalog-card]').forEach(card=>{const match=(!q||ipaNormText(card.dataset.search).includes(q))&&(f==='all'||card.dataset.geo===f);card.style.display=match?'':'none'});const hint=document.querySelector('#catalogDuplicateHint');if(hint)hint.textContent=q?`${[...document.querySelectorAll('[data-catalog-card]')].filter(x=>x.style.display!=='none').length} resultado(s) no banco.`:''};
  if(search)search.oninput=apply;if(filter)filter.onchange=apply;
  document.querySelectorAll('[data-admin-locate-place]').forEach(btn=>btn.onclick=async()=>{const p=(adminData().placeCatalog||[]).find(x=>x.id===btn.dataset.adminLocatePlace);if(!p)return;btn.disabled=true;btn.textContent='Localizando...';try{await ipaLocateCatalogPlace(p);if(window.IPAFirebase?.user)await window.IPAFirebase.syncNow();toast('Localização atualizada ✓');render()}catch(e){toast(e.message||'Não foi possível localizar');btn.disabled=false;btn.textContent='📍 Atualizar localização'}});
+ const syncPhotos=document.querySelector('#catalogPhotosToTrips');if(syncPhotos)syncPhotos.onclick=ipaSyncExistingCatalogPhotos;const testPhoto=document.querySelector('#catalogPhotoTest');if(testPhoto)testPhoto.onclick=ipaTestPlacePhotoEndpoint;
  const photoBatch=document.querySelector('#catalogPhotoBatch');if(photoBatch)photoBatch.onclick=ipaStartCatalogPhotoBatch;
  const photoStop=document.querySelector('#catalogPhotoStop');if(photoStop)photoStop.onclick=()=>{if(ipaCatalogPhotoJob?.running){ipaCatalogPhotoJob.running=false;ipaCatalogPhotoJob.paused=true;ipaCatalogPhotoJob.current='Interrompendo após a consulta atual…';ipaCatalogPhotoFeedback(ipaCatalogPhotoJob)}};
  if(ipaCatalogPhotoJob)ipaCatalogPhotoFeedback(ipaCatalogPhotoJob);
@@ -1560,7 +1638,7 @@ function googleMapsRouteUrl(day,t){
  return `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(first)}&destination=${encodeURIComponent(last)}${middle?`&waypoints=${encodeURIComponent(middle)}`:''}&travelmode=walking`;
 }
 function ipaPlacePhotoHtml(place,cls=''){
- const url=String(place?.photoUrl||'');
+ const url=String(place?.photoUrl||(place?.placeId?'/api/places/photo?placeId='+encodeURIComponent(place.placeId):''));
  if(!url)return `<div class="ipa-place-photo-fallback ${cls}" aria-label="Foto não disponível">📍</div>`;
  // Apenas URLs próprias do endpoint protegido ou URLs https; nunca executar HTML de dados remotos.
  if(!url.startsWith('/api/places/photo?placeId=')&&!/^https:\/\//i.test(url))return `<div class="ipa-place-photo-fallback ${cls}">📍</div>`;
@@ -2263,7 +2341,7 @@ function adminPlaces(){
  <div class="catalog-summary catalog-summary-visual"><div><span>📍</span><strong>${places.length}</strong><small>Lugares</small></div><div><span>🌎</span><strong>${countries.length}</strong><small>Países</small></div><div><span>🏙️</span><strong>${cities.length}</strong><small>Destinos</small></div><div><span>🎯</span><strong>${places.length?Math.round(located/places.length*100):0}%</strong><small>Geolocalizados <em>${located}/${places.length}</em></small></div></div>
  ${ipaCountryDashboard(places,'places')}
  <section class="ipa-admin-panel"><div class="section-head"><div><span class="eyebrow">BASE DO ROTEIRO AUTOMÁTICO</span><h2>Experiências cadastradas</h2></div></div>
- <div class="catalog-toolbar"><label class="catalog-search"><span>🔎</span><input id="catalogSearch" class="v2-concierge-input" placeholder="Pesquisar nome, cidade, país ou categoria..."></label><select id="catalogGeoFilter" class="v2-concierge-input"><option value="all">Todos os lugares</option><option value="missing">⚠️ Sem localização</option><option value="located">📍 Localização confirmada</option></select><button class="btn btn-light" id="catalogLocateMissing">📍 Localizar pendentes</button></div><div class="ipa-photo-auto-note"><strong>📸 Fotos automáticas ativas</strong><small>Novos lugares já trazem imagem na busca. O roteiro do cliente também reaproveita a foto salva no Banco de Lugares.</small></div><div id="catalogPhotoProgress" class="ipa-photo-job" aria-live="polite" hidden></div><small class="ipa-photo-batch-note">${places.filter(p=>!p.photoUrl).length} lugares sem foto no catálogo. Quando um local novo for buscado no Google Places, a foto principal será vinculada automaticamente.</small>
+ <div class="catalog-toolbar"><label class="catalog-search"><span>🔎</span><input id="catalogSearch" class="v2-concierge-input" placeholder="Pesquisar nome, cidade, país ou categoria..."></label><select id="catalogGeoFilter" class="v2-concierge-input"><option value="all">Todos os lugares</option><option value="missing">⚠️ Sem localização</option><option value="located">📍 Localização confirmada</option></select><button class="btn btn-light" id="catalogLocateMissing">📍 Localizar pendentes</button></div><div class="ipa-photo-auto-note"><button type="button" class="btn btn-primary" id="catalogPhotosToTrips" data-no-save-feedback>🖼️ Aplicar fotos nos roteiros</button><button type="button" class="btn btn-light" id="catalogPhotoTest" data-no-save-feedback>🔍 Testar imagem do Google</button><small>Uma única atualização para vincular as fotos já salvas às viagens existentes. Não faz novas buscas no Google.</small><div id="catalogPhotoSyncReport" class="ipa-photo-sync-report" hidden></div></div><div class="ipa-photo-auto-note"><strong>📸 Fotos automáticas ativas</strong><small>Novos lugares já trazem imagem na busca. O roteiro do cliente também reaproveita a foto salva no Banco de Lugares.</small></div><div id="catalogPhotoProgress" class="ipa-photo-job" aria-live="polite" hidden></div><small class="ipa-photo-batch-note">${places.filter(p=>!p.photoUrl).length} lugares sem foto no catálogo. Quando um local novo for buscado no Google Places, a foto principal será vinculada automaticamente.</small>
  <div id="catalogDuplicateHint" class="catalog-search-hint"></div>
  <div class="catalog-grid" id="catalogGrid">${places.map(p=>{const geo=Number.isFinite(Number(p.lat))&&Number.isFinite(Number(p.lng));return `<article class="catalog-card" data-catalog-card data-catalog-id="${ipaEscape(p.id)}" data-country="${ipaEscape(p.country||'Sem país')}" data-city="${ipaEscape(p.city||p.destination||'Sem destino')}" data-search="${ipaEscape(`${p.name||''} ${p.city||''} ${p.country||''} ${p.category||''}`.toLowerCase())}" data-geo="${geo?'located':'missing'}"><div><span class="chip">${p.category||'Experiência'}</span>${p.priority==='Imperdível'?'<span class="chip orange">Imperdível</span>':''}<span class="chip ${geo?'geo-ok':'geo-missing'}">${geo?'📍 Localização confirmada':'⚠️ Localização pendente'}</span></div>${ipaPlacePhotoHtml(p,'ipa-catalog-thumbnail')}<h3>${ipaEscape(p.name)}</h3><p>${ipaEscape([p.city,p.country].filter(Boolean).join(', '))}</p><div class="catalog-meta"><b>${ipaCatalogMoney(p.cost,p.currency)}</b><span>${Number(p.durationMinutes||120)} min</span></div><small>${(p.interests||[]).join(' · ')}</small>${p.tip?`<em>💡 ${ipaEscape(p.tip)}</em>`:''}<div class="lead-actions">${!geo?`<button class="btn btn-light" data-admin-locate-place="${p.id}">📍 Atualizar localização</button>`:''}<button class="btn btn-light" data-admin-edit-place="${p.id}">✏️ Editar</button><button class="btn btn-light" data-admin-delete-place="${p.id}">🗑️ Excluir</button></div></article>`}).join('')||'<div class="smart-empty"><b>Seu banco ainda está vazio.</b><small>Cadastre os primeiros lugares para o app começar a montar roteiros personalizados.</small></div>'}</div></section>`;
 }
