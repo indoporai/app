@@ -5,6 +5,24 @@ const modalClose=document.querySelector('#modalClose');
 const photoInput=document.querySelector('#photoInput');
 const topTitle=document.querySelector('#topTitle');
 
+function ipaSaveClientPage(){
+ try{if(state.profile!=='client'||!state.scenarioChosen)return;
+ sessionStorage.setItem('ipa-client-return',JSON.stringify({uid:window.IPAFirebase?.user?.uid||'',route:state.route,mode:state.mode,tripDay:state.tripDay,scrollY:window.scrollY||0,at:Date.now()}));
+ }catch(e){console.warn('Não foi possível preservar a tela',e)}
+}
+function ipaRestoreClientPage(){
+ try{
+  const saved=JSON.parse(sessionStorage.getItem('ipa-client-return')||'null');
+  if(!saved||Date.now()-saved.at>24*3600*1000)return false;
+  if(saved.uid&&saved.uid!==(window.IPAFirebase?.user?.uid||''))return false;
+  const valid=['today','trip','explore','community','memories','diary','payments'];
+  if(!valid.includes(saved.route))return false;
+  state.route=saved.route;state.mode=['before','during','after'].includes(saved.mode)?saved.mode:'before';state.tripDay=Number(saved.tripDay)||1;
+  requestAnimationFrame(()=>requestAnimationFrame(()=>window.scrollTo({top:Number(saved.scrollY)||0,behavior:'instant'})));
+  return true;
+ }catch(e){return false}
+}
+window.addEventListener('pagehide',ipaSaveClientPage);
 const savedPhotos=JSON.parse(localStorage.getItem('ipa_beta06_photos')||'[]');
 const savedProfile=localStorage.getItem('ipa_beta06_profile')||'client';
 const state={route:'today',mode:'during',profile:savedProfile,scenarioChosen:false,leadStage:'new',tripDay:1,steps:12480,shareLocation:false,live:false,liveSeconds:0,liveTimer:null,liveViewers:23,reactions:14,photos:savedPhotos,messages:[
@@ -124,7 +142,7 @@ function render(){
  view.innerHTML=routes[state.route]();
  document.querySelectorAll('.nav-item').forEach(b=>b.classList.toggle('active',b.dataset.route===state.route));
  document.body.classList.toggle('hidden-nav',state.profile==='prospect');
- bind(); ipaUpdateProfileButton(); if(state.route==='admin'&&state.profile==='admin')ipaEnsureAdminConciergeListener(); window.scrollTo({top:0,behavior:'smooth'});
+ bind(); ipaUpdateProfileButton(); if(state.profile==='client'&&state.scenarioChosen)ipaSaveClientPage(); if(state.route==='admin'&&state.profile==='admin')ipaEnsureAdminConciergeListener(); window.scrollTo({top:0,behavior:'smooth'});
 }
 
 function ipaParticipantKey(p){return p?.id||p?.participantId||p?.email||p?.name||''}
@@ -1061,7 +1079,16 @@ function bind(){
  };
  document.querySelectorAll('[data-firebase-logout]').forEach(b=>b.onclick=async()=>{await window.IPAFirebase.logout();render()});
  document.querySelectorAll('[data-firebase-sync]').forEach(b=>b.onclick=async()=>{toast('Sincronizando com Firebase...');try{await window.IPAFirebase.syncNow();toast('Firebase sincronizado')}catch(e){toast(e.message||'Erro ao sincronizar')}});
- document.querySelectorAll('[data-external-route]').forEach(b=>b.onclick=()=>{const url=b.dataset.externalRoute;if(url)window.location.assign(url)});
+ document.querySelectorAll('[data-external-route]').forEach(b=>b.onclick=()=>{
+  const url=b.dataset.externalRoute;
+  if(!url)return;
+  try{const parsed=new URL(url,location.href);if(!['https:','http:'].includes(parsed.protocol))throw Error('Endereço inválido');
+   ipaSaveClientPage();
+   // Abrir em outra aba mantém a viagem, o dia e a posição atual intactos.
+   const link=document.createElement('a');link.href=parsed.href;link.target='_blank';link.rel='noopener noreferrer';
+   document.body.appendChild(link);link.click();link.remove();
+  }catch(e){toast('Não foi possível abrir o documento: endereço inválido.')}
+ });
  document.querySelectorAll('[data-move-place]').forEach(b=>b.onclick=()=>{
   const t=activeTrip();if(!t)return;
   const day=(t.itinerary||[]).find(d=>Number(d.day)===Number(state.tripDay||t.itinerary?.[0]?.day||1));if(!day)return;
@@ -1531,14 +1558,39 @@ function prepChecklist(section,title){
  };
  const original=Array.isArray(d.prep?.[section])?d.prep[section]:[];
  const items=original.length?original.map(x=>typeof x==='string'?{label:x}:x): (presets[section]||[]).map(label=>({label,done:false}));
- const userKey=window.IPAFirebase?.user?.uid||'visitante',tripKey=activeTrip()?.id||'sem-viagem';
- const storageKey='ipa-client-prep:'+userKey+':'+tripKey+':'+section;
- let checked={};try{checked=JSON.parse(localStorage.getItem(storageKey)||'{}')}catch(e){}
- showModal(`<span class="eyebrow">Preparação da viagem</span><h2>${ipaEscape(title||section)}</h2><p>Toque para marcar ou desmarcar. Seu progresso é guardado neste dispositivo.</p><div class="prep-checklist">${items.map((x,i)=>`<label><input type="checkbox" data-prep-toggle="${section}:${i}" ${Object.prototype.hasOwnProperty.call(checked,i)?checked[i]:(!!x.done)?'checked':''}><span>${ipaEscape(x.label||'Item '+(i+1))}</span></label>`).join('')}</div>`);
- modalContent.querySelectorAll('[data-prep-toggle]').forEach(cb=>cb.addEventListener('change',()=>{
-   const idx=Number(cb.dataset.prepToggle.split(':')[1]);checked[idx]=cb.checked;
-   try{localStorage.setItem(storageKey,JSON.stringify(checked))}catch(e){console.warn('Não foi possível guardar checklist',e)}
+ const trip=activeTrip();
+ const email=String(window.IPAFirebase?.user?.email||'').trim().toLowerCase();
+ const userKey=window.IPAFirebase?.user?.uid||email||'visitante';
+ const tripKey=trip?.id||'sem-viagem';
+ // Stable identity and stable item labels; independent of changing array indices.
+ const storageKey='ipa-client-prep-v2:'+userKey+':'+tripKey+':'+section;
+ const legacyKey='ipa-client-prep:'+userKey+':'+tripKey+':'+section;
+ let checked={};
+ try{
+  checked=JSON.parse(localStorage.getItem(storageKey)||'null')||{};
+  if(!Object.keys(checked).length){const legacy=JSON.parse(localStorage.getItem(legacyKey)||'{}');
+   items.forEach((x,i)=>{if(Object.prototype.hasOwnProperty.call(legacy,i))checked[String(x.label||i)]=Boolean(legacy[i])});
+  }
+ }catch(e){checked={}}
+ const itemKey=x=>String(x.label||'').trim();
+ const itemDone=(x,i)=>Object.prototype.hasOwnProperty.call(checked,itemKey(x))?checked[itemKey(x)]:Boolean(x.done);
+ showModal(`<span class="eyebrow">Preparação da viagem</span><h2>${ipaEscape(title||section)}</h2><p>Marque cada item. Seu progresso é salvo automaticamente neste navegador.</p><div class="prep-checklist">${items.map((x,i)=>`<label><input type="checkbox" data-prep-index="${i}" ${itemDone(x,i)?'checked':''}><span>${ipaEscape(x.label||'Item '+(i+1))}</span></label>`).join('')}</div><small id="ipa-prep-saved" role="status" aria-live="polite">${items.filter((x,i)=>itemDone(x,i)).length} de ${items.length} concluídos</small>`);
+ const persist=()=>{
+  try{
+   localStorage.setItem(storageKey,JSON.stringify(checked));
+   const verified=JSON.parse(localStorage.getItem(storageKey)||'{}');
+   if(JSON.stringify(verified)!==JSON.stringify(checked))throw Error('Falha de verificação');
+   const count=items.filter((x,i)=>itemDone(x,i)).length;
+   const feedback=modalContent.querySelector('#ipa-prep-saved');
+   if(feedback){feedback.textContent='✓ Salvo · '+count+' de '+items.length+' concluídos';feedback.style.color='#16805a'}
+  }catch(e){console.error('Erro ao gravar checklist',e);const feedback=modalContent.querySelector('#ipa-prep-saved');if(feedback){feedback.textContent='Não foi possível salvar neste navegador.';feedback.style.color='#b33a35'};toast('Não foi possível salvar checklist neste dispositivo')}
+ };
+ modalContent.querySelectorAll('[data-prep-index]').forEach(cb=>cb.addEventListener('change',()=>{
+   checked[itemKey(items[Number(cb.dataset.prepIndex)])]=cb.checked;
+   persist();
  }));
+ // Persist migrated checklist and show state immediately on reopening.
+ if(Object.keys(checked).length)persist();
 
 }
 function benefitsPersonalized(){
@@ -2838,6 +2890,7 @@ window.addEventListener('ipa-client-experience-ready',()=>{
    localStorage.removeItem('ipa-preview-trip-id');
    state.mode='before';
    state.route='today';
+   ipaRestoreClientPage();
    document.body.classList.remove('hidden-nav');
    render();
  }
@@ -2856,7 +2909,7 @@ window.addEventListener('ipa-firebase-service-loaded',()=>{if(state.profile==='a
 window.addEventListener('ipa-firebase-ready',()=>{
  const fb=window.IPAFirebase;
  if(fb?.user && fb.user.uid!=='5dlGX6JlrUQHyjFWSHB9Dye0r1E3' && (fb.status==='client-connected'||fb.status==='client-no-trip')){
-   state.scenarioChosen=true;state.profile='client';state.mode='before';state.route='today';document.body.classList.remove('hidden-nav');render();return;
+   state.scenarioChosen=true;state.profile='client';state.mode='before';state.route='today';ipaRestoreClientPage();document.body.classList.remove('hidden-nav');render();return;
  }
  if(state.profile==='admin'||state.route==='admin')render();
 });
