@@ -349,13 +349,123 @@ async function ipaLocateCatalogPlace(p){
  const r=await fetch(`/api/places/search?q=${encodeURIComponent(q)}&destination=${encodeURIComponent(destination)}`,{cache:'no-store'}),j=await r.json();
  if(!r.ok||!j.ok)throw new Error(j.error||'Não foi possível localizar');
  const hit=(j.places||[])[0];if(!hit||!Number.isFinite(Number(hit.lat))||!Number.isFinite(Number(hit.lng)))throw new Error('Local não encontrado com segurança');
- IPAData.updateCatalogPlace(p.id,{lat:Number(hit.lat),lng:Number(hit.lng),placeId:p.placeId||hit.id||'',mapsUrl:p.mapsUrl||hit.mapsUrl||'',address:p.address||hit.address||'',geoUpdatedAt:new Date().toISOString()});return hit;
+ IPAData.updateCatalogPlace(p.id,{lat:Number(hit.lat),lng:Number(hit.lng),placeId:p.placeId||hit.id||'',photoUrl:p.photoUrl||hit.photoUrl||'',mapsUrl:p.mapsUrl||hit.mapsUrl||'',address:p.address||hit.address||'',geoUpdatedAt:new Date().toISOString()});return hit;
+}
+// Beta 6.29.59 - busca cuidadosa, em lotes, de fotos para o acervo já cadastrado.
+let ipaCatalogPhotoJob=null;
+function ipaCatalogPhotoCount(){
+ const arr=adminData().placeCatalog||[];
+ return {total:arr.length,missing:arr.filter(p=>!p.photoUrl).length,pending:arr.filter(p=>!p.photoUrl&&p.photoLookupStatus!=='not-found').length};
+}
+function ipaCatalogPhotoFeedback(job){
+ const el=document.querySelector('#catalogPhotoProgress');if(!el)return;
+ const remaining=ipaCatalogPhotoCount().pending;
+ el.hidden=false;
+ el.innerHTML=`<div class="ipa-photo-job-head"><strong>${job.running?'Buscando fotos no Google…':job.paused?'Atualização interrompida':'Lote finalizado'}</strong><span>${job.done}/${job.total} pesquisados</span></div><div class="ipa-photo-job-bar"><div style="width:${job.total?Math.round(100*job.done/job.total):0}%"></div></div><small>✓ ${job.found} fotos gravadas · ${job.noPhoto} sem correspondência/foto · ${job.errors} erros · ${remaining} lugares ainda pendentes de busca</small><small>${ipaEscape(job.current||'')}</small>`;
+ const btn=document.querySelector('#catalogPhotoStop');if(btn)btn.disabled=!job.running;
+}
+function ipaCatalogPhotoMatch(place,results){
+ const n=ipaNormText(place.name), city=ipaNormText(place.city), country=ipaNormText(place.country);
+ if(!n)return null;
+ if(place.placeId){const exact=results.find(p=>p.id===place.placeId&&p.photoUrl);if(exact)return exact;}
+ const scored=results.filter(p=>p.photoUrl).map(p=>{
+  const m=ipaNormText(p.name), addr=ipaNormText(p.address),cityHit=!city||ipaNormText(p.city)===city||addr.includes(city);
+  const countryHit=!country||ipaNormText(p.country)===country||addr.includes(country);
+  const same=m===n,similar=m.length>8&&n.length>8&&(m.includes(n)||n.includes(m));
+  return {p,valid:countryHit&&cityHit&&(same||similar),score:same?2:1};
+ }).filter(x=>x.valid).sort((a,b)=>b.score-a.score);
+ // Não escolher um local ambíguo caso a busca retorne duplicatas plausíveis.
+ if(scored.length>1&&scored[0].score===scored[1].score)return null;
+ return scored[0]?.p||null;
+}
+async function ipaCatalogPhotoLookup(place){
+ if(place.placeId){
+  const r=await fetch('/api/places/photo-info?placeId='+encodeURIComponent(place.placeId),{cache:'no-store'});
+  const j=await r.json();if(!r.ok||!j.ok)throw new Error(j.error||'Falha ao consultar foto pelo ID');
+  if(j.photoUrl)return j;
+ }
+ const q=[place.name,place.address].filter(Boolean).join(' ').slice(0,190);
+ const dest=[place.city,place.country].filter(Boolean).join(', ');
+ const r=await fetch(`/api/places/search?q=${encodeURIComponent(q)}&destination=${encodeURIComponent(dest)}`,{cache:'no-store'});
+ const j=await r.json();if(!r.ok||!j.ok)throw new Error(j.error||'Falha ao pesquisar Google Places');
+ return ipaCatalogPhotoMatch(place,j.places||[]);
+}
+function ipaUpdateRoutePhotosForCatalog(place,photoUrl){
+ const updates=[];
+ for(const trip of adminData().trips||[]){
+  if(!Array.isArray(trip.itinerary))continue;
+  let dirty=false;
+  const itinerary=trip.itinerary.map(day=>{
+   if(!Array.isArray(day.places))return day;
+   const places=day.places.map(p=>{
+    const linked=String(p.catalogPlaceId||'')===String(place.id)||!!(place.placeId&&p.placeId===place.placeId);
+    // Para lugares antigos sem vínculo, exigir nome E endereço iguais.
+    const legacy=!linked&&!p.catalogPlaceId&&!p.placeId&&ipaNormText(p.name)===ipaNormText(place.name)&&!!p.address&&ipaNormText(p.address)===ipaNormText(place.address);
+    if(!(linked||legacy)||p.photoUrl)return p;
+    dirty=true;return {...p,photoUrl};
+   });return dirty?{...day,places}:day;
+  });
+  if(dirty)updates.push({tripId:trip.id,itinerary});
+ }
+ return updates;
+}
+async function ipaStartCatalogPhotoBatch(){
+ if(ipaCatalogPhotoJob?.running)return;
+ if(!window.IPAFirebase?.user){toast('Entre como administrador para atualizar as fotos.');return}
+ const queue=(adminData().placeCatalog||[]).filter(p=>!p.photoUrl&&p.photoLookupStatus!=='not-found').slice(0,25);
+ if(!queue.length){toast('Nenhum lugar pendente. Os que não têm imagem disponível foram marcados para revisão.');return}
+ const job={running:true,paused:false,total:queue.length,done:0,found:0,noPhoto:0,errors:0,current:'Iniciando consultas…'};
+ ipaCatalogPhotoJob=job;ipaCatalogPhotoFeedback(job);
+ const btn=document.querySelector('#catalogPhotoBatch');if(btn)btn.disabled=true;
+ const changedTrips=new Map();
+ for(const p of queue){
+  if(!job.running)break;
+  job.current=p.name+' · '+[p.city,p.country].filter(Boolean).join(', ');ipaCatalogPhotoFeedback(job);
+  try{
+   const hit=await ipaCatalogPhotoLookup(p);
+   if(hit?.photoUrl){
+    const current=(adminData().placeCatalog||[]).find(x=>String(x.id)===String(p.id));
+    if(current&&!current.photoUrl){
+     const patch={photoUrl:hit.photoUrl,placeId:current.placeId||hit.id||'',photoUpdatedAt:new Date().toISOString()};
+     // Confirmação remota ANTES de considerar a foto concluída.
+     const stored=await window.IPAFirebase.saveCatalogPhoto(p.id,patch);
+     if(stored){IPAData.updateCatalogPlace(p.id,patch);job.found++;}
+     const linked=ipaUpdateRoutePhotosForCatalog({...current,...patch},hit.photoUrl);
+     linked.forEach(t=>changedTrips.set(t.tripId,t.itinerary));
+    }
+   }else{
+    await window.IPAFirebase.saveCatalogPhoto(p.id,{photoLookupStatus:'not-found',photoCheckedAt:new Date().toISOString()});
+    IPAData.updateCatalogPlace(p.id,{photoLookupStatus:'not-found',photoCheckedAt:new Date().toISOString()});
+    job.noPhoto++;
+   }
+  }catch(err){job.errors++;console.warn('Foto não atualizada',p.name,err);job.current='Falha em '+p.name+': '+(err.message||'erro')}
+  job.done++;ipaCatalogPhotoFeedback(job);
+  // Pequena pausa: evita disparar centenas de consultas simultâneas.
+  await new Promise(resolve=>setTimeout(resolve,250));
+ }
+ job.current='Gravando fotos nos roteiros das viagens existentes…';ipaCatalogPhotoFeedback(job);
+ for(const [tripId,itinerary] of changedTrips){
+  try{await window.IPAFirebase.saveTripItineraryPhotos(tripId,itinerary);IPAData.updateTrip(tripId,{itinerary})}
+  catch(err){job.errors++;console.error('Não foi possível atualizar o roteiro',tripId,err)}
+ }
+ job.running=false;job.current=job.paused?'Lote interrompido. As fotos já gravadas foram preservadas.':'Pode executar outro lote para continuar de onde parou.';
+ ipaCatalogPhotoFeedback(job);
+ if(btn)btn.disabled=false;
+ toast(`Lote finalizado: ${job.found} fotos salvas, ${job.noPhoto} sem foto, ${job.errors} erros.`);
+ // Atualiza somente as miniaturas; não apaga o histórico de progresso.
+ document.querySelectorAll('[data-catalog-card]').forEach(card=>{
+  const id=card.dataset.catalogId;const p=(adminData().placeCatalog||[]).find(x=>x.id===id);
+  if(p?.photoUrl){const old=card.querySelector('.ipa-catalog-thumbnail');if(old)old.outerHTML=ipaPlacePhotoHtml(p,'ipa-catalog-thumbnail')}
+ });
 }
 function ipaBindCatalogTools(){
  const search=document.querySelector('#catalogSearch'),filter=document.querySelector('#catalogGeoFilter');
  const apply=()=>{const q=ipaNormText(search?.value),f=filter?.value||'all';document.querySelectorAll('[data-catalog-card]').forEach(card=>{const match=(!q||ipaNormText(card.dataset.search).includes(q))&&(f==='all'||card.dataset.geo===f);card.style.display=match?'':'none'});const hint=document.querySelector('#catalogDuplicateHint');if(hint)hint.textContent=q?`${[...document.querySelectorAll('[data-catalog-card]')].filter(x=>x.style.display!=='none').length} resultado(s) no banco.`:''};
  if(search)search.oninput=apply;if(filter)filter.onchange=apply;
  document.querySelectorAll('[data-admin-locate-place]').forEach(btn=>btn.onclick=async()=>{const p=(adminData().placeCatalog||[]).find(x=>x.id===btn.dataset.adminLocatePlace);if(!p)return;btn.disabled=true;btn.textContent='Localizando...';try{await ipaLocateCatalogPlace(p);if(window.IPAFirebase?.user)await window.IPAFirebase.syncNow();toast('Localização atualizada ✓');render()}catch(e){toast(e.message||'Não foi possível localizar');btn.disabled=false;btn.textContent='📍 Atualizar localização'}});
+ const photoBatch=document.querySelector('#catalogPhotoBatch');if(photoBatch)photoBatch.onclick=ipaStartCatalogPhotoBatch;
+ const photoStop=document.querySelector('#catalogPhotoStop');if(photoStop)photoStop.onclick=()=>{if(ipaCatalogPhotoJob?.running){ipaCatalogPhotoJob.running=false;ipaCatalogPhotoJob.paused=true;ipaCatalogPhotoJob.current='Interrompendo após a consulta atual…';ipaCatalogPhotoFeedback(ipaCatalogPhotoJob)}};
+ if(ipaCatalogPhotoJob)ipaCatalogPhotoFeedback(ipaCatalogPhotoJob);
  const bulk=document.querySelector('#catalogLocateMissing');if(bulk)bulk.onclick=async()=>{const missing=(adminData().placeCatalog||[]).filter(p=>!Number.isFinite(Number(p.lat))||!Number.isFinite(Number(p.lng)));if(!missing.length)return toast('Todos os lugares já têm localização ✓');bulk.disabled=true;let ok=0;for(const p of missing){bulk.textContent=`📍 Localizando ${ok+1}/${missing.length}...`;try{await ipaLocateCatalogPlace(p);ok++}catch(e){console.warn('Localização pendente',p.name,e)}}try{if(window.IPAFirebase?.user)await window.IPAFirebase.syncNow()}catch{}toast(`${ok} de ${missing.length} lugares localizados ✓`);render()};
 }
 function bind(){
@@ -372,7 +482,7 @@ function bind(){
   <label>Interesses relacionados</label><div class="planner-interests" id="catalogInterests">${IPA_INTERESTS.map(x=>`<label><input type="checkbox" value="${x}"> ${x}</label>`).join('')}</div>
   <div class="planner-grid"><label class="route-pro-check"><input id="catalogKids" type="checkbox" checked> 👶 Bom com crianças</label><label>Reserva<select id="catalogReservation" class="v2-concierge-input"><option>Não exige</option><option>Recomendada</option><option>Obrigatória</option></select></label></div>
   <label>Dica Indo por Aí<textarea id="catalogTip" class="rating-text" placeholder="O que torna esse lugar especial?"></textarea></label>
-  <input id="catalogPlaceId" type="hidden"><input id="catalogMapsUrl" type="hidden"><input id="catalogLat" type="hidden"><input id="catalogLng" type="hidden">
+  <div id="catalogPhotoPreview" class="ipa-photo-search-preview">📷 A foto principal aparecerá aqui quando disponível na busca.</div><input id="catalogPhotoUrl" type="hidden"><input id="catalogPlaceId" type="hidden"><input id="catalogMapsUrl" type="hidden"><input id="catalogLat" type="hidden"><input id="catalogLng" type="hidden">
   <button id="saveCatalogPlace" class="btn btn-primary btn-block">Salvar no Banco de Lugares</button>`);
   setTimeout(()=>{
    const q=document.querySelector('#catalogGoogleSearch'),box=document.querySelector('#catalogPlaceSuggestions'),save=document.querySelector('#saveCatalogPlace');
@@ -393,7 +503,7 @@ function bind(){
       document.querySelector('#catalogAddress').value=p.address||'';
       if(p.city)document.querySelector('#catalogCity').value=p.city;
       if(p.country)document.querySelector('#catalogCountry').value=p.country;
-      document.querySelector('#catalogPlaceId').value=p.id||'';
+      document.querySelector('#catalogPlaceId').value=p.id||'';document.querySelector('#catalogPhotoUrl').value=p.photoUrl||'';document.querySelector('#catalogPhotoPreview').innerHTML=ipaPlacePhotoHtml(p,'ipa-photo-preview');
       document.querySelector('#catalogMapsUrl').value=p.mapsUrl||'';
       document.querySelector('#catalogLat').value=p.lat??'';
       document.querySelector('#catalogLng').value=p.lng??'';
@@ -408,7 +518,7 @@ function bind(){
     const city=v('#catalogCity'),country=v('#catalogCountry');if(!city||!country){toast('Informe cidade e país');return}
     const dup=ipaFindCatalogDuplicates(name,city);if(dup.length&&!confirm(`Possível local já cadastrado: “${dup[0].name}” em ${dup[0].city}.\n\nDeseja cadastrar mesmo assim?`))return;
     const interests=[...document.querySelectorAll('#catalogInterests input:checked')].map(x=>x.value);
-    const payload={name,category:v('#catalogCategory'),city,country,address:v('#catalogAddress'),cost:Number(v('#catalogCost')||0),currency:v('#catalogCurrency'),durationMinutes:Number(v('#catalogDuration')||120),priority:v('#catalogPriority'),interests,kidsFriendly:!!document.querySelector('#catalogKids')?.checked,reservation:v('#catalogReservation'),tip:v('#catalogTip'),placeId:v('#catalogPlaceId'),mapsUrl:v('#catalogMapsUrl'),lat:Number(v('#catalogLat'))||null,lng:Number(v('#catalogLng'))||null};
+    const payload={name,category:v('#catalogCategory'),city,country,address:v('#catalogAddress'),cost:Number(v('#catalogCost')||0),currency:v('#catalogCurrency'),durationMinutes:Number(v('#catalogDuration')||120),priority:v('#catalogPriority'),interests,kidsFriendly:!!document.querySelector('#catalogKids')?.checked,reservation:v('#catalogReservation'),tip:v('#catalogTip'),photoUrl:v('#catalogPhotoUrl'),placeId:v('#catalogPlaceId'),mapsUrl:v('#catalogMapsUrl'),lat:Number(v('#catalogLat'))||null,lng:Number(v('#catalogLng'))||null};
     try{
      save.disabled=true;save.textContent='Salvando...';
      IPAData.addCatalogPlace(payload);
@@ -992,12 +1102,12 @@ function bind(){
    <label>Horário</label><input id="routePlaceTime" type="time" class="v2-concierge-input">
    <label>Dica inteligente</label><textarea id="routePlaceTip" class="rating-text" placeholder="Ex.: melhor horário, reserva, tempo sugerido, o que pedir..."></textarea>
    <label>Observação operacional</label><input id="routePlaceNote" class="v2-concierge-input" maxlength="140" placeholder="Ingresso, reserva, ponto de encontro...">
-   <input id="routePlaceId" type="hidden"><input id="routeMapsUrl" type="hidden">
+   <div id="routePhotoPreview" class="ipa-photo-search-preview">📷 Foto disponível ao selecionar um lugar na busca.</div><input id="routePhotoUrl" type="hidden"><input id="routePlaceId" type="hidden"><input id="routeMapsUrl" type="hidden">
    <div class="smart-place-actions"><button id="saveRoutePlace" class="btn btn-primary">+ Adicionar ao roteiro</button><button id="saveAsTip" class="btn btn-light">💡 Adicionar como dica</button></div>`);
    setTimeout(()=>{
      const q=document.querySelector('#routePlaceName'), box=document.querySelector('#placeSuggestions'), catalogSelect=document.querySelector('#routeCatalogPlace');
      let selectedCatalogPlace=null;
-     const fillFromCatalog=p=>{if(!p)return;selectedCatalogPlace=p;q.value=p.name||'';document.querySelector('#routePlaceAddress').value=p.address||'';document.querySelector('#routePlaceId').value=p.placeId||'';document.querySelector('#routeMapsUrl').value=p.mapsUrl||'';const cat=document.querySelector('#routePlaceCategory');if(cat&&p.category){const found=[...cat.options].find(o=>o.textContent.toLowerCase().includes(String(p.category).toLowerCase()));if(found)cat.value=found.value}document.querySelector('#routePlaceTip').value=p.tip||'';document.querySelector('#routePlaceNote').value=[p.durationMinutes?`${p.durationMinutes} min`:'',p.reservation?`Reserva: ${p.reservation}`:''].filter(Boolean).join(' · ');box.innerHTML=`<div class="selected-place">✓ ${ipaEscape(p.name||'')}<small>${ipaEscape(p.address||'')}</small></div>`};
+     const fillFromCatalog=p=>{if(!p)return;selectedCatalogPlace=p;q.value=p.name||'';document.querySelector('#routePlaceAddress').value=p.address||'';document.querySelector('#routePlaceId').value=p.placeId||'';document.querySelector('#routePhotoUrl').value=p.photoUrl||'';document.querySelector('#routePhotoPreview').innerHTML=ipaPlacePhotoHtml(p,'ipa-photo-preview');document.querySelector('#routeMapsUrl').value=p.mapsUrl||'';const cat=document.querySelector('#routePlaceCategory');if(cat&&p.category){const found=[...cat.options].find(o=>o.textContent.toLowerCase().includes(String(p.category).toLowerCase()));if(found)cat.value=found.value}document.querySelector('#routePlaceTip').value=p.tip||p.smartTip||'';document.querySelector('#routePlaceNote').value=[p.durationMinutes?`${p.durationMinutes} min`:'',p.reservation?`Reserva: ${p.reservation}`:''].filter(Boolean).join(' · ');box.innerHTML=`<div class="selected-place">✓ ${ipaEscape(p.name||'')}<small>${ipaEscape(p.address||'')}</small></div>`};
      if(catalogSelect)catalogSelect.onchange=()=>{const p=(adminData().placeCatalog||[]).find(x=>x.id===catalogSelect.value);fillFromCatalog(p)};
      let timer;
      q.oninput=()=>{clearTimeout(timer);timer=setTimeout(async()=>{
@@ -1008,11 +1118,11 @@ function bind(){
          const j=await r.json();
          if(j.needsKey){box.innerHTML=`<small>Busca automática pronta, mas falta configurar <b>GOOGLE_MAPS_API_KEY</b> no Cloudflare. O botão Maps já funciona.</small>`;return}
          box.innerHTML=(j.places||[]).map((p,i)=>`<button type="button" data-place-result='${encodeURIComponent(JSON.stringify(p))}'><b>${p.name}</b><small>${p.address}</small>${p.rating?`<em>★ ${p.rating} · ${p.reviews} avaliações</em>`:''}</button>`).join('')||'<small>Nenhum resultado. Tente outro termo.</small>';
-         box.querySelectorAll('[data-place-result]').forEach(x=>x.onclick=()=>{const p=JSON.parse(decodeURIComponent(x.dataset.placeResult));q.value=p.name;document.querySelector('#routePlaceAddress').value=p.address||'';document.querySelector('#routePlaceId').value=p.id||'';document.querySelector('#routeMapsUrl').value=p.mapsUrl||'';box.innerHTML=`<div class="selected-place">✓ ${p.name}<small>${p.address}</small></div>`});
+         box.querySelectorAll('[data-place-result]').forEach(x=>x.onclick=()=>{const p=JSON.parse(decodeURIComponent(x.dataset.placeResult));q.value=p.name;document.querySelector('#routePlaceAddress').value=p.address||'';document.querySelector('#routePlaceId').value=p.id||'';document.querySelector('#routePhotoUrl').value=p.photoUrl||'';document.querySelector('#routePhotoPreview').innerHTML=ipaPlacePhotoHtml(p,'ipa-photo-preview');document.querySelector('#routeMapsUrl').value=p.mapsUrl||'';box.innerHTML=`<div class="selected-place">✓ ${p.name}<small>${p.address}</small></div>`});
        }catch(e){box.innerHTML='<small>Não foi possível buscar agora. Use o botão Maps.</small>'}
      },350)};
      document.querySelector('#openGoogleSearch').onclick=()=>window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q.value+' '+(trip?.destination||''))}`,'_blank');
-     const collect=()=>{const base=selectedCatalogPlace?{...selectedCatalogPlace,catalogPlaceId:selectedCatalogPlace.id}:{};return {...base,name:q.value.trim(),address:document.querySelector('#routePlaceAddress').value.trim(),time:document.querySelector('#routePlaceTime').value,note:document.querySelector('#routePlaceNote').value.trim(),placeId:document.querySelector('#routePlaceId').value||base.placeId||'',mapsUrl:document.querySelector('#routeMapsUrl').value||base.mapsUrl||'',category:document.querySelector('#routePlaceCategory').value,smartTip:document.querySelector('#routePlaceTip').value.trim()||base.tip||''}};
+     const collect=()=>{const base=selectedCatalogPlace?{...selectedCatalogPlace,catalogPlaceId:selectedCatalogPlace.id}:{};return {...base,name:q.value.trim(),address:document.querySelector('#routePlaceAddress').value.trim(),time:document.querySelector('#routePlaceTime').value,photoUrl:document.querySelector('#routePhotoUrl').value||base.photoUrl||'',note:document.querySelector('#routePlaceNote').value.trim(),placeId:document.querySelector('#routePlaceId').value||base.placeId||'',mapsUrl:document.querySelector('#routeMapsUrl').value||base.mapsUrl||'',category:document.querySelector('#routePlaceCategory').value,smartTip:document.querySelector('#routePlaceTip').value.trim()||base.tip||''}};
      const saveRouteBtn=document.querySelector('#saveRoutePlace');
      if(saveRouteBtn)saveRouteBtn.onclick=()=>{const p=collect();if(!p.name){toast('Informe ou selecione o local');return}saveRouteBtn.disabled=true;saveRouteBtn.textContent='Adicionando...';try{const saved=IPAData.addItineraryPlace(tripId,Number(day),p);if(!saved)throw new Error('Viagem não encontrada');toast('Local adicionado ao roteiro ✓');modal.close();view.innerHTML=adminTripEditor(tripId);bind();if(window.IPAFirebase?.user)window.IPAFirebase.syncNow().catch(e=>console.warn('Local salvo; sincronização pendente',e))}catch(e){console.error(e);saveRouteBtn.disabled=false;saveRouteBtn.textContent='+ Adicionar ao roteiro';toast(e.message||'Não foi possível adicionar o local')}};
      document.querySelector('#saveAsTip').onclick=async()=>{const p=collect();if(!p.name){toast('Informe o nome do local');return}IPAData.addRecommendation({...p,tripId,clientId:trip?.clientId,day:Number(day),networkRecommended:true});if(window.IPAFirebase?.user)await window.IPAFirebase.syncNow();toast('Dica adicionada à viagem ✓');modal.close();view.innerHTML=adminTripEditor(tripId);bind()};
@@ -1090,13 +1200,14 @@ function bind(){
   <div class="planner-grid"><label>Custo por pessoa<input id="epCost" type="number" min="0" step=".01" class="v2-concierge-input" value="${Number(p.cost||0)}"></label><label>Moeda<select id="epCurrency" class="v2-concierge-input">${['EUR','BRL','USD'].map(x=>`<option ${x===(p.currency||'EUR')?'selected':''}>${x}</option>`).join('')}</select></label><label>Duração (min)<input id="epDuration" type="number" min="15" step="15" class="v2-concierge-input" value="${Number(p.durationMinutes||120)}"></label><label>Prioridade<select id="epPriority" class="v2-concierge-input">${['Recomendado','Imperdível','Opcional'].map(x=>`<option ${x===(p.priority||'Recomendado')?'selected':''}>${x}</option>`).join('')}</select></label></div>
   <label>Interesses relacionados</label><div class="planner-interests" id="epInterests">${IPA_INTERESTS.map(x=>`<label><input type="checkbox" value="${x}" ${(p.interests||[]).includes(x)?'checked':''}> ${x}</label>`).join('')}</div>
   <div class="planner-grid"><label class="route-pro-check"><input id="epKids" type="checkbox" ${p.kidsFriendly!==false?'checked':''}> 👶 Bom com crianças</label><label>Reserva<select id="epReservation" class="v2-concierge-input">${['Não exige','Recomendada','Obrigatória'].map(x=>`<option ${x===(p.reservation||'Não exige')?'selected':''}>${x}</option>`).join('')}</select></label></div>
+  <label>URL da foto principal<input id="epPhotoUrl" class="v2-concierge-input" value="${ipaEscape(p.photoUrl||'')}" placeholder="Preenchida automaticamente pela busca"></label><div class="ipa-photo-search-preview">${ipaPlacePhotoHtml(p,'ipa-photo-preview')}</div>
   <label>Dica Indo por Aí<textarea id="epTip" class="rating-text">${ipaEscape(p.tip||'')}</textarea></label>
   <div class="catalog-geo-edit"><span>${Number.isFinite(Number(p.lat))&&Number.isFinite(Number(p.lng))?'📍 Localização confirmada':'⚠️ Localização pendente'}</span>${!(Number.isFinite(Number(p.lat))&&Number.isFinite(Number(p.lng)))?`<button type="button" class="btn btn-light" id="epLocate">Atualizar localização</button>`:''}</div>
   <button id="epSave" class="btn btn-primary btn-block">💾 Salvar alterações</button>`);
   setTimeout(()=>{const locate=document.querySelector('#epLocate');if(locate)locate.onclick=async()=>{locate.disabled=true;locate.textContent='Localizando...';try{const temp={...p,name:document.querySelector('#epName').value.trim(),city:document.querySelector('#epCity').value.trim(),country:document.querySelector('#epCountry').value.trim(),address:document.querySelector('#epAddress').value.trim()};await ipaLocateCatalogPlace(temp);if(window.IPAFirebase?.user)await window.IPAFirebase.syncNow();modal.close();render();toast('Localização atualizada ✓')}catch(e){toast(e.message||'Não foi possível localizar');locate.disabled=false;locate.textContent='Atualizar localização'}};document.querySelector('#epSave').onclick=async()=>{
     const v=id=>document.querySelector(id)?.value?.trim?.()||'';const name=v('#epName'),city=v('#epCity'),country=v('#epCountry');if(!name||!city||!country){toast('Informe nome, cidade e país');return}
     const interests=[...document.querySelectorAll('#epInterests input:checked')].map(x=>x.value);
-    IPAData.updateCatalogPlace(p.id,{name,category:v('#epCategory'),city,country,address:v('#epAddress'),cost:Number(v('#epCost')||0),currency:v('#epCurrency'),durationMinutes:Number(v('#epDuration')||120),priority:v('#epPriority'),interests,kidsFriendly:!!document.querySelector('#epKids')?.checked,reservation:v('#epReservation'),tip:v('#epTip')});
+    IPAData.updateCatalogPlace(p.id,{name,category:v('#epCategory'),city,country,address:v('#epAddress'),cost:Number(v('#epCost')||0),currency:v('#epCurrency'),durationMinutes:Number(v('#epDuration')||120),priority:v('#epPriority'),interests,kidsFriendly:!!document.querySelector('#epKids')?.checked,reservation:v('#epReservation'),photoUrl:v('#epPhotoUrl'),tip:v('#epTip')});
     if(window.IPAFirebase?.user)await window.IPAFirebase.syncNow();modal.close();render();toast('Lugar atualizado no Firebase ✓');
   };},0);
  });
@@ -1375,6 +1486,13 @@ function googleMapsRouteUrl(day,t){
  const first=q(places[0]),last=q(places[places.length-1]);
  const middle=places.slice(1,-1).map(q).join("|");
  return `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(first)}&destination=${encodeURIComponent(last)}${middle?`&waypoints=${encodeURIComponent(middle)}`:''}&travelmode=walking`;
+}
+function ipaPlacePhotoHtml(place,cls=''){
+ const url=String(place?.photoUrl||'');
+ if(!url)return `<div class="ipa-place-photo-fallback ${cls}" aria-label="Foto não disponível">📍</div>`;
+ // Apenas URLs próprias do endpoint protegido ou URLs https; nunca executar HTML de dados remotos.
+ if(!url.startsWith('/api/places/photo?placeId=')&&!/^https:\/\//i.test(url))return `<div class="ipa-place-photo-fallback ${cls}">📍</div>`;
+ return `<div class="ipa-place-photo ${cls}"><img loading="lazy" src="${ipaEscape(url)}" alt="Foto de ${ipaEscape(place.name||'atração')}" onerror="this.style.display='none';this.parentElement.classList.add('ipa-photo-failed')"><span class="ipa-place-photo-empty">📍</span></div>`;
 }
 function ipaClientDayPlaces(t,day){
  const official=normalizedPlaces(day);
@@ -1902,7 +2020,7 @@ function beforeView(){
 ${tripWeatherSection(t)}
 ${modeCard()}
 <section class="section"><div class="v2-plan-card"><div><span class="eyebrow">Seu plano contratado</span><h3>${plan}</h3><p>${t?.name||'Minha viagem'} · ${dest}, ${country} ${flag}</p></div><button class="btn btn-light" data-plan-details="true">Ver benefícios</button></div></section>
-${tripModule('itinerary')?`<section class="section"><div class="section-head"><div><span class="eyebrow">Seu roteiro</span><h2>${firstDay?firstDay.title:'Roteiro em preparação'}</h2></div><span class="chip">${t?.itinerary?.length||0} dias</span></div>${firstDay?`<div class="client-itinerary-preview">${normalizedPlaces(firstDay).slice(0,4).map((p,i)=>`<div><span>${i+1}</span><div><b>${p.name}</b><small>${p.time||p.address||'Programado no roteiro'}</small></div></div>`).join('')}</div>`:'<p>O Indo por Aí está preparando seus dias.</p>'}</section>`:''}
+${tripModule('itinerary')?`<section class="section"><div class="section-head"><div><span class="eyebrow">Seu roteiro</span><h2>${firstDay?firstDay.title:'Roteiro em preparação'}</h2></div><span class="chip">${t?.itinerary?.length||0} dias</span></div>${firstDay?`<div class="client-itinerary-preview">${normalizedPlaces(firstDay).slice(0,4).map((p,i)=>`<div><span>${i+1}</span>${ipaPlacePhotoHtml(p,'ipa-preview-thumbnail')}<div><b>${p.name}</b><small>${p.time||p.address||'Programado no roteiro'}</small></div></div>`).join('')}</div>`:'<p>O Indo por Aí está preparando seus dias.</p>'}</section>`:''}
 ${tripModule('payments')?`<section class="section"><button class="payment-alert-card" data-go="payments"><div class="payment-alert-icon">💳</div><div><span class="eyebrow">Pagamentos</span><h3>Acompanhe sua viagem</h3><p>${(d?.payments||[]).filter(p=>p.status!=='Pago'&&(!t||p.tripId===t.id||(!p.tripId&&p.trip===t.name))).length} cobrança(s) em aberto</p></div><span>›</span></button></section>`:''}
 <section class="section"><div class="section-head"><div><span class="eyebrow">Sua jornada até o embarque</span><h2>Preparação da viagem</h2></div></div>
  <div class="v2-journey">
@@ -2048,9 +2166,9 @@ function adminPlaces(){
  <div class="catalog-summary catalog-summary-visual"><div><span>📍</span><strong>${places.length}</strong><small>Lugares</small></div><div><span>🌎</span><strong>${countries.length}</strong><small>Países</small></div><div><span>🏙️</span><strong>${cities.length}</strong><small>Destinos</small></div><div><span>🎯</span><strong>${places.length?Math.round(located/places.length*100):0}%</strong><small>Geolocalizados <em>${located}/${places.length}</em></small></div></div>
  ${ipaCountryDashboard(places,'places')}
  <section class="ipa-admin-panel"><div class="section-head"><div><span class="eyebrow">BASE DO ROTEIRO AUTOMÁTICO</span><h2>Experiências cadastradas</h2></div></div>
- <div class="catalog-toolbar"><label class="catalog-search"><span>🔎</span><input id="catalogSearch" class="v2-concierge-input" placeholder="Pesquisar nome, cidade, país ou categoria..."></label><select id="catalogGeoFilter" class="v2-concierge-input"><option value="all">Todos os lugares</option><option value="missing">⚠️ Sem localização</option><option value="located">📍 Localização confirmada</option></select><button class="btn btn-light" id="catalogLocateMissing">📍 Localizar pendentes</button></div>
+ <div class="catalog-toolbar"><label class="catalog-search"><span>🔎</span><input id="catalogSearch" class="v2-concierge-input" placeholder="Pesquisar nome, cidade, país ou categoria..."></label><select id="catalogGeoFilter" class="v2-concierge-input"><option value="all">Todos os lugares</option><option value="missing">⚠️ Sem localização</option><option value="located">📍 Localização confirmada</option></select><button class="btn btn-light" id="catalogLocateMissing">📍 Localizar pendentes</button><button class="btn btn-primary" id="catalogPhotoBatch">📸 Buscar fotos (25 por lote)</button><button class="btn btn-light" id="catalogPhotoStop" disabled>Interromper</button></div><div id="catalogPhotoProgress" class="ipa-photo-job" aria-live="polite" hidden></div><small class="ipa-photo-batch-note">${places.filter(p=>!p.photoUrl).length} lugares sem foto (${places.filter(p=>!p.photoUrl&&p.photoLookupStatus!=='not-found').length} ainda não pesquisados). O Google Places pode gerar cobranças. Cada lote consulta até 25 lugares e preserva fotos existentes.</small>
  <div id="catalogDuplicateHint" class="catalog-search-hint"></div>
- <div class="catalog-grid" id="catalogGrid">${places.map(p=>{const geo=Number.isFinite(Number(p.lat))&&Number.isFinite(Number(p.lng));return `<article class="catalog-card" data-catalog-card data-country="${ipaEscape(p.country||'Sem país')}" data-city="${ipaEscape(p.city||p.destination||'Sem destino')}" data-search="${ipaEscape(`${p.name||''} ${p.city||''} ${p.country||''} ${p.category||''}`.toLowerCase())}" data-geo="${geo?'located':'missing'}"><div><span class="chip">${p.category||'Experiência'}</span>${p.priority==='Imperdível'?'<span class="chip orange">Imperdível</span>':''}<span class="chip ${geo?'geo-ok':'geo-missing'}">${geo?'📍 Localização confirmada':'⚠️ Localização pendente'}</span></div><h3>${ipaEscape(p.name)}</h3><p>${ipaEscape([p.city,p.country].filter(Boolean).join(', '))}</p><div class="catalog-meta"><b>${ipaCatalogMoney(p.cost,p.currency)}</b><span>${Number(p.durationMinutes||120)} min</span></div><small>${(p.interests||[]).join(' · ')}</small>${p.tip?`<em>💡 ${ipaEscape(p.tip)}</em>`:''}<div class="lead-actions">${!geo?`<button class="btn btn-light" data-admin-locate-place="${p.id}">📍 Atualizar localização</button>`:''}<button class="btn btn-light" data-admin-edit-place="${p.id}">✏️ Editar</button><button class="btn btn-light" data-admin-delete-place="${p.id}">🗑️ Excluir</button></div></article>`}).join('')||'<div class="smart-empty"><b>Seu banco ainda está vazio.</b><small>Cadastre os primeiros lugares para o app começar a montar roteiros personalizados.</small></div>'}</div></section>`;
+ <div class="catalog-grid" id="catalogGrid">${places.map(p=>{const geo=Number.isFinite(Number(p.lat))&&Number.isFinite(Number(p.lng));return `<article class="catalog-card" data-catalog-card data-catalog-id="${ipaEscape(p.id)}" data-country="${ipaEscape(p.country||'Sem país')}" data-city="${ipaEscape(p.city||p.destination||'Sem destino')}" data-search="${ipaEscape(`${p.name||''} ${p.city||''} ${p.country||''} ${p.category||''}`.toLowerCase())}" data-geo="${geo?'located':'missing'}"><div><span class="chip">${p.category||'Experiência'}</span>${p.priority==='Imperdível'?'<span class="chip orange">Imperdível</span>':''}<span class="chip ${geo?'geo-ok':'geo-missing'}">${geo?'📍 Localização confirmada':'⚠️ Localização pendente'}</span></div>${ipaPlacePhotoHtml(p,'ipa-catalog-thumbnail')}<h3>${ipaEscape(p.name)}</h3><p>${ipaEscape([p.city,p.country].filter(Boolean).join(', '))}</p><div class="catalog-meta"><b>${ipaCatalogMoney(p.cost,p.currency)}</b><span>${Number(p.durationMinutes||120)} min</span></div><small>${(p.interests||[]).join(' · ')}</small>${p.tip?`<em>💡 ${ipaEscape(p.tip)}</em>`:''}<div class="lead-actions">${!geo?`<button class="btn btn-light" data-admin-locate-place="${p.id}">📍 Atualizar localização</button>`:''}<button class="btn btn-light" data-admin-edit-place="${p.id}">✏️ Editar</button><button class="btn btn-light" data-admin-delete-place="${p.id}">🗑️ Excluir</button></div></article>`}).join('')||'<div class="smart-empty"><b>Seu banco ainda está vazio.</b><small>Cadastre os primeiros lugares para o app começar a montar roteiros personalizados.</small></div>'}</div></section>`;
 }
 function adminTemplates(){
  const d=adminData();
@@ -2429,7 +2547,7 @@ function duringView(){
  const country=tripCountry(t),flag=countryFlag(country),route=googleMapsRouteUrl(day,t);
  return `<section class="hero during-personalized-hero"><span class="eyebrow">Durante a viagem</span><h1>${tripDestination(t)} ${flag}</h1><p>${t.name} · Dia ${day.day}${day.title?` · ${day.title}`:''}</p><div class="hero-actions">${route?`<button class="btn btn-light" data-external-route="${route}">Abrir rota</button>`:''}${tripModule('concierge')?`<button class="btn btn-light" data-concierge>👑 Concierge</button>`:''}${tripModule('live')?`<button class="btn btn-primary" id="realLiveBtn">🔴 Live</button>`:''}</div></section>
  ${modeCard()}
- <section class="section"><div class="section-head"><div><span class="eyebrow">Roteiro real</span><h2>${day.title||`Dia ${day.day}`}</h2></div><span class="chip">${places.length} locais</span></div><div class="during-place-list">${places.map((p,i)=>`<div class="during-place-card ${p.personal?'during-place-personal':''}"><div class="during-place-number">${i+1}</div><div><small>${p.time||'Horário livre'}</small><div class="during-place-title" data-journey-title="${ipaEscape([t.id,day.day,p.id||i].join(':'))}"><b>${p.name}</b>${journeyInlineStars(t.id,day.day,p.id||i)}</div><p>${p.address||p.note||'Programado no roteiro'}</p><div class="during-place-actions"><button data-map="${(p.address||p.name)+', '+country}">Mapa</button><button class="${(ipaDB().journeyPlaces?.[[t.id,day.day,p.id||i].join(':')]?.checked)?'checked':''}" data-journey-check="${t.id}|${day.day}|${p.id||i}">${(ipaDB().journeyPlaces?.[[t.id,day.day,p.id||i].join(':')]?.checked)?'✓ Feito':'✓ Check'}</button><button data-journey-rate="${t.id}|${day.day}|${p.id||i}" data-place-name="${encodeURIComponent(p.name)}">${(()=>{const rr=Number(ipaDB().journeyPlaces?.[[t.id,day.day,p.id||i].join(':')]?.rating||0);return rr?`${'★'.repeat(rr)}${'☆'.repeat(5-rr)}`:'★ Avaliar'})()}</button></div></div></div>`).join('')||'<p>Nenhum local cadastrado para este dia.</p>'}</div></section>
+ <section class="section"><div class="section-head"><div><span class="eyebrow">Roteiro real</span><h2>${day.title||`Dia ${day.day}`}</h2></div><span class="chip">${places.length} locais</span></div><div class="during-place-list">${places.map((p,i)=>`<div class="during-place-card ${p.personal?'during-place-personal':''}"><div class="during-place-number">${i+1}</div>${ipaPlacePhotoHtml(p,'ipa-during-thumbnail')}<div><small>${p.time||'Horário livre'}</small><div class="during-place-title" data-journey-title="${ipaEscape([t.id,day.day,p.id||i].join(':'))}"><b>${p.name}</b>${journeyInlineStars(t.id,day.day,p.id||i)}</div><p>${ipaEscape(p.address||'Programado no roteiro')}</p>${p.note?`<div class="ipa-place-client-note"><strong>📝 Observação</strong><span>${ipaEscape(p.note)}</span></div>`:''}${(p.smartTip||p.tip)?`<div class="ipa-place-client-tip"><strong>💡 Dica Indo por Aí</strong><span>${ipaEscape(p.smartTip||p.tip)}</span></div>`:''}<div class="during-place-actions"><button data-map="${(p.address||p.name)+', '+country}">Mapa</button><button class="${(ipaDB().journeyPlaces?.[[t.id,day.day,p.id||i].join(':')]?.checked)?'checked':''}" data-journey-check="${t.id}|${day.day}|${p.id||i}">${(ipaDB().journeyPlaces?.[[t.id,day.day,p.id||i].join(':')]?.checked)?'✓ Feito':'✓ Check'}</button><button data-journey-rate="${t.id}|${day.day}|${p.id||i}" data-place-name="${encodeURIComponent(p.name)}">${(()=>{const rr=Number(ipaDB().journeyPlaces?.[[t.id,day.day,p.id||i].join(':')]?.rating||0);return rr?`${'★'.repeat(rr)}${'☆'.repeat(5-rr)}`:'★ Avaliar'})()}</button></div></div></div>`).join('')||'<p>Nenhum local cadastrado para este dia.</p>'}</div></section>
  <section class="section"><div class="section-head"><h2>Dias da viagem</h2></div><div class="day-strip">${days.map(x=>`<button class="day-pill ${Number(x.day)===Number(day.day)?'active':''}" data-day="${x.day}"><small>Dia</small><strong>${x.day}</strong></button>`).join('')}</div></section>
  <section class="section ipa-real-map-section"><div class="section-head"><div><span class="eyebrow">MAPA DO DIA</span><h2>Seu roteiro no mapa</h2></div><span class="chip">A → B → C${places.length>3?' → D':''}</span></div><div id="ipaRealMap" class="ipa-real-map"><div class="ipa-map-loading">🗺️ Carregando mapa...</div></div><div class="ipa-map-legend"><span><i class="official"></i> Roteiro oficial</span><span><i class="personal"></i> Dica adicionada</span><span><i class="current"></i> Você</span></div></section>
 `;
@@ -2464,7 +2582,7 @@ function tripView(){
  const day=days.find(x=>Number(x.day)===dayNumber)||{day:1,title:"Roteiro em preparação",places:[]};
  const places=ipaClientDayPlaces(t,day);
  const country=tripCountry(t),flag=countryFlag(country);
- const rows=places.map((p,index)=>`<div class="itinerary-item dynamic-itinerary-item ipa-reorder-item"><span class="ipa-order-number">${index+1}</span><span class="itinerary-line"><i></i></span><span class="itinerary-icon">${p.personal?'✨':(index===0?'📍':'•')}</span><span class="itinerary-copy"><b>${ipaEscape(p.name)}${p.personal?' · <em class="personal-route-inline">Sua descoberta</em>':''}</b><small>${ipaEscape(p.address||p.note||'Detalhes no roteiro')}</small></span><span class="ipa-move-controls"><button type="button" data-move-place="${index}:up" ${index===0?'disabled':''} aria-label="Subir passeio">↑</button><button type="button" data-move-place="${index}:down" ${index===places.length-1?'disabled':''} aria-label="Descer passeio">↓</button></span><button class="mini-map-open" data-map="${ipaEscape((p.address||p.name)+', '+country)}">↗</button></div>`).join('');
+ const rows=places.map((p,index)=>`<div class="itinerary-item dynamic-itinerary-item ipa-reorder-item"><span class="ipa-order-number">${index+1}</span><span class="itinerary-line"><i></i></span>${ipaPlacePhotoHtml(p,'ipa-itinerary-thumbnail')}<span class="itinerary-copy"><b>${ipaEscape(p.name)}${p.personal?' · <em class="personal-route-inline">Sua descoberta</em>':''}</b><small>${ipaEscape(p.address||'Local do passeio')}</small>${p.note?`<div class="ipa-place-client-note"><strong>📝 Observação</strong><span>${ipaEscape(p.note)}</span></div>`:''}${(p.smartTip||p.tip)?`<div class="ipa-place-client-tip"><strong>💡 Dica Indo por Aí</strong><span>${ipaEscape(p.smartTip||p.tip)}</span></div>`:''}</span><span class="ipa-move-controls"><button type="button" data-move-place="${index}:up" ${index===0?'disabled':''} aria-label="Subir passeio">↑</button><button type="button" data-move-place="${index}:down" ${index===places.length-1?'disabled':''} aria-label="Descer passeio">↓</button></span><button class="mini-map-open" data-map="${ipaEscape((p.address||p.name)+', '+country)}">↗</button></div>`).join('');
  const route=ipaFullClientMapsUrl(places,t);
  return `<section class="hero personalized-trip-hero"><span class="eyebrow">Minha viagem</span><h1>${t.name} ${flag}</h1><p>${tripDestination(t)}, ${country} · ${days.length} dias de roteiro</p><div class="hero-actions">${route?`<button class="btn btn-light" data-external-route="${route}">Abrir rota no Google Maps</button>`:''}<button class="btn btn-primary" data-go="explore">Ver mapa do dia</button></div></section>
  <section class="section itinerary-days"><div class="day-strip">${days.map(x=>`<button class="day-pill ${Number(x.day)===dayNumber?'active':''}" data-day="${x.day}"><small>Dia</small><strong>${x.day}</strong></button>`).join('')}</div></section>

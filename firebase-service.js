@@ -730,6 +730,22 @@ window.IPAFirebase = {
     await deleteDoc(doc(firestore,"tripDocuments",id));
     return true;
   },
+  async saveCatalogPhoto(id,patch){
+    if(!currentUser || currentUser.uid!==ADMIN_UID)throw new Error('Apenas o ADM pode atualizar o catálogo.');
+    const ref=doc(firestore,'placeCatalog',String(id));
+    const before=await getDoc(ref);
+    if(!before.exists())throw new Error('Lugar não encontrado no Firebase.');
+    if(before.data().photoUrl)return false;
+    await updateDoc(ref,{...patch,updatedAt:serverTimestamp()});
+    const after=await getDoc(ref);
+    if(after.data()?.photoUrl!==patch.photoUrl)throw new Error('A foto não foi confirmada no Firebase.');
+    return true;
+  },
+  async saveTripItineraryPhotos(tripId,itinerary){
+    if(!currentUser || currentUser.uid!==ADMIN_UID)throw new Error('Apenas o ADM pode atualizar roteiros.');
+    const ref=doc(firestore,'trips',String(tripId));
+    await updateDoc(ref,{itinerary,updatedAt:serverTimestamp()});
+  },
   async deleteCatalogPlace(id){
     if(!currentUser || currentUser.uid!==ADMIN_UID) throw new Error("Somente o ADM pode excluir lugares.");
     if(!id) throw new Error("Lugar inválido.");

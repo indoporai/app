@@ -209,7 +209,7 @@ async function googlePlaceSearch(request,env){
   const text=[q,destination].filter(Boolean).join(", ");
   const r=await fetch("https://places.googleapis.com/v1/places:searchText",{
     method:"POST",
-    headers:{"Content-Type":"application/json","X-Goog-Api-Key":key,"X-Goog-FieldMask":"places.id,places.displayName,places.formattedAddress,places.googleMapsUri,places.primaryType,places.rating,places.userRatingCount,places.addressComponents,places.location"},
+    headers:{"Content-Type":"application/json","X-Goog-Api-Key":key,"X-Goog-FieldMask":"places.id,places.displayName,places.formattedAddress,places.googleMapsUri,places.primaryType,places.rating,places.userRatingCount,places.addressComponents,places.location,places.photos"},
     body:JSON.stringify({textQuery:text,languageCode:"pt-BR",maxResultCount:6})
   });
   const body=await r.json().catch(()=>({}));
@@ -221,11 +221,46 @@ async function googlePlaceSearch(request,env){
       id:p.id||"",name:p.displayName?.text||"",address:p.formattedAddress||"",mapsUrl:p.googleMapsUri||"",
       category:p.primaryType||"",rating:p.rating||null,reviews:p.userRatingCount||0,
       city:pick("locality","postal_town","administrative_area_level_2","administrative_area_level_1"),
-      country:pick("country"),lat:p.location?.latitude??null,lng:p.location?.longitude??null
+      country:pick("country"),lat:p.location?.latitude??null,lng:p.location?.longitude??null,
+      photoUrl:p.photos?.[0]?.name ? `/api/places/photo?placeId=${encodeURIComponent(p.id)}` : ""
     };
   })});
 }
 
+
+async function googlePlacePhotoInfo(request,env){
+ const key=env.GOOGLE_MAPS_API_KEY;
+ if(!key)return json({ok:false,error:'GOOGLE_MAPS_API_KEY não configurada'},503);
+ const id=new URL(request.url).searchParams.get('placeId')||'';
+ if(!/^[a-zA-Z0-9_-]{8,300}$/.test(id))return json({ok:false,error:'ID de local inválido'},400);
+ const r=await fetch('https://places.googleapis.com/v1/places/'+encodeURIComponent(id),{
+  headers:{'X-Goog-Api-Key':key,'X-Goog-FieldMask':'id,displayName,formattedAddress,photos'}
+ });
+ const j=await r.json().catch(()=>({}));
+ if(!r.ok)return json({ok:false,error:j?.error?.message||'Erro ao consultar foto'},r.status);
+ return json({ok:true,id:j.id||id,name:j.displayName?.text||'',address:j.formattedAddress||'',photoUrl:j.photos?.[0]?.name?'/api/places/photo?placeId='+encodeURIComponent(id):''});
+}
+
+async function googlePlacePhoto(request,env){
+ const key=env.GOOGLE_MAPS_API_KEY;
+ if(!key)return new Response('Fotos não configuradas',{status:503});
+ const u=new URL(request.url), id=(u.searchParams.get('placeId')||'').trim();
+ if(!/^[a-zA-Z0-9_-]{8,300}$/.test(id))return new Response('Lugar inválido',{status:400});
+ const details=await fetch(`https://places.googleapis.com/v1/places/${encodeURIComponent(id)}`,{
+  headers:{'X-Goog-Api-Key':key,'X-Goog-FieldMask':'photos'},cf:{cacheTtl:3600,cacheEverything:true}
+ });
+ if(!details.ok)return new Response('Foto indisponível',{status:404});
+ const data=await details.json().catch(()=>({}));
+ const name=data.photos?.[0]?.name;
+ if(!name||!/^places\/[a-zA-Z0-9_-]+\/photos\/[a-zA-Z0-9_-]+$/.test(name))return new Response('Sem foto',{status:404});
+ const media=await fetch(`https://places.googleapis.com/v1/${name}/media?maxWidthPx=700&skipHttpRedirect=true`,{
+  headers:{'X-Goog-Api-Key':key}
+ });
+ if(!media.ok)return new Response('Foto indisponível',{status:404});
+ const photo=await media.json().catch(()=>({}));
+ if(!/^https:\/\//.test(photo.photoUri||''))return new Response('Sem imagem',{status:404});
+ return Response.redirect(photo.photoUri,302);
+}
 
 async function computeRoadRoute(request,env){
  const key=env.GOOGLE_MAPS_API_KEY;if(!key)return json({ok:false,error:"GOOGLE_MAPS_API_KEY não configurada"},500);
@@ -295,6 +330,8 @@ export default {
     }
     if (url.pathname === "/api/contact/whatsapp" && request.method === "GET") return whatsappContact(request,env);
     if (url.pathname === "/api/places/search" && request.method === "GET") return googlePlaceSearch(request,env);
+    if (url.pathname === "/api/places/photo" && request.method === "GET") return googlePlacePhoto(request,env);
+    if (url.pathname === "/api/places/photo-info" && request.method === "GET") return googlePlacePhotoInfo(request,env);
     if (url.pathname === "/api/routes/compute" && request.method === "POST") return computeRoadRoute(request,env);
     if (url.pathname === "/api/climate/generate" && request.method === "POST") return generateClimate(request,env);
     if (url.pathname === "/api/live/create" && request.method === "POST") return createLiveRoom(env);

@@ -896,3 +896,28 @@ dialog:has(#routeCatalogPlace) .smart-place-actions button{
 .ipa-concierge-completed-actions .btn{font-size:12px;padding:7px 11px}
 .ipa-concierge-completed-details{padding-top:12px;border-top:1px solid #e7ecef;margin-top:12px}
 .ipa-concierge-completed-details[hidden]{display:none!important}
+
+.ipa-place-client-note,.ipa-place-client-tip{display:flex;flex-direction:column;gap:3px;margin-top:8px;padding:9px 11px;border-radius:9px;background:#eef5fb;font-size:12px;line-height:1.45;color:#27475f;white-space:normal;overflow-wrap:anywhere}
+.ipa-place-client-note strong,.ipa-place-client-tip strong{font-size:12px;color:#0b4478}
+.ipa-place-client-tip{background:#fff8e9;color:#655128}
+.ipa-place-client-tip strong{color:#7a5717}
+
+/* Beta 6.29.58 — fotografias automáticas dos lugares */
+.ipa-place-photo,.ipa-place-photo-fallback{position:relative;display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;border-radius:12px;background:#e9f4f3;color:#0e7f87;min-width:54px;width:64px;height:64px}
+.ipa-place-photo img{width:100%;height:100%;display:block;object-fit:cover}
+.ipa-place-photo-empty{display:none;font-size:23px}
+.ipa-photo-failed .ipa-place-photo-empty{display:block}
+.ipa-photo-preview{width:140px;height:96px;max-width:100%}
+.ipa-photo-search-preview{background:#f5f9fa;padding:8px;border-radius:12px;margin:8px 0;color:#65757e;font-size:12px}
+.ipa-itinerary-thumbnail{width:58px;height:58px;min-width:58px;margin-right:6px}
+.ipa-during-thumbnail{width:74px;height:74px;min-width:74px;margin:0 8px}
+.ipa-preview-thumbnail{width:48px;height:48px;min-width:48px}
+.ipa-catalog-thumbnail{width:100%;height:130px;margin:10px 0}
+
+/* Beta 6.29.59 — progresso da importação de fotos */
+.ipa-photo-job{padding:15px;border:1px solid #d5e4ec;background:#f6fbfd;border-radius:12px;margin:12px 0;display:grid;gap:7px}
+.ipa-photo-job[hidden]{display:none!important}
+.ipa-photo-job-head{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:13px}
+.ipa-photo-job-bar{height:9px;border-radius:10px;background:#dce9ee;overflow:hidden}
+.ipa-photo-job-bar>div{height:100%;border-radius:10px;background:#087a99;transition:width .25s}
+.ipa-photo-job small,.ipa-photo-batch-note{color:#526d7a;font-size:12px}
