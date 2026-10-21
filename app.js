@@ -134,15 +134,34 @@ function ipaUpdateProfileButton(){
  const initials=String(name).trim().split(/\s+/).filter(Boolean).slice(0,2).map(x=>x[0]).join('').toUpperCase()||'👤';
  b.hidden=false;b.innerHTML=`${ipaEscape(initials)}<span></span>`;b.setAttribute('aria-label',`Perfil de ${name}`);
 }
+// Preserve scroll for updates within the same screen (Firebase refreshes,
+// checklist actions, day selection, etc.). Reset only on real navigation.
+let ipaLastRenderedScreen=null;
 function render(){
  if(state.profile==='client' && state.scenarioChosen && !ipaIsClientAuthenticated()){
    ipaUpdateProfileButton(); showClientLogin(); return;
  }
+ const screen=state.profile+':'+state.route;
+ const sameScreen=ipaLastRenderedScreen===screen;
+ const previousY=Math.max(0,window.scrollY||document.documentElement.scrollTop||0);
  topTitle.textContent=titles[state.route]||'Indo por Aí';
  view.innerHTML=routes[state.route]();
  document.querySelectorAll('.nav-item').forEach(b=>b.classList.toggle('active',b.dataset.route===state.route));
  document.body.classList.toggle('hidden-nav',state.profile==='prospect');
- bind(); ipaUpdateProfileButton(); if(state.profile==='client'&&state.scenarioChosen)ipaSaveClientPage(); if(state.route==='admin'&&state.profile==='admin')ipaEnsureAdminConciergeListener(); window.scrollTo({top:0,behavior:'smooth'});
+ bind();
+ ipaUpdateProfileButton();
+ if(state.route==='admin'&&state.profile==='admin')ipaEnsureAdminConciergeListener();
+ ipaLastRenderedScreen=screen;
+ // Avoid scrolling to the top on every background update.
+ // Restoring after layout avoids jumps when content is re-rendered.
+ if(sameScreen){
+   window.scrollTo({top:previousY,behavior:'instant'});
+   requestAnimationFrame(()=>window.scrollTo({top:previousY,behavior:'instant'}));
+ }else if(previousY>0){
+   window.scrollTo({top:0,behavior:'instant'});
+ }
+ if(state.profile==='client'&&state.scenarioChosen)
+   requestAnimationFrame(ipaSaveClientPage);
 }
 
 function ipaParticipantKey(p){return p?.id||p?.participantId||p?.email||p?.name||''}
