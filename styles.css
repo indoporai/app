@@ -968,3 +968,37 @@ dialog:has(#routeCatalogPlace) .smart-place-actions button{
 .ipa-photo-sync-report{display:grid;gap:7px;background:#fff;border:1px solid #d6e5e8;border-radius:12px;padding:12px;margin-top:10px;color:#164358;font-size:13px;line-height:1.5}
 .ipa-photo-sync-report[hidden]{display:none!important}
 .ipa-photo-sync-report small{color:#647581;overflow-wrap:anywhere}
+
+/* Beta 6.29.66 - cards mobile com áreas de grid explícitas.
+   Corrige auto-placement que colocava o texto numa coluna estreita. */
+.ipa-reorder-item{display:grid!important;grid-template-areas:"number photo copy controls"!important;grid-template-columns:42px 94px minmax(0,1fr) 36px!important;align-items:start!important;min-width:0}
+.ipa-reorder-item>.ipa-order-number{grid-area:number;min-width:0}
+.ipa-reorder-item>.ipa-itinerary-thumbnail{grid-area:photo}
+.ipa-reorder-item>.itinerary-copy{grid-area:copy;width:100%;min-width:0;max-width:100%;overflow-wrap:break-word}
+.ipa-reorder-item>.ipa-move-controls{grid-area:controls;grid-column:auto!important;align-self:start;justify-content:flex-start}
+.ipa-reorder-item .ipa-itinerary-copy-head b{overflow-wrap:normal;word-break:normal;hyphens:auto}
+.ipa-reorder-item .ipa-itinerary-address{overflow-wrap:break-word;word-break:normal}
+@media (max-width:760px){
+ .ipa-reorder-item{grid-template-areas:"number photo controls" "copy copy copy"!important;grid-template-columns:44px 92px minmax(0,1fr)!important;column-gap:12px!important;row-gap:12px!important;padding:14px!important;height:auto!important;min-height:0!important}
+ .ipa-reorder-item>.ipa-order-number{width:42px;height:42px}
+ .ipa-reorder-item>.ipa-itinerary-thumbnail{width:92px;height:92px;min-width:92px}
+ .ipa-reorder-item>.itinerary-copy{grid-column:1/-1!important;grid-row:2!important;gap:8px}
+ .ipa-reorder-item>.ipa-move-controls{grid-column:3!important;grid-row:1!important;display:flex;flex-direction:row!important;align-items:start;justify-content:flex-end;gap:8px;align-self:start}
+ .ipa-reorder-item>.ipa-move-controls button{min-width:42px;min-height:42px;padding:9px}
+ .ipa-reorder-item .ipa-itinerary-copy-head{gap:8px;flex-direction:row;align-items:center}
+ .ipa-reorder-item .ipa-itinerary-copy-head b{font-size:18px;line-height:1.3}
+ .ipa-reorder-item .ipa-itinerary-address{font-size:13px;line-height:1.5}
+ .ipa-reorder-item .ipa-itinerary-actions .mini-map-open{width:auto;min-height:40px}
+ .ipa-reorder-item .ipa-place-client-note,.ipa-reorder-item .ipa-place-client-tip{margin-top:5px;max-width:100%}
+ .during-place-card{grid-template-areas:"number photo main"!important;grid-template-columns:42px 88px minmax(0,1fr)!important;min-width:0;gap:12px!important}
+ .during-place-card>.during-place-number{grid-area:number}
+ .during-place-card>.ipa-during-thumbnail{grid-area:photo;width:88px;height:88px;min-width:88px}
+ .during-place-card>.during-place-main{grid-area:main;min-width:0;overflow-wrap:break-word}
+}
+@media(max-width:450px){
+ .during-place-card{grid-template-areas:"number photo photo" "main main main"!important;grid-template-columns:42px 88px minmax(0,1fr)!important}
+ .during-place-card>.during-place-main{grid-column:1/-1!important;grid-row:2!important}
+ .during-place-card .during-place-title b{font-size:17px}
+ .during-place-card .during-place-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+ .during-place-card .during-place-actions button{min-width:0;width:100%;font-size:12px;overflow-wrap:break-word}
+}
