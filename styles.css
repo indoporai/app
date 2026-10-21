@@ -1002,3 +1002,14 @@ dialog:has(#routeCatalogPlace) .smart-place-actions button{
  .during-place-card .during-place-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
  .during-place-card .during-place-actions button{min-width:0;width:100%;font-size:12px;overflow-wrap:break-word}
 }
+
+/* Beta 6.29.67 — feedback simples sem avaliação por estrelas */
+.ipa-place-feedback{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.3fr);gap:9px;margin-top:12px;align-items:stretch;width:100%}
+.ipa-place-feedback button{border:0;border-radius:12px;padding:11px 9px;min-height:44px;font-size:12px;font-weight:800;line-height:1.2;background:#edf5f7;color:#0b6173;cursor:pointer}
+.ipa-place-reactions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;min-width:0}
+.ipa-place-feedback .ipa-visit-toggle.selected{background:#d5f3e8;color:#08735c}
+.ipa-place-reactions button.selected{background:#dceafe;color:#164fa4;box-shadow:inset 0 0 0 2px #74a6e9}
+.ipa-place-reactions button[data-journey-reaction$="|down"].selected{background:#fff0e7;color:#a44d21;box-shadow:inset 0 0 0 2px #edb08a}
+.ipa-reorder-item .ipa-place-feedback{grid-template-columns:minmax(0,1fr) minmax(0,1.3fr)}
+.during-place-actions{margin-bottom:4px}
+@media(max-width:480px){.ipa-place-feedback,.ipa-reorder-item .ipa-place-feedback{grid-template-columns:1fr}.ipa-place-feedback button{font-size:13px}.ipa-place-reactions button{min-height:42px}}
