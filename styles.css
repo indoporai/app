@@ -1013,3 +1013,20 @@ dialog:has(#routeCatalogPlace) .smart-place-actions button{
 .ipa-reorder-item .ipa-place-feedback{grid-template-columns:minmax(0,1fr) minmax(0,1.3fr)}
 .during-place-actions{margin-bottom:4px}
 @media(max-width:480px){.ipa-place-feedback,.ipa-reorder-item .ipa-place-feedback{grid-template-columns:1fr}.ipa-place-feedback button{font-size:13px}.ipa-place-reactions button{min-height:42px}}
+
+/* Beta 6.29.68 — várias viagens por cliente e estrelas douradas */
+.ipa-my-trips-section{margin:20px 0 24px}
+.ipa-my-trips-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,265px),1fr));gap:12px}
+.ipa-my-trip-card{display:flex;align-items:flex-start;gap:14px;min-width:0;width:100%;padding:17px;border-radius:18px;text-align:left;border:1px solid #dfeaf0;background:white;box-shadow:0 7px 22px rgba(13,55,77,.05);color:#12354d;cursor:pointer}
+.ipa-my-trip-card.active{border:2px solid #087a99;background:#f0faff;padding:16px}
+.ipa-my-trip-flags{font-size:25px;line-height:1.2;max-width:75px;flex-shrink:0}
+.ipa-my-trip-copy{display:grid;gap:6px;flex:1;min-width:0}
+.ipa-my-trip-copy b{font-size:15px;line-height:1.3}
+.ipa-my-trip-copy small{color:#607988;font-size:12px}
+.ipa-my-trip-cities{font-size:12px;color:#0d667e;line-height:1.4;overflow-wrap:anywhere}
+.ipa-my-trip-copy em{font-style:normal;font-size:11px;color:#527888}
+.ipa-my-trip-arrow{color:#087a99;font-size:20px;font-weight:800}
+.ipa-day-location{color:#41778a;font-size:13px;display:block;margin-top:6px}
+.journey-inline-stars .ipa-stars-earned{color:#f1b324!important}
+.journey-inline-stars .ipa-stars-pending{color:#bbc4cb!important}
+@media(max-width:600px){.ipa-my-trips-grid{grid-template-columns:1fr}.ipa-my-trip-card{padding:14px}.ipa-my-trip-card.active{padding:13px}}

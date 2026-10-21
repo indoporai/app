@@ -362,28 +362,27 @@ async function loadClientExperience(){
     }
   }
 
-  // Último fallback: qualquer viagem publicada daquele cliente.
+  // Sempre carregamos TODAS as viagens publicadas deste cliente.
+  // Um convite aponta a viagem inicial, mas não restringe o login a ela.
   let trips=[];
-  if(!chosenTrip){
-    try{
-      const snap=await getDocs(
-        query(collection(firestore,"trips"),where("clientId","==",client.id))
-      );
-      trips=snap.docs.map(d=>({id:d.id,...d.data()})).filter(t=>t.published===true);
-      const today=new Date().toISOString().slice(0,10);
-      trips.sort((a,b)=>{
-        const aa=String(a.startDate||"9999-12-31"),bb=String(b.startDate||"9999-12-31");
-        const af=aa>=today,bf=bb>=today;
-        if(af!==bf)return af?-1:1;
-        return af?aa.localeCompare(bb):bb.localeCompare(aa);
-      });
-      chosenTrip=trips[0]||null;
-    }catch(e){
-      console.warn("Busca de viagens do cliente falhou",e);
-    }
+  try{
+    const snap=await getDocs(query(collection(firestore,"trips"),where("clientId","==",client.id)));
+    trips=snap.docs.map(d=>({id:d.id,...d.data()})).filter(t=>t.published===true);
+    const today=new Date().toISOString().slice(0,10);
+    trips.sort((a,b)=>{
+      const aa=String(a.startDate||"9999-12-31"),bb=String(b.startDate||"9999-12-31");
+      const af=aa>=today,bf=bb>=today;
+      return af!==bf?(af?-1:1):(af?aa.localeCompare(bb):bb.localeCompare(aa));
+    });
+  }catch(e){
+    console.warn("Não foi possível listar todas as viagens",e);
+    // Conserva a experiência de uma viagem caso a consulta falhe.
+    
   }
-
-  if(chosenTrip)trips=[chosenTrip];
+  const lastSelected=localStorage.getItem("ipa-active-trip-id");
+  chosenTrip=trips.find(t=>t.id===lastSelected)
+    ||trips.find(t=>t.id===chosenTrip?.id)
+    ||trips[0]||null;
 
   if(!chosenTrip){
     status="client-no-trip";
@@ -405,9 +404,13 @@ async function loadClientExperience(){
   catch(e){console.warn("Benefícios indisponíveis",e);}
 
   let memories=[],tripDocuments=[],recommendations=[];
-  try{const s=await getDocs(query(collection(firestore,"memories"),where("clientId","==",client.id)));memories=s.docs.map(d=>({id:d.id,...d.data()})).filter(x=>x.tripId===chosenTrip.id)}catch(e){}
-  try{const s=await getDocs(query(collection(firestore,"tripDocuments"),where("clientId","==",client.id)));tripDocuments=s.docs.map(d=>({id:d.id,...d.data()})).filter(x=>x.tripId===chosenTrip.id)}catch(e){}
-  try{const s=await getDocs(query(collection(firestore,"recommendations"),where("tripId","==",chosenTrip.id)));recommendations=s.docs.map(d=>({id:d.id,...d.data()}))}catch(e){}
+  try{const s=await getDocs(query(collection(firestore,"memories"),where("clientId","==",client.id)));memories=s.docs.map(d=>({id:d.id,...d.data()})).filter(x=>trips.some(t=>t.id===x.tripId))}catch(e){}
+  try{const s=await getDocs(query(collection(firestore,"tripDocuments"),where("clientId","==",client.id)));tripDocuments=s.docs.map(d=>({id:d.id,...d.data()})).filter(x=>trips.some(t=>t.id===x.tripId))}catch(e){}
+  for(const trip of trips){
+    try{const s=await getDocs(query(collection(firestore,"recommendations"),where("tripId","==",trip.id)));
+      recommendations.push(...s.docs.map(d=>({id:d.id,...d.data()})));
+    }catch(e){console.warn("Recomendações indisponíveis para a viagem",trip.id,e)}
+  }
 
   const cloudData={
     activeClientId:client.id,
@@ -420,7 +423,7 @@ async function loadClientExperience(){
       plan:chosenTrip.plan||"Explore",
       trip:chosenTrip.name||"Minha viagem"
     },
-    trips:[chosenTrip],
+    trips,
     payments,
     benefits,
     memories,
@@ -729,6 +732,17 @@ window.IPAFirebase = {
     if(!id) throw new Error("Documento inválido.");
     await deleteDoc(doc(firestore,"tripDocuments",id));
     return true;
+  },
+  async createCatalogPlace(place){
+    if(!currentUser || currentUser.uid!==ADMIN_UID)throw new Error('Somente o ADM pode cadastrar lugares. Faça login administrativo novamente.');
+    if(!place?.id || !place?.name || !place?.city || !place?.country)throw new Error('Informe nome, cidade e país.');
+    const ref=doc(firestore,'placeCatalog',String(place.id));
+    const exists=await getDoc(ref);
+    if(exists.exists())throw new Error('Já existe um lugar com este identificador. Tente novamente.');
+    await setDoc(ref,place);
+    const confirmed=await getDoc(ref);
+    if(!confirmed.exists() || confirmed.data().name!==place.name)throw new Error('O Firebase não confirmou o cadastro.');
+    return confirmed.data();
   },
   async saveCatalogPhoto(id,patch){
     if(!currentUser || currentUser.uid!==ADMIN_UID)throw new Error('Apenas o ADM pode atualizar o catálogo.');
