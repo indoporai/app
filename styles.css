@@ -1030,3 +1030,5 @@ dialog:has(#routeCatalogPlace) .smart-place-actions button{
 .journey-inline-stars .ipa-stars-earned{color:#f1b324!important}
 .journey-inline-stars .ipa-stars-pending{color:#bbc4cb!important}
 @media(max-width:600px){.ipa-my-trips-grid{grid-template-columns:1fr}.ipa-my-trip-card{padding:14px}.ipa-my-trip-card.active{padding:13px}}
+
+.ipa-invite-notice{border:1px solid #d6e8ee;background:#f2f9fc;border-radius:14px;padding:12px 14px;margin:14px 0}.ipa-invite-notice b{font-size:14px;color:#085d79}.ipa-invite-notice p{margin:6px 0;color:#314e60}.ipa-invite-notice small{font-size:12px;color:#5d7382;line-height:1.5}

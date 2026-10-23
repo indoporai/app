@@ -1,0 +1,28 @@
+INDO POR AÍ — BETA 6.29.70 — E-MAIL DE APROVAÇÃO
+
+O convite é enviado pela API Firebase Authentication sendSignInLinkToEmail.
+O modelo do e-mail pertence à configuração do Firebase Authentication,
+e NÃO pode ser substituído apenas pela publicação do ZIP.
+
+O que foi ajustado neste pacote:
+- Texto da comunicação por WhatsApp com a mensagem aprovada.
+- Orientação visual na confirmação de aprovação no ADM.
+- Modelo HTML pronto para configurar no Firebase.
+- O link de autenticação e a criação de senha não foram alterados.
+
+PARA ALTERAR O E-MAIL REAL:
+1. Firebase Console > Authentication > Templates / Modelos.
+2. Encontre o modelo "Email address sign-in" / "Login por link de e-mail".
+3. Atualize o assunto para: ✈️ Seu acesso ao Indo por Aí foi aprovado!
+4. Utilize o conteúdo do arquivo MODELO-EMAIL-APROVACAO-FIREBASE.html,
+   na medida em que o editor de modelos do seu console permitir HTML.
+5. Mantenha obrigatoriamente a variável %LINK% do Firebase.
+6. Envie um convite de teste antes de usar com viajantes reais.
+
+ATENÇÃO:
+- Modelos padrão do Firebase não aceitam personalização do NOME do viajante
+  por documento. Por isso o HTML usa "Olá, viajante!".
+- Para personalização do nome e envio de HTML próprio, será necessário
+  integrar um provedor transacional de e-mail no backend.
+- Dependendo do plano/configuração, o Firebase pode limitar customizações
+  dos modelos. Nessa situação, não altere o fluxo atual de autenticação.
