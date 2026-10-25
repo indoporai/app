@@ -1,0 +1,15 @@
+INDO POR AÍ — Beta 6.29.71 — Teste de envio Resend
+
+1. Publicar ZIP completo no Cloudflare Pages (incluindo _worker.js).
+2. Verificar que RESEND_API_KEY permanece como Secret em Production.
+3. Fazer login no ADM → Dashboard → Testar e-mail Resend.
+4. Checar indoporaicomagente@gmail.com (inclusive Spam) e o painel Resend → Emails.
+
+SEGURANÇA: A rota /api/email/test exige ID token válido do UID administrativo,
+verificado pela API do Firebase; o destinatário é fixo. Não expõe RESEND_API_KEY
+e não aceita destinatários arbitrários.
+
+IMPORTANTE: o envio de teste NÃO é um convite real. O fluxo de aprovação e o
+Firebase Authentication seguem inalterados. Para substituir o e-mail padrão do
+Firebase com um convite personalizado único, será necessário gerar o link
+seguro pelo backend usando credenciais administrativas do Firebase.

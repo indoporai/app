@@ -320,10 +320,43 @@ async function tripWeather(request){
  }catch(e){return json({ok:false,error:e?.message||'Não foi possível consultar o clima.'},502)}
 }
 
+// Teste protegido de e-mail. Não cria links de login nem usa a API do Resend no navegador.
+async function ipaResendTest(request,env){
+  if(!env.RESEND_API_KEY)return json({ok:false,error:"RESEND_API_KEY não configurada em Production."},503);
+  const authHeader=request.headers.get('authorization')||'';
+  const match=/^Bearer\s+(.+)$/i.exec(authHeader);
+  if(!match)return json({ok:false,error:"Faça login como ADM."},401);
+  // A API do Firebase valida a assinatura e a expiração do ID token.
+  const apiKey=env.FIREBASE_WEB_API_KEY||'AIzaSyD_EYtJ3h_WDvga2eV8LKEiCpDaT8gSEiM';
+  let identity;
+  try{
+    const response=await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${encodeURIComponent(apiKey)}`,{
+      method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({idToken:match[1]})
+    });
+    if(!response.ok)return json({ok:false,error:'Sessão inválida ou expirada. Entre novamente no ADM.'},401);
+    const payload=await response.json();identity=payload.users?.[0];
+  }catch(e){return json({ok:false,error:'Não foi possível verificar o login no Firebase.'},502)}
+  if(identity?.localId!=='5dlGX6JlrUQHyjFWSHB9Dye0r1E3')return json({ok:false,error:'Apenas o administrador pode enviar testes.'},403);
+  // Destinatário fixo: esta rota não é um retransmissor aberto de e-mails.
+  const recipient='indoporaicomagente@gmail.com';
+  const html=`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"></head><body style="margin:0;padding:30px;background:#f5f8fc;font-family:Arial,sans-serif;color:#18354a"><div style="max-width:560px;margin:auto;background:white;border-radius:20px;padding:30px;border:1px solid #e4ebf3"><div style="font-size:26px;color:#006a83;font-weight:bold">✈️ Indo por Aí</div><h1 style="font-size:23px">Seu acesso ao Indo por Aí foi aprovado!</h1><p>Olá, viajante! 🌍</p><p>Temos uma ótima notícia: seu acesso ao Indo por Aí foi aprovado! 🎉</p><p>Sua próxima aventura está cada vez mais perto. No aplicativo você poderá acompanhar seu roteiro, hospedagens, documentos, preparação e conversar com o Concierge.</p><p style="background:#edf7f9;border-radius:10px;padding:14px"><strong>Este é um e-mail de teste.</strong> Nenhum convite real foi criado. O botão definitivo será conectado ao link seguro do Firebase numa etapa posterior.</p><a href="https://app.indoporaicomagente.com/" style="display:inline-block;background:#ff741d;color:white;text-decoration:none;padding:14px 22px;border-radius:12px;font-weight:bold">Visualizar aplicativo (teste)</a><p>Sua viagem começa muito antes do embarque!</p><p>Equipe Indo por Aí 💙</p></div></body></html>`;
+  let response,data;
+  try{
+    response=await fetch('https://api.resend.com/emails',{
+      method:'POST',headers:{Authorization:`Bearer ${env.RESEND_API_KEY}`,'content-type':'application/json'},
+      body:JSON.stringify({from:'Indo por Aí <acesso@indoporaicomagente.com>',to:[recipient],subject:'✈️ Teste de envio — Indo por Aí',html})
+    });
+    data=await response.json();
+  }catch(e){return json({ok:false,error:'Falha ao conectar ao Resend.'},502)}
+  if(!response.ok)return json({ok:false,error:data?.message||'Resend recusou o envio.',resendStatus:response.status},502);
+  return json({ok:true,message:'E-mail de teste aceito pelo Resend.',emailId:data.id,recipient});
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
 
+    if (url.pathname === "/api/email/test" && request.method === "POST") return ipaResendTest(request,env);
     if (url.pathname === "/api/maps/browser-key" && request.method === "GET") {
       if(!env.GOOGLE_MAPS_BROWSER_KEY)return json({ok:false,error:"GOOGLE_MAPS_BROWSER_KEY não configurada."},500);
       return json({ok:true,key:env.GOOGLE_MAPS_BROWSER_KEY});

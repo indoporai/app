@@ -947,6 +947,22 @@ function bind(){
  document.querySelectorAll('[data-admin-benefit]').forEach(x=>x.onchange=()=>{IPAData.setBenefit(x.dataset.adminBenefit,x.checked);render()});
  document.querySelectorAll('[data-admin-remind]').forEach(b=>b.onclick=()=>toast('Lembrete enviado ao cliente'));
  document.querySelectorAll('[data-admin-exit]').forEach(b=>b.onclick=()=>showInitialScenario());
+ const emailTest=document.querySelector('#ipaResendTest');
+ if(emailTest)emailTest.onclick=async()=>{
+   if(emailTest.disabled)return;
+   emailTest.disabled=true;emailTest.textContent='Enviando teste...';
+   try{
+     const firebase=window.IPAFirebase;
+     if(!firebase?.user)throw new Error('Entre no ADM para testar o envio.');
+     const idToken=await firebase.user.getIdToken();
+     const response=await fetch('/api/email/test',{method:'POST',headers:{'authorization':'Bearer '+idToken}});
+     const data=await response.json();
+     if(!response.ok||!data.ok)throw new Error(data.error||'Falha ao enviar e-mail.');
+     toast('Teste enviado para '+data.recipient+' ✓');
+     emailTest.textContent='✓ Teste enviado';
+   }catch(err){console.error('Resend test',err);toast('E-mail não enviado: '+(err.message||err));emailTest.textContent='✉ Testar e-mail Resend'}
+   finally{emailTest.disabled=false}
+ };
  document.querySelectorAll('[data-admin-invite-trip]').forEach(b=>b.onclick=async()=>{
    const tripId=b.dataset.adminInviteTrip;
    const clientId=b.dataset.clientId;
@@ -2291,7 +2307,7 @@ function adminData(){const d=ipaDB()||{};d.clients=Array.isArray(d.clients)?d.cl
 function adminMoney(v){return new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(Number(v||0))}
 function adminMetric(icon,label,value,sub=''){return `<div class="ipa-admin-metric"><span>${icon}</span><div><small>${label}</small><strong>${value}</strong><em>${sub}</em></div></div>`}
 function adminTripList(){const d=adminData();return `<div class="ipa-admin-trip-list">${d.trips.map(t=>{const c=d.clients.find(x=>x.id===t.clientId);return `<div class="trip-list-row"><button class="trip-list-open" data-admin-trip="${ipaEscape(t.id)}"><span>${[...new Set(tripStages(t).map(st=>st.country).filter(Boolean))].slice(0,4).map(countryFlag).join(" ")||countryFlag(tripCountry(t))}</span><div><b>${ipaEscape(t.name)}</b><small>${ipaEscape(c?.name||'Cliente')} · ${ipaEscape(t.destination||'')}</small></div><em>${ipaEscape(t.plan||'')}</em><i>${t.published?'Publicado':ipaEscape(t.status||'')}</i><strong>›</strong></button><div class="trip-list-actions"><button type="button" class="btn btn-light" data-admin-smart-client-trip="${ipaEscape(t.clientId||'')}" data-smart-existing-trip="${ipaEscape(t.id)}">✨ Criar roteiro</button><button type="button" class="btn btn-light trip-delete-action" data-admin-delete-trip="${ipaEscape(t.id)}">🗑 Excluir</button></div></div>`}).join('')||'<p>Nenhuma viagem cadastrada.</p>'}</div>`}
-function adminDashboard(){const d=adminData(),open=d.payments.filter(p=>p.status!=='Pago').reduce((s,p)=>s+Number(p.amount||0),0);return `<div class="ipa-admin-head"><div><span class="eyebrow">INDO POR AÍ BUSINESS</span><h1>Dashboard</h1><p>Gerencie clientes, viagens e receita em um só lugar.</p></div><button class="btn btn-primary" data-admin-new-trip>+ Nova viagem</button></div><div class="ipa-admin-metrics">${adminMetric('👤','Clientes',d.clients.length,'ativos')}${adminMetric('✈️','Viagens',d.trips.length,'cadastradas')}${adminMetric('💳','Em aberto',adminMoney(open),'a receber')}${adminMetric('🔴','Live',d.trips.filter(t=>t.modules?.live).length,'habilitadas')}</div><section class="ipa-admin-panel"><div class="section-head"><div><span class="eyebrow">OPERAÇÃO</span><h2>Viagens</h2></div><button class="btn btn-light" data-admin-section="trips">Ver todas</button></div>${adminTripList()}</section><section class="ipa-admin-panel"><span class="eyebrow">PRÓXIMAS AÇÕES</span><h2>O que precisa da sua atenção</h2><div class="ipa-admin-attention"><div>💳 <span><b>Cobranças em aberto</b><small>Envie lembretes pelo Financeiro.</small></span></div><div>👁️ <span><b>Confira como cliente</b><small>Revise a experiência antes de publicar.</small></span></div><div>🔴 <span><b>Live</b><small>Ative apenas quando quiser transmissão.</small></span></div></div></section>`}
+function adminDashboard(){const d=adminData(),open=d.payments.filter(p=>p.status!=='Pago').reduce((s,p)=>s+Number(p.amount||0),0);return `<div class="ipa-admin-head"><div><span class="eyebrow">INDO POR AÍ BUSINESS</span><h1>Dashboard</h1><p>Gerencie clientes, viagens e receita em um só lugar.</p></div><button class="btn btn-primary" data-admin-new-trip>+ Nova viagem</button></div><div class="ipa-admin-email-test"><div><strong>✉️ E-mail personalizado — Resend</strong><small>Teste seguro de envio para indoporaicomagente@gmail.com. Não envia convites reais nem substitui o e-mail de acesso do Firebase.</small></div><button class="btn btn-primary" id="ipaResendTest" data-no-save-feedback>✉ Testar e-mail Resend</button></div><div class="ipa-admin-metrics">${adminMetric('👤','Clientes',d.clients.length,'ativos')}${adminMetric('✈️','Viagens',d.trips.length,'cadastradas')}${adminMetric('💳','Em aberto',adminMoney(open),'a receber')}${adminMetric('🔴','Live',d.trips.filter(t=>t.modules?.live).length,'habilitadas')}</div><section class="ipa-admin-panel"><div class="section-head"><div><span class="eyebrow">OPERAÇÃO</span><h2>Viagens</h2></div><button class="btn btn-light" data-admin-section="trips">Ver todas</button></div>${adminTripList()}</section><section class="ipa-admin-panel"><span class="eyebrow">PRÓXIMAS AÇÕES</span><h2>O que precisa da sua atenção</h2><div class="ipa-admin-attention"><div>💳 <span><b>Cobranças em aberto</b><small>Envie lembretes pelo Financeiro.</small></span></div><div>👁️ <span><b>Confira como cliente</b><small>Revise a experiência antes de publicar.</small></span></div><div>🔴 <span><b>Live</b><small>Ative apenas quando quiser transmissão.</small></span></div></div></section>`}
 function ipaPlanLimit(plan){return {Explore:1,Signature:3,Elite:5,Groups:Infinity}[plan]??1}
 function ipaAccessUsage(client,d=adminData()){
  const root=client.clientType==='Acompanhante'?(d.clients.find(x=>x.id===client.primaryClientId)||client):client;
