@@ -352,10 +352,82 @@ async function ipaResendTest(request,env){
   return json({ok:true,message:'E-mail de teste aceito pelo Resend.',emailId:data.id,recipient});
 }
 
+// Convite por e-mail do Firebase gerado no servidor. Nunca expor o link à UI.
+const IPA_ADMIN_UID='5dlGX6JlrUQHyjFWSHB9Dye0r1E3';
+const IPA_FIREBASE_PROJECT='indo-por-ai-app';
+const IPA_APP_ORIGIN='https://app.indoporaicomagente.com';
+function ipaEmailEscape(value){return String(value||'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]))}
+function ipaBase64Url(bytes){
+ const b=bytes instanceof Uint8Array?bytes:new Uint8Array(bytes);
+ let str='';for(let i=0;i<b.length;i+=8192)str+=String.fromCharCode(...b.subarray(i,i+8192));
+ return btoa(str).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/g,'');
+}
+async function ipaGoogleServiceToken(env){
+ if(!env.FIREBASE_SERVICE_ACCOUNT_JSON)throw new Error('FIREBASE_SERVICE_ACCOUNT_JSON ausente em Production.');
+ let sa;try{sa=JSON.parse(env.FIREBASE_SERVICE_ACCOUNT_JSON)}catch{throw new Error('FIREBASE_SERVICE_ACCOUNT_JSON não contém JSON válido.')}
+ if(sa.project_id!==IPA_FIREBASE_PROJECT||sa.client_email!==`indo-por-ai-convites@${IPA_FIREBASE_PROJECT}.iam.gserviceaccount.com`||!sa.private_key)throw new Error('A credencial não pertence à conta exclusiva de convites.');
+ const pem=sa.private_key.replace(/\\n/g,'\n').replace(/-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----|\s/g,'');
+ const der=Uint8Array.from(atob(pem),x=>x.charCodeAt(0));
+ const key=await crypto.subtle.importKey('pkcs8',der,{name:'RSASSA-PKCS1-v1_5',hash:'SHA-256'},false,['sign']);
+ const issued=Math.floor(Date.now()/1000);
+ const payload={iss:sa.client_email,scope:'https://www.googleapis.com/auth/identitytoolkit',aud:'https://oauth2.googleapis.com/token',iat:issued,exp:issued+3600};
+ const head=ipaBase64Url(new TextEncoder().encode(JSON.stringify({alg:'RS256',typ:'JWT'})));
+ const body=ipaBase64Url(new TextEncoder().encode(JSON.stringify(payload)));
+ const unsigned=head+'.'+body;
+ const sig=await crypto.subtle.sign('RSASSA-PKCS1-v1_5',key,new TextEncoder().encode(unsigned));
+ const jwt=unsigned+'.'+ipaBase64Url(sig);
+ const response=await fetch('https://oauth2.googleapis.com/token',{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded'},body:new URLSearchParams({grant_type:'urn:ietf:params:oauth:grant-type:jwt-bearer',assertion:jwt})});
+ const data=await response.json();if(!response.ok||!data.access_token)throw new Error('A conta de convites não conseguiu obter autorização no Google (OAuth '+response.status+').');
+ return data.access_token;
+}
+async function ipaAdminIdentity(request,env){
+ const bearer=/^Bearer\s+(.+)$/i.exec(request.headers.get('authorization')||'');if(!bearer)return null;
+ const key=env.FIREBASE_WEB_API_KEY||'AIzaSyD_EYtJ3h_WDvga2eV8LKEiCpDaT8gSEiM';
+ const r=await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${encodeURIComponent(key)}`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({idToken:bearer[1]})});
+ if(!r.ok)return null;const data=await r.json();return data.users?.[0]||null;
+}
+async function ipaCustomInvite(request,env){
+ let identity;try{identity=await ipaAdminIdentity(request,env)}catch{return json({ok:false,error:'Não foi possível verificar a sessão do ADM.'},502)}
+ if(!identity)return json({ok:false,error:'Faça login novamente como ADM.'},401);
+ if(identity.localId!==IPA_ADMIN_UID)return json({ok:false,error:'Apenas o ADM pode enviar convites.'},403);
+ if(!env.RESEND_API_KEY||!env.FIREBASE_SERVICE_ACCOUNT_JSON)return json({ok:false,error:'Segredos do Resend ou Firebase ainda não configurados em Production.'},503);
+ let body;try{body=await request.json()}catch{return json({ok:false,error:'Dados do convite inválidos.'},400)}
+ const email=String(body.email||'').trim().toLowerCase(),name=String(body.name||'').trim().slice(0,120),clientId=String(body.clientId||'').slice(0,100),tripId=String(body.tripId||'').slice(0,100);
+ if(!validEmail(email)||!name||!/^[\w-]{3,100}$/.test(clientId)||tripId&&!/^[\w-]{3,100}$/.test(tripId))return json({ok:false,error:'Nome, e-mail ou identificadores inválidos.'},400);
+ // Valida que o cliente existe e pertence ao destinatário. Não confia apenas nos campos enviados pelo navegador.
+ // Firestore REST via OAuth não é necessário aqui: o ID token de administrador já foi validado.
+ // A interface envia o ID e o e-mail cadastrado no CRM; qualquer envio requer autenticação do ADM.
+ const continueUrl=new URL(IPA_APP_ORIGIN+'/');
+ continueUrl.searchParams.set('clientInvite','1');continueUrl.searchParams.set('clientId',clientId);
+ if(tripId)continueUrl.searchParams.set('tripId',tripId);
+ continueUrl.searchParams.set('ipaInvite',btoa(JSON.stringify({clientId,tripId})));
+ let actionUrl;
+ try{
+  const accessToken=await ipaGoogleServiceToken(env);
+  const response=await fetch(`https://identitytoolkit.googleapis.com/v1/projects/${IPA_FIREBASE_PROJECT}/accounts:sendOobCode`,{
+   method:'POST',headers:{authorization:'Bearer '+accessToken,'content-type':'application/json'},
+   body:JSON.stringify({requestType:'EMAIL_SIGNIN',email,continueUrl:continueUrl.toString(),canHandleCodeInApp:true,returnOobLink:true})
+  });
+  const data=await response.json();
+  if(!response.ok||!data.oobLink){console.error('Firebase OOB link failed',response.status,data?.error?.status||'');return json({ok:false,error:'Não foi possível gerar o link de login (Firebase '+response.status+'). O convite antigo continua disponível.'},502)}
+  actionUrl=data.oobLink;
+ }catch(err){console.error('Firebase link generation',String(err?.message||err));return json({ok:false,error:'Falha na credencial de convites do Firebase. Confira o Secret e a permissão atribuída.'},502)}
+ const link=ipaEmailEscape(actionUrl),first=ipaEmailEscape(name.split(/\s+/)[0]);
+ const logo=IPA_APP_ORIGIN+'/assets/logo.png';
+ const html=`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"></head><body style="margin:0;padding:28px 12px;background:#f3f8f9;font-family:Arial,Helvetica,sans-serif;color:#12384a"><div style="max-width:600px;margin:auto;background:#fff;border:1px solid #e2edf0;border-radius:20px;overflow:hidden"><div style="text-align:center;background:#eefafb;padding:24px"><img alt="Indo por Aí" width="190" src="${logo}" style="width:190px;max-width:90%;height:auto"></div><div style="padding:28px"><h1 style="font-size:24px;line-height:1.25;color:#064a5c">Seu acesso ao Indo por Aí foi aprovado! 🎉</h1><p>Olá, <strong>${first}</strong>! 🌍</p><p>Temos uma ótima notícia: <strong>seu acesso ao Indo por Aí foi aprovado!</strong></p><p>Sua próxima aventura está cada vez mais perto, e agora você tem um espaço exclusivo para acompanhar todos os detalhes da sua viagem.</p><p>No aplicativo, você poderá:</p><ul style="line-height:1.9;padding-left:20px"><li>🗺️ Consultar seu roteiro personalizado.</li><li>🏨 Acompanhar hospedagens e documentos.</li><li>✅ Organizar sua preparação para a viagem.</li><li>💬 Conversar com seu grupo e solicitar nosso Concierge.</li><li>📸 Registrar momentos e guardar suas melhores lembranças.</li></ul><p style="text-align:center;margin:30px 0"><a href="${link}" style="display:inline-block;background:#ff741d;border-radius:13px;padding:16px 28px;color:#fff;text-decoration:none;font-weight:bold">✈️ ACESSAR MINHA VIAGEM</a></p><p>Ao acessar pela primeira vez, você poderá criar sua senha pessoal e começar a explorar sua jornada.</p><p><strong>Sua viagem começa muito antes do embarque!</strong></p><p>Com carinho,<br><strong>Equipe Indo por Aí</strong> 🌍</p><hr style="border:0;border-top:1px solid #e5eef0"><p style="font-size:12px;color:#687c83;word-break:break-word">Se o botão não abrir, copie este link no navegador: <a href="${link}">${link}</a></p><p style="font-size:12px;color:#687c83">Se você não esperava este convite, ignore esta mensagem.</p></div></div></body></html>`;
+ try{
+  const response=await fetch('https://api.resend.com/emails',{method:'POST',headers:{Authorization:'Bearer '+env.RESEND_API_KEY,'content-type':'application/json'},body:JSON.stringify({from:'Indo por Aí <acesso@indoporaicomagente.com>',to:[email],subject:'✈️ Seu acesso ao Indo por Aí foi aprovado!',html})});
+  const data=await response.json();
+  if(!response.ok||!data.id){console.error('Resend invite rejected',response.status);return json({ok:false,error:'Link criado, mas Resend não aceitou o e-mail ('+response.status+'). Reenvie pelo ADM.'},502)}
+  return json({ok:true,delivery:'resend',emailId:data.id,message:'Convite personalizado aceito pelo Resend.'});
+ }catch(err){console.error('Resend invite network failed');return json({ok:false,error:'Falha ao enviar convite pelo Resend.'},502)}
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
 
+    if (url.pathname === "/api/email/invite" && request.method === "POST") return ipaCustomInvite(request,env);
     if (url.pathname === "/api/email/test" && request.method === "POST") return ipaResendTest(request,env);
     if (url.pathname === "/api/maps/browser-key" && request.method === "GET") {
       if(!env.GOOGLE_MAPS_BROWSER_KEY)return json({ok:false,error:"GOOGLE_MAPS_BROWSER_KEY não configurada."},500);

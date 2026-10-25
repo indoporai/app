@@ -1,0 +1,13 @@
+BETA 6.29.72 — CONVITES PERSONALIZADOS E ÍCONE
+
+1. Publicar este ZIP completo no Cloudflare Pages, inclusive _worker.js.
+2. Secrets em Production: RESEND_API_KEY e FIREBASE_SERVICE_ACCOUNT_JSON (JSON REAL da conta indo-por-ai-convites, jamais no app).
+3. A conta do Google Cloud deve ter permissão firebaseauth.users.sendEmail.
+4. Na aprovação de cliente, o ADM envia e-mail pelo Resend com link real de login do Firebase (EMAIL_SIGNIN).
+5. O botão Reenviar acesso tenta Resend e oferece Firebase como alternativa se houver falha.
+6. Testar com e-mail próprio de cliente de teste primeiro; verificar Resend → Emails e, depois, login real e configuração de senha.
+7. Não usar o botão de aprovação em cliente real antes do teste completo.
+
+ATENÇÃO: o recebimento do e-mail teste anterior NÃO confirma a geração do link Firebase. Se o endpoint retornar erro, mantenha o convite antigo via fallback do botão de reenvio.
+
+ÍCONES: assets/icon-192.png, icon-512.png, apple-touch-icon.png, favicon.png. Para atualizar um app já instalado no iPhone, pode ser necessário removê-lo da Tela de Início e adicioná-lo novamente.

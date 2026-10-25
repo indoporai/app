@@ -680,6 +680,13 @@ window.IPAFirebase = {
   async logout(){
     await signOut(auth);
   },
+  async sendCustomClientInvite(email,clientId,tripId="",name=""){
+    if(!currentUser||currentUser.uid!==ADMIN_UID)throw new Error("Entre como ADM para enviar o convite.");
+    const response=await fetch('/api/email/invite',{method:'POST',headers:{'authorization':'Bearer '+await currentUser.getIdToken(),'content-type':'application/json'},body:JSON.stringify({email,clientId,tripId,name})});
+    let data={};try{data=await response.json()}catch{}
+    if(!response.ok||!data.ok)throw new Error(data.error||'Falha no envio personalizado.');
+    return data;
+  },
   async sendClientInvite(email,clientId,tripId=""){
     if(!currentUser || currentUser.uid!==ADMIN_UID) throw new Error("Entre como administrador.");
     if(!email) throw new Error("Cliente sem e-mail cadastrado.");
