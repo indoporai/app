@@ -378,6 +378,9 @@ async function loadClientExperience(){
     // Conserva a experiência de uma viagem caso a consulta falhe.
     
   }
+  // A listagem pode falhar por rede/índice. Nunca descartar uma viagem
+  // publicada que já foi validada por leitura direta de documento.
+  if(chosenTrip && !trips.some(t=>t.id===chosenTrip.id))trips.unshift(chosenTrip);
   const lastSelected=localStorage.getItem("ipa-active-trip-id");
   chosenTrip=trips.find(t=>t.id===lastSelected)
     ||trips.find(t=>t.id===chosenTrip?.id)
@@ -786,6 +789,37 @@ window.IPAFirebase = {
       results.push(item.tripId);
     }
     return results;
+  },
+  async confirmClientTripPublication(clientId,tripId,approveClient=true){
+    if(!currentUser || currentUser.uid!==ADMIN_UID)throw new Error('Entre no ADM autorizado.');
+    if(!clientId||!tripId)throw new Error('Selecione cliente e viagem.');
+    const local=window.IPAData?.getAll?.()||{};
+    const c=(local.clients||[]).find(x=>x.id===clientId);
+    const t=(local.trips||[]).find(x=>x.id===tripId);
+    if(!c||!t)throw new Error('Cadastro ou viagem não encontrado.');
+    if(t.clientId && t.clientId!==clientId)throw new Error('A viagem está vinculada a outro cliente.');
+    if(!String(c.email||'').trim())throw new Error('Cliente sem e-mail.');
+    const now=new Date().toISOString();
+    // As gravações são explícitas: syncNow pode estar em andamento e não
+    // confirma os documentos individuais.
+    await setDoc(doc(firestore,'clients',clientId),{
+      ...c,...(approveClient?{approvalStatus:'Aprovado',accessApproved:true,approvedAt:c.approvedAt||now}:{}),
+      activeTripId:tripId,lastInvitedTripId:tripId,updatedAt:serverTimestamp()
+    },{merge:true});
+    await setDoc(doc(firestore,'trips',tripId),{
+      ...t,clientId,published:true,status:'Publicado',publishedAt:t.publishedAt||now,
+      updatedAt:serverTimestamp()
+    },{merge:true});
+    const [clientCheck,tripCheck]=await Promise.all([
+      getDoc(doc(firestore,'clients',clientId)),getDoc(doc(firestore,'trips',tripId))
+    ]);
+    if(!clientCheck.exists()||!tripCheck.exists()||
+      clientCheck.data().activeTripId!==tripId||
+      (approveClient && clientCheck.data().approvalStatus!=='Aprovado')||
+      tripCheck.data().clientId!==clientId||tripCheck.data().published!==true){
+      throw new Error('A publicação não foi confirmada no Firebase. O convite não foi enviado.');
+    }
+    return {clientId,tripId};
   },
   async syncNow(){
     if(!currentUser) throw new Error("Faça login primeiro.");

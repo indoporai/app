@@ -1367,28 +1367,10 @@ function bind(){
   showModal(`<span class="eyebrow">CLIENTE</span><h2>Editar cliente</h2><label>Nome<input id="ecName" class="v2-concierge-input" value="${ipaEscape(c.name||'')}"></label><label>E-mail<input id="ecEmail" class="v2-concierge-input" value="${ipaEscape(c.email||'')}"></label><label>WhatsApp<input id="ecPhone" class="v2-concierge-input" value="${ipaEscape(c.phone||'')}"></label><label>Pacote<select id="ecPlan" class="v2-concierge-input">${['Explore','Signature','Elite','Groups'].map(x=>`<option ${x===(c.plan||'Explore')?'selected':''}>${x}</option>`).join('')}</select></label><label>Tipo<select id="ecType" class="v2-concierge-input"><option ${c.clientType!=='Acompanhante'?'selected':''}>Titular</option><option ${c.clientType==='Acompanhante'?'selected':''}>Acompanhante</option></select></label><button id="ecSave" class="btn btn-primary btn-block">Salvar alterações</button>`);
   setTimeout(()=>document.querySelector('#ecSave').onclick=async()=>{IPAData.updateClientById(c.id,{name:document.querySelector('#ecName').value.trim(),email:document.querySelector('#ecEmail').value.trim().toLowerCase(),phone:document.querySelector('#ecPhone').value.trim(),plan:document.querySelector('#ecPlan').value,clientType:document.querySelector('#ecType').value});if(window.IPAFirebase?.user)await window.IPAFirebase.syncNow();modal.close();render();toast('Cliente atualizado ✓')},0);
  });
- document.querySelectorAll('[data-admin-approve-client]').forEach(b=>b.onclick=()=>{
-  const c=adminData().clients.find(x=>x.id===b.dataset.adminApproveClient);if(!c)return;const a=ipaAccessUsage(c);if(a.total!==Infinity&&a.used>=a.total){toast(`Limite do ${a.root.plan||c.plan} atingido`);return}
-  showModal(`<span class="eyebrow">LIBERAR ACESSO</span><h2>Aprovar ${ipaEscape(c.name)}</h2><p>${ipaEscape(c.plan||'Explore')} · ${ipaEscape(c.clientType||'Titular')}</p><label>Como deseja avisar?</label><select id="approveChannel" class="v2-concierge-input"><option value="email">📧 E-mail</option><option value="whatsapp">💬 WhatsApp</option><option value="both">📧💬 E-mail e WhatsApp</option></select><div class="ipa-invite-notice"><b>✉️ Mensagem de boas-vindas</b><p>Seu acesso ao Indo por Aí foi aprovado! Sua viagem começa muito antes do embarque.</p><small>O convite será enviado pelo Resend com sua mensagem personalizada e um link seguro do Firebase. Em caso de falha, tente reenviar pelo Resend; o app não dispara outro e-mail automaticamente.</small></div><button id="approveConfirm" class="btn btn-primary btn-block">Aprovar e liberar acesso</button>`);
-  setTimeout(()=>document.querySelector('#approveConfirm').onclick=async()=>{
-   const button=document.querySelector('#approveConfirm'),ch=document.querySelector('#approveChannel').value;
-   button.disabled=true;button.textContent='Aprovando e preparando convite...';
-   try{
-    IPAData.updateClientById(c.id,{approvalStatus:'Aprovado',accessApproved:true,approvedAt:new Date().toISOString(),accessNotificationChannel:ch});
-    if(window.IPAFirebase?.user)await window.IPAFirebase.syncNow();
-    let delivered=false;
-    if((ch==='email'||ch==='both')&&c.email){
-      button.textContent='Enviando e-mail personalizado...';
-      await window.IPAFirebase.sendCustomClientInvite(c.email,c.id,c.activeTripId||'',c.name||'Viajante');delivered=true;
-    }
-    if((ch==='whatsapp'||ch==='both')&&c.phone){
-      const txt=`Olá, ${c.name}!\n\nSeu acesso ao Indo por Aí foi aprovado!\nAcesse https://app.indoporaicomagente.com/ para acompanhar sua viagem.\n\nEquipe Indo por Aí`;
-      const r=await fetch('/api/contact/whatsapp?text='+encodeURIComponent(txt),{cache:'no-store'}),j=await r.json();if(j.url)window.open(j.url,'_blank');
-    }
-    if(delivered){IPAData.updateClientById(c.id,{accessNotifiedAt:new Date().toISOString()});await window.IPAFirebase.syncNow()}
-    modal.close();render();toast(delivered?'Cliente aprovado · convite personalizado enviado ✓':'Cliente aprovado ✓');
-   }catch(err){console.error('Convite personalizado',err);toast('Cliente aprovado, mas e-mail NÃO enviado: '+(err.message||'erro')+' Use Reenviar acesso.');button.disabled=false;button.textContent='Tentar envio novamente';}
-  },0);
+ // Central única: escolher a viagem -> conferir -> aprovar/publicar -> enviar convite.
+ document.querySelectorAll('[data-admin-approve-client], [data-client-publication]').forEach(b=>b.onclick=()=>{
+  const id=b.dataset.adminApproveClient||b.dataset.clientPublication;
+  ipaOpenUnifiedPublication(id,b.dataset.selectedTrip||'');
  });
  document.querySelectorAll('[data-admin-resend-access]').forEach(b=>b.onclick=async()=>{const d=adminData(),c=d.clients.find(x=>x.id===b.dataset.adminResendAccess);if(!c?.email)return toast('Cliente sem e-mail');const tripId=c.activeTripId||c.lastInvitedTripId||'';const trip=tripId?d.trips.find(t=>t.id===tripId):null;if(!trip)return toast('Vincule uma viagem ao cliente antes de reenviar');if(trip.published!==true)return toast('Publique a viagem antes de reenviar o acesso');try{await window.IPAFirebase.syncNow();await window.IPAFirebase.sendCustomClientInvite(c.email,c.id,trip.id,c.name||'Viajante');IPAData.updateClientById(c.id,{activeTripId:trip.id,lastInvitedTripId:trip.id,accessNotifiedAt:new Date().toISOString()});await window.IPAFirebase.syncNow();toast('Convite personalizado reenviado com a viagem vinculada ✓')}catch(e){console.error(e);toast('Convite personalizado não enviado: '+(e.message||'erro')+'. Confira o backend e tente novamente.');}});
  document.querySelectorAll('[data-admin-edit-place]').forEach(b=>b.onclick=()=>{
@@ -2357,9 +2339,75 @@ function ipaAccessUsage(client,d=adminData()){
  const group=d.clients.filter(x=>x.id===root.id||x.primaryClientId===root.id);
  return {root,used:group.filter(x=>x.accessApproved).length,total:ipaPlanLimit(root.plan||client.plan||'Explore')};
 }
+function ipaOpenUnifiedPublication(clientId,selectedTripId=''){
+ const d=adminData(),c=d.clients.find(x=>x.id===clientId);
+ if(!c){toast('Cliente não encontrado.');return}
+ const ownTrips=d.trips.filter(t=>t.clientId===c.id);
+ const selected=selectedTripId||c.activeTripId||ownTrips[0]?.id||'';
+ const optionRows=ownTrips.map(t=>`<option value="${ipaEscape(t.id)}" ${t.id===selected?'selected':''}>${ipaEscape(t.name||'Viagem')} · ${ipaEscape(tripDestination(t))}</option>`).join('');
+ showModal(`<span class="eyebrow">INDO POR AÍ BUSINESS</span><h2>Preparar e liberar viagem</h2>
+  <p>Uma única tela para aprovar o cadastro, conferir a viagem, publicar e enviar o acesso. O cliente só recebe o e-mail ao final.</p>
+  <div class="ipa-unified-client"><strong>👤 ${ipaEscape(c.name)}</strong><small>${ipaEscape(c.email||'E-mail não cadastrado')}</small><small>Status atual: ${ipaEscape(c.approvalStatus||'Aguardando aprovação')}</small></div>
+  <label>1. Escolha a viagem<select id="ipaUnifiedTrip" class="v2-concierge-input"><option value="">Selecione...</option>${optionRows}</select></label>
+  ${!ownTrips.length?'<div class="ipa-publication-error">Este cliente ainda não possui viagem vinculada. Crie a viagem no ADM antes de liberar o acesso.</div>':''}
+  <div id="ipaUnifiedReview" class="ipa-unified-review"></div>
+  <label class="ipa-unified-checkbox"><input type="checkbox" id="ipaUnifiedChecked"> 2. Conferi o roteiro, as datas e o conteúdo do cliente</label>
+  <label class="ipa-unified-checkbox"><input type="checkbox" id="ipaUnifiedEmail" checked> 3. Enviar convite personalizado por e-mail após confirmar a publicação</label>
+  <div class="ipa-unified-actions"><button class="btn btn-light" id="ipaUnifiedPreview">👁 Ver prévia</button><button class="btn btn-primary" id="ipaUnifiedPublish">✓ Aprovar e publicar</button></div>
+  <small id="ipaUnifiedStatus" role="status">O e-mail nunca será enviado antes da confirmação da publicação no Firebase.</small>`);
+ const select=document.querySelector('#ipaUnifiedTrip'),review=document.querySelector('#ipaUnifiedReview');
+ function refresh(){
+  const t=d.trips.find(x=>x.id===select.value);
+  if(!t){review.innerHTML='<p>Escolha uma viagem vinculada ao cliente.</p>';return}
+  const days=(t.itinerary||[]).length,places=(t.itinerary||[]).reduce((n,day)=>n+(day.places||[]).length,0);
+  review.innerHTML=`<div class="ipa-unified-overview"><b>✈️ ${ipaEscape(t.name)}</b><small>${ipaEscape(tripStages(t).map(x=>x.destination).filter(Boolean).join(' → ')||tripDestination(t))}</small><small>${days} dia(s) de roteiro · ${places} passeio(s)</small><small>${t.published?'✓ Já publicada':'Ainda não publicada'} · ${places?'Roteiro disponível':'⚠️ Sem passeios'}</small><small>Hospedagens: ${(t.hotelBookings||[]).length} · Documentos: ${(d.tripDocuments||[]).filter(x=>x.tripId===t.id).length} (opcionais)</small></div>`;
+ }
+ select.onchange=refresh;refresh();
+ document.querySelector('#ipaUnifiedPreview').onclick=()=>{
+  const tripId=select.value;
+  if(!tripId){toast('Selecione a viagem primeiro.');return}
+  modal.close();
+  const preview=document.querySelector(`[data-client-preview="${CSS.escape(tripId)}"]`);
+  if(preview)preview.click();else {adminTripId=tripId;view.innerHTML=adminTripEditor(tripId);bind();document.querySelector('[data-client-preview]')?.click()}
+ };
+ document.querySelector('#ipaUnifiedPublish').onclick=async()=>{
+  const t=d.trips.find(x=>x.id===select.value),button=document.querySelector('#ipaUnifiedPublish'),message=document.querySelector('#ipaUnifiedStatus');
+  if(!t){toast('Escolha uma viagem vinculada ao cliente.');return}
+  if(!(t.itinerary||[]).some(day=>(day.places||[]).length)){toast('Cadastre pelo menos um passeio no roteiro.');return}
+  if(!document.querySelector('#ipaUnifiedChecked').checked){toast('Confirme a revisão da experiência antes de publicar.');return}
+  if(!c.email){toast('Cadastre o e-mail do cliente antes de liberar.');return}
+  const emailRequested=document.querySelector('#ipaUnifiedEmail').checked;
+  button.disabled=true;select.disabled=true;button.textContent='Publicando no Firebase...';message.textContent='Gravando e conferindo os dados...';
+  try{
+   // Atualiza a memória local apenas após a confirmação real da publicação.
+   await window.IPAFirebase.confirmClientTripPublication(c.id,t.id,true);
+   const now=new Date().toISOString();
+   IPAData.updateClientById(c.id,{approvalStatus:'Aprovado',accessApproved:true,approvedAt:c.approvedAt||now,activeTripId:t.id,lastInvitedTripId:t.id});
+   IPAData.updateTrip(t.id,{published:true,status:'Publicado',publishedAt:t.publishedAt||now,publicationReview:{...(t.publicationReview||{}),experience:true},publicationReviewedAt:now});
+   message.textContent='✓ Cliente aprovado e viagem publicada no Firestore.';
+   if(emailRequested){
+    button.textContent='Enviando pelo Resend...';
+    await window.IPAFirebase.sendCustomClientInvite(c.email,c.id,t.id,c.name||'Viajante');
+    IPAData.updateClientById(c.id,{inviteStatus:'sent',inviteSentAt:now,accessNotifiedAt:now});
+    IPAData.updateTrip(t.id,{publicationInviteSentAt:now,publicationInviteError:''});
+    message.textContent='✓ Viagem publicada e convite personalizado enviado.';
+   }else message.textContent='✓ Viagem publicada. Convite não enviado, conforme escolhido.';
+   button.textContent='✓ Concluído';
+   toast(emailRequested?'Cliente aprovado, viagem publicada e convite enviado ✓':'Cliente aprovado e viagem publicada ✓');
+   setTimeout(()=>{modal.close();render()},1400);
+  }catch(e){
+   console.error('Publicação unificada',e);
+   const error='Falha: '+(e?.message||e);
+   message.textContent=error;
+   if(t?.published)IPAData.updateTrip(t.id,{publicationInviteError:String(e?.message||e).slice(0,240)});
+   button.textContent='Tentar novamente';button.disabled=false;select.disabled=false;
+   toast(error);
+  }
+ };
+}
 function adminClients(){
  const d=adminData();
- return `<div class="ipa-admin-head"><div><span class="eyebrow">CRM</span><h1>Clientes</h1><p>Cadastros manuais e solicitações do Quero viajar.</p></div><div class="lead-actions"><button class="btn btn-primary" data-admin-new-client>+ Novo cliente</button><button class="btn btn-light" data-admin-smart-client-trip>✨ Criar viagem inteligente</button></div></div><div class="catalog-summary ipa-access-summary"><div><strong>1</strong><small>Explore · acesso</small></div><div><strong>3</strong><small>Signature · acessos</small></div><div><strong>5</strong><small>Elite · acessos</small></div><div><strong>∞</strong><small>Groups · acessos</small></div></div><div class="ipa-admin-client-grid">${d.clients.map(c=>{const a=ipaAccessUsage(c,d),pending=(c.approvalStatus||'Aprovado')!=='Aprovado';return `<div class="ipa-admin-client"><div class="ipa-admin-avatar">${(c.name||'C').split(' ').map(x=>x[0]).slice(0,2).join('')}</div><div><b>${ipaEscape(c.name)}</b><small>${ipaEscape(c.email||'')} ${c.phone?' · '+ipaEscape(c.phone):''}</small><em>${ipaEscape(c.plan||'Explore')} · ${ipaEscape(c.clientType||'Titular')} · ${pending?'🟠 Aguardando aprovação':'🟢 Aprovado'}</em><small>Acessos: ${a.used} de ${a.total===Infinity?'ilimitados':a.total}</small><div class="lead-actions"><button class="btn btn-light" data-admin-edit-client="${c.id}">✏️ Editar</button><button class="btn btn-light" data-admin-smart-client-trip="${c.id}">✨ Criar viagem inteligente</button>${pending?`<button class="btn btn-primary" data-admin-approve-client="${c.id}">✓ Aprovar cliente</button>`:`<button class="btn btn-light" data-admin-resend-access="${c.id}">📲 Reenviar acesso</button>`}</div></div></div>`}).join('')||'<div class="smart-empty"><b>Nenhum cliente cadastrado.</b></div>'}</div>`
+ return `<div class="ipa-admin-head"><div><span class="eyebrow">CRM</span><h1>Clientes</h1><p>Cadastros manuais e solicitações do Quero viajar.</p></div><div class="lead-actions"><button class="btn btn-primary" data-admin-new-client>+ Novo cliente</button><button class="btn btn-light" data-admin-smart-client-trip>✨ Criar viagem inteligente</button></div></div><div class="catalog-summary ipa-access-summary"><div><strong>1</strong><small>Explore · acesso</small></div><div><strong>3</strong><small>Signature · acessos</small></div><div><strong>5</strong><small>Elite · acessos</small></div><div><strong>∞</strong><small>Groups · acessos</small></div></div><div class="ipa-admin-client-grid">${d.clients.map(c=>{const a=ipaAccessUsage(c,d),pending=(c.approvalStatus||'Aprovado')!=='Aprovado';return `<div class="ipa-admin-client"><div class="ipa-admin-avatar">${(c.name||'C').split(' ').map(x=>x[0]).slice(0,2).join('')}</div><div><b>${ipaEscape(c.name)}</b><small>${ipaEscape(c.email||'')} ${c.phone?' · '+ipaEscape(c.phone):''}</small><em>${ipaEscape(c.plan||'Explore')} · ${ipaEscape(c.clientType||'Titular')} · ${pending?'🟠 Aguardando aprovação':'🟢 Aprovado'}</em><small>Acessos: ${a.used} de ${a.total===Infinity?'ilimitados':a.total}</small><div class="lead-actions"><button class="btn btn-light" data-admin-edit-client="${c.id}">✏️ Editar</button><button class="btn btn-light" data-admin-smart-client-trip="${c.id}">✨ Criar viagem inteligente</button><button class="btn ${pending?'btn-primary':'btn-light'}" data-client-publication="${c.id}">${pending?'✓ Preparar e aprovar viagem':'🚀 Publicar / enviar acesso'}</button></div></div></div>`}).join('')||'<div class="smart-empty"><b>Nenhum cliente cadastrado.</b></div>'}</div>`
 }
 
 function adminTrips(){return `<div class="ipa-admin-head"><div><span class="eyebrow">EXPERIÊNCIAS</span><h1>Viagens</h1><p>Escolha uma viagem para personalizar o app.</p></div><div class="lead-actions"><button class="btn btn-primary" data-admin-new-trip>+ Nova viagem</button><button class="btn btn-light" data-admin-smart-client-trip>✨ Criação inteligente</button></div></div><section class="ipa-admin-panel">${adminTripList()}</section>`}
@@ -2492,7 +2540,7 @@ function ipaTripPublicationPanel(t,c){
  <div class="ipa-publication-summary"><div><small>Cliente</small><strong>${ipaEscape(c?.name||'Não vinculado')}</strong></div><div><small>Destinos</small><strong>${ipaEscape(tripStages(t).map(x=>x.destination).filter(Boolean).join(' → ')||tripDestination(t))}</strong></div><div><small>Situação</small><strong>${status}</strong></div></div>
  <h3>Checklist antes de publicar</h3>
  <div class="ipa-publication-checklist">${check.items.map(item=>`<div class="ipa-publication-check ${item.ok?'is-done':''}"><span class="ipa-publication-check-icon">${item.ok?'✓':item.required?'!':'·'}</span><div><b>${ipaEscape(item.title)}</b><small>${ipaEscape(item.description)}</small></div>${item.id==='review'?`<label class="ipa-publication-review"><input type="checkbox" data-publication-review="${ipaEscape(t.id)}" ${item.ok?'checked':''}> Conferido</label>`:!item.required?'<span class="ipa-publication-optional">Opcional</span>':''}</div>`).join('')}</div>
- <div class="ipa-publication-actions"><button class="btn btn-light" data-client-preview="${ipaEscape(t.id)}" data-client-preview-client="${ipaEscape(t.clientId||'')}" ${!c?'disabled':''}>👁 Prévia do cliente</button><button class="btn ${!t.published?'btn-primary':'btn-light'}" data-publication-confirm="${ipaEscape(t.id)}" ${!t.published&&!check.ready?'disabled':''}>${t.published?'Retirar publicação':'🚀 Publicar viagem'}</button><button class="btn btn-light" data-admin-invite-trip="${ipaEscape(t.id)}" data-client-id="${ipaEscape(t.clientId||'')}" data-client-email="${ipaEscape(c?.email||'')}" ${!t.published||!c?.email?'disabled':''}>✉ ${sent?'Reenviar acesso':'Enviar acesso'}</button></div>
+ <div class="ipa-publication-actions"><button class="btn btn-primary" data-client-publication="${ipaEscape(t.clientId||'')}" data-selected-trip="${ipaEscape(t.id)}" ${!c?'disabled':''}>🚀 Aprovar, publicar e enviar (tudo em uma tela)</button><button class="btn btn-light" data-client-preview="${ipaEscape(t.id)}" data-client-preview-client="${ipaEscape(t.clientId||'')}" ${!c?'disabled':''}>👁 Prévia do cliente</button><button class="btn ${!t.published?'btn-primary':'btn-light'}" data-publication-confirm="${ipaEscape(t.id)}" ${!t.published&&!check.ready?'disabled':''}>${t.published?'Retirar publicação':'🚀 Publicar viagem'}</button><button class="btn btn-light" data-admin-invite-trip="${ipaEscape(t.id)}" data-client-id="${ipaEscape(t.clientId||'')}" data-client-email="${ipaEscape(c?.email||'')}" ${!t.published||!c?.email?'disabled':''}>✉ ${sent?'Reenviar acesso':'Enviar acesso'}</button></div>
  ${!t.published&&!check.ready?'<small class="ipa-publication-help">Para publicar, conclua os itens obrigatórios do checklist. Hospedagens e documentos são opcionais.</small>':''}
  <div class="ipa-publication-history"><b>Histórico</b><small>Publicação: ${t.publishedAt?ipaEscape(new Date(t.publishedAt).toLocaleString('pt-BR')):'Ainda não publicada'}</small><small>Convite: ${sent?ipaEscape(new Date(t.publicationInviteSentAt).toLocaleString('pt-BR')):'Nenhum convite confirmado para esta viagem'}</small>${t.publicationInviteError?`<small class="ipa-publication-error">Último erro: ${ipaEscape(t.publicationInviteError)}</small>`:''}</div>
  <small>Publicar não envia cobrança ou convite automaticamente. Clientes que já possuem login recebem a nova viagem no mesmo acesso.</small>

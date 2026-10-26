@@ -1060,3 +1060,12 @@ dialog:has(#routeCatalogPlace) .smart-place-actions button{
 .ipa-publication-history{margin-top:15px;padding:12px;border-top:1px solid #d9e7ec;display:grid;gap:5px}
 .ipa-publication-history b{font-size:12px}.ipa-publication-history small{font-size:11px;color:#596f7a}.ipa-publication-error{color:#b42318!important}
 @media(max-width:700px){.ipa-publication-summary{grid-template-columns:1fr 1fr}.ipa-publication-actions{grid-template-columns:1fr}.ipa-publication-check{flex-wrap:wrap}}
+
+/* Beta 6.29.77 — Jornada única de liberação */
+.ipa-unified-client,.ipa-unified-overview{display:grid;gap:6px;padding:13px 15px;border:1px solid #dbe9eb;border-radius:14px;background:#f6fafb;margin:12px 0}
+.ipa-unified-client small,.ipa-unified-overview small{color:#54707d;line-height:1.4}
+.ipa-unified-checkbox{display:flex;align-items:flex-start;gap:10px;padding:12px 0;font-size:14px}
+.ipa-unified-checkbox input{margin-top:4px;width:18px;height:18px;flex:0 0 auto}
+.ipa-unified-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:14px}
+.ipa-unified-actions .btn{flex:1 1 160px}
+#ipaUnifiedStatus{display:block;margin-top:10px;color:#34596b;line-height:1.5}

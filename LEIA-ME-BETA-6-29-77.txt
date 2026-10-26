@@ -1,0 +1,6 @@
+Indo por Aí — Beta 6.29.77
+Central única: ADM > Clientes > Preparar e aprovar viagem, ou ADM > Viagens > Aprovar, publicar e enviar.
+Selecione a viagem, revise, marque a conferência e execute. O cliente só recebe e-mail após confirmação da viagem publicada e vinculada no Firestore.
+A navegação do cliente também conserva uma viagem já encontrada individualmente caso a listagem de viagens falhe.
+Testar com cliente de teste; confirmar no Firestore clients.activeTripId e trips.published antes de um envio real.
+Observação: a prévia não substitui a publicação. Nenhuma credencial está incluída no ZIP.
