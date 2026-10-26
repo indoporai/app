@@ -727,14 +727,15 @@ function bind(){
    };
   },0);
  });
- document.querySelectorAll('[data-lead-generate]').forEach(btn=>btn.onclick=async()=>{const d=adminData(),lead=(d.travelLeads||[]).find(x=>x.id===btn.dataset.leadGenerate);if(!lead)return;const result=ipaGenerateCuratedRoute(lead);IPAData.updateTravelLead(lead.id,{adminSuggestion:result,status:'Em análise'});const box=document.querySelector(`[data-lead-result="${lead.id}"]`);if(box)box.innerHTML=ipaAdminSuggestionHtml(lead,result);btn.textContent='↻ Gerar novamente';try{if(window.IPAFirebase?.user)await window.IPAFirebase.syncNow()}catch(e){console.warn(e)};bind()});
+ document.querySelectorAll('[data-lead-generate]').forEach(btn=>btn.onclick=async()=>{const d=adminData(),lead=(d.travelLeads||[]).find(x=>x.id===btn.dataset.leadGenerate);if(!lead)return;const result=ipaGenerateRequestedCityRoute(lead);IPAData.updateTravelLead(lead.id,{adminSuggestion:result,status:'Em análise'});const box=document.querySelector(`[data-lead-result="${lead.id}"]`);if(box)box.innerHTML=ipaAdminSuggestionHtml(lead,result);btn.textContent='↻ Gerar novamente';try{if(window.IPAFirebase?.user)await window.IPAFirebase.syncNow()}catch(e){console.warn(e)};bind()});
  document.querySelectorAll('[data-lead-create-trip]').forEach(btn=>btn.onclick=async()=>{
    const d=adminData(),lead=(d.travelLeads||[]).find(x=>x.id===btn.dataset.leadCreateTrip);if(!lead?.adminSuggestion)return toast('Gere a sugestão antes de criar a viagem');
    if(lead.tripId){adminSection='trips';adminTripId=lead.tripId;render();return}
    const client=(d.clients||[]).find(c=>c.id===lead.clientId||c.leadId===lead.id||c.requestCode===lead.requestCode||(lead.email&&String(c.email||'').toLowerCase()===String(lead.email).toLowerCase())||(lead.phone&&c.phone===lead.phone));
    if(!client)return toast('Cliente do pedido não encontrado');
    const itinerary=(lead.adminSuggestion.days||[]).map(day=>({day:Number(day.day),title:`Dia ${day.day}`,places:(day.places||[]).map((p,i)=>({...p,id:`trip-place-${Date.now()}-${day.day}-${i}`,catalogPlaceId:p.catalogPlaceId||p.id}))}));
-   const trip=IPAData.createTrip({clientId:client.id,name:`${lead.destination} · ${lead.name||client.name}`,destination:lead.destination,country:'',plan:client.plan||lead.plan||'Explore',itinerary,sourceLeadId:lead.id,sourceRequestCode:lead.requestCode,smartRouteApprovedAt:new Date().toISOString(),status:'Em preparação'});
+   const requestedStages=(Array.isArray(lead.stages)&&lead.stages.length?lead.stages:[{destination:lead.destination,days:lead.days}]).map((x,i)=>({id:'stage-'+Date.now()+'-'+i,order:i+1,destination:x.destination,country:x.country||'',days:Number(x.days)||1}));
+   const trip=IPAData.createTrip({clientId:client.id,name:`${requestedStages.map(x=>x.destination).join(' → ')} · ${lead.name||client.name}`,destination:requestedStages[0].destination,country:'',stages:requestedStages,plan:client.plan||lead.plan||'Explore',itinerary,sourceLeadId:lead.id,sourceRequestCode:lead.requestCode,smartRouteApprovedAt:new Date().toISOString(),status:'Em preparação'});
    IPAData.updateClientById(client.id,{activeTripId:trip.id,lastConfiguredTripId:trip.id});
    IPAData.updateTravelLead(lead.id,{tripId:trip.id,status:'Roteiro aprovado'});
    try{if(window.IPAFirebase?.user)await window.IPAFirebase.syncNow()}catch(e){console.error(e);toast('Viagem criada, mas a sincronização ficou pendente');return}
@@ -1391,8 +1392,8 @@ function bind(){
    const now=new Date().toISOString();
    IPAData.updateTrip(t.id,{adminPreparedAt:now});
    await window.IPAFirebase.syncNow();
-   adminTripId=null;adminSection='clients';render();
-   toast('Viagem salva. Vá ao cartão do cliente para publicar e avisar.');
+   adminTripId=null;adminSection='clients';render();window.scrollTo({top:0,behavior:'instant'});
+   toast('Viagem salva ✓ Você está em Clientes. Selecione Publicar viagem.');
   }catch(e){console.error('Salvar viagem',e);toast('Falha ao salvar no Firebase: '+(e.message||e));btn.disabled=false;btn.textContent='💾 Salvar e seguir para Clientes'}
  });
  document.querySelectorAll('[data-client-manage-trip]').forEach(btn=>btn.onclick=()=>{
@@ -2492,7 +2493,7 @@ function ipaSelectClientTripAction(clientId,action){
   }else if(action==='delete'){
    controls.innerHTML='<p class="ipa-publication-error">A exclusão é definitiva e não apaga documentos vinculados automaticamente.</p><button class="btn btn-light btn-block" id="ipaClientDoAction">🗑 Excluir esta viagem</button>';
   }else{
-   controls.innerHTML=`<label class="ipa-unified-checkbox"><input type="checkbox" id="ipaClientReviewConfirmed"> Conferi roteiro, documentos, voo e financeiro em Viagens</label><label>Como deseja avisar o cliente?<select id="ipaClientNotifyChannel" class="v2-concierge-input"><option value="email">✉️ E-mail personalizado (Resend)</option><option value="whatsapp">📱 WhatsApp (abrir mensagem pronta)</option></select></label><small>O e-mail envia o link seguro de primeiro acesso. No WhatsApp será enviada somente uma mensagem informativa, sem credenciais. Para o primeiro login, o link seguro de e-mail ainda será necessário.</small><button class="btn btn-primary btn-block" id="ipaClientDoAction">🚀 Publicar e preparar aviso</button><small id="ipaClientPublicationStatus" role="status"></small>`;
+   controls.innerHTML=`<div class="ipa-publication-choice"><label class="ipa-unified-checkbox"><input type="checkbox" id="ipaClientReviewConfirmed"> Conferi os dados da viagem e autorizo a publicação.</label><div class="ipa-publication-channel-title">Como deseja avisar o viajante?</div><label class="ipa-publication-channel"><input type="radio" name="ipaClientNotifyChannel" value="email" checked><span><b>✉️ Enviar por e-mail</b><small>Convite personalizado com acesso seguro pelo Resend.</small></span></label><label class="ipa-publication-channel"><input type="radio" name="ipaClientNotifyChannel" value="whatsapp"><span><b>📱 Avisar pelo WhatsApp</b><small>Abre a mensagem pronta. O envio é confirmado por você.</small></span></label><small class="ipa-publication-security-note">No primeiro acesso, a criação da senha exige um link seguro enviado por e-mail.</small><button class="btn btn-primary btn-block" id="ipaClientDoAction">🚀 Publicar viagem e avisar</button><small id="ipaClientPublicationStatus" role="status"></small></div>`;
   }
   document.querySelector('#ipaClientDoAction').onclick=async()=>{
    if(action==='edit'){modal.close();adminTripId=trip.id;adminSection='trips';render();return}
@@ -2505,7 +2506,7 @@ function ipaSelectClientTripAction(clientId,action){
    }
    if(!document.querySelector('#ipaClientReviewConfirmed')?.checked)return toast('Confirme a revisão da viagem antes de publicar.');
    if(!places)return toast('A viagem precisa ter passeios antes da publicação.');
-   const channel=document.querySelector('#ipaClientNotifyChannel').value;
+   const channel=document.querySelector('[name="ipaClientNotifyChannel"]:checked')?.value||'email';
    if(channel==='email'&&!client.email)return toast('Cadastre o e-mail do cliente antes de publicar por e-mail.');
    const phone=String(client.phone||'').replace(/\D/g,'');
    if(channel==='whatsapp'&&!phone)return toast('Cadastre o telefone do cliente para usar WhatsApp.');
@@ -2847,7 +2848,7 @@ function ipaPlannerForm(plan=''){
  const chosen=plan||ipaProspectPlan||'';
  return `<span class="eyebrow">QUERO VIAJAR</span><h2>Conte como você quer viajar</h2><p>Suas respostas serão enviadas ao Indo por Aí. Nossa curadoria prepara a sugestão internamente e entra em contato com você.</p>
  ${chosen?`<div class="prospect-plan-picked"><span>Plano escolhido</span><b>${ipaEscape(chosen)}</b></div>`:''}
- <div class="planner-grid"><label>Seu nome<input id="plannerName" class="v2-concierge-input" placeholder="Como podemos te chamar?"></label><label>WhatsApp<input id="plannerPhone" class="v2-concierge-input" placeholder="(11) 99999-9999"></label><label>E-mail <small>opcional</small><input id="plannerEmail" type="email" class="v2-concierge-input" placeholder="voce@email.com"></label><label>Destino<input id="plannerDestination" class="v2-concierge-input" placeholder="Ex.: Porto"></label><label>Dias<input id="plannerDays" type="number" min="1" max="30" value="4" class="v2-concierge-input"></label><label>Adultos<input id="plannerAdults" type="number" min="1" value="2" class="v2-concierge-input"></label><label>Crianças<input id="plannerChildren" type="number" min="0" value="0" class="v2-concierge-input"></label></div>
+ <div class="planner-grid"><label>Seu nome<input id="plannerName" class="v2-concierge-input" placeholder="Como podemos te chamar?"></label><label>WhatsApp<input id="plannerPhone" class="v2-concierge-input" placeholder="(11) 99999-9999"></label><label>E-mail <small>opcional</small><input id="plannerEmail" type="email" class="v2-concierge-input" placeholder="voce@email.com"></label><label>Quantas cidades você quer visitar?<select id="plannerCityCount" class="v2-concierge-input">${Array.from({length:8},(_,i)=>`<option value="${i+1}">${i+1} ${i===0?'cidade':'cidades'}</option>`).join('')}</select></label><label>Duração total da viagem (dias)<input id="plannerDays" type="number" min="1" max="90" value="4" class="v2-concierge-input"></label><div class="ipa-planner-cities" id="plannerCities" aria-live="polite"></div><label>Adultos<input id="plannerAdults" type="number" min="1" value="2" class="v2-concierge-input"></label><label>Crianças<input id="plannerChildren" type="number" min="0" value="0" class="v2-concierge-input"></label></div>
  <label>Quanto pretende gastar com passeios e experiências? <small>por pessoa, para toda a viagem</small></label><div class="planner-budget"><select id="plannerCurrency" class="v2-concierge-input"><option value="EUR">€ EUR</option><option value="BRL">R$ BRL</option><option value="USD">$ USD</option></select><input id="plannerBudget" type="number" min="0" step="10" class="v2-concierge-input" placeholder="500"></div>
  <label>Seu ritmo</label><select id="plannerPace" class="v2-concierge-input"><option value="leve">Leve · 2 a 3 experiências/dia</option><option value="equilibrado" selected>Equilibrado · 3 a 4/dia</option><option value="intenso">Intenso · 4 a 5/dia</option></select>
  <label>O que mais combina com você?</label><div class="planner-interests">${IPA_INTERESTS.map(x=>`<label><input type="checkbox" value="${x}"> ${x}</label>`).join('')}</div>
@@ -2868,6 +2869,20 @@ function ipaGenerateCuratedRoute(input){
  for(const p of remaining){const target=days.slice().sort((a,b)=>a.usedMinutes-b.usedMinutes).find(x=>x.places.length<perDay&&x.usedMinutes+Number(p.durationMinutes||120)<=dayMinutes);if(target){target.places.push(p);target.usedMinutes+=Number(p.durationMinutes||120)}}
  return {days,spent,budget,currency:input.currency||'EUR',count:days.reduce((n,x)=>n+x.places.length,0),optimizedByLocation:true};
 }
+function ipaGenerateRequestedCityRoute(lead){
+ const stages=Array.isArray(lead?.stages)?lead.stages.filter(x=>x.destination&&Number(x.days)>0):[];
+ if(!stages.length)return ipaGenerateCuratedRoute(lead);
+ let dayOffset=0,totalSpent=0,matched=0;
+ const allDays=[],allCities=[];
+ for(const stage of stages){
+  const portion=Number(lead.budget||0)>0 ? Number(lead.budget)*Number(stage.days)/Math.max(1,Number(lead.days)) : 0;
+  const route=ipaGenerateCuratedRoute({...lead,destination:stage.destination,days:stage.days,budget:portion});
+  allDays.push(...route.days.map(day=>({...day,day:day.day+dayOffset,city:stage.destination,title:`Dia ${day.day+dayOffset} · ${stage.destination}`})));
+  allCities.push({destination:stage.destination,days:stage.days,startDay:dayOffset+1,endDay:dayOffset+Number(stage.days)});
+  dayOffset+=Number(stage.days);totalSpent+=Number(route.spent)||0;matched+=Number(route.count)||0;
+ }
+ return {days:allDays,spent:totalSpent,budget:Number(lead.budget)||0,currency:lead.currency||'EUR',count:matched,optimizedByLocation:true,stages:allCities};
+}
 function ipaRequestCode(){return 'IPA-'+String(Date.now()).slice(-6)}
 function ipaLeadWhatsappText(lead){
  const people=`${lead.adults} adulto${Number(lead.adults)===1?'':'s'}${Number(lead.children)>0?` + ${lead.children} criança${Number(lead.children)===1?'':'s'}`:''}`;
@@ -2877,7 +2892,7 @@ function ipaLeadWhatsappText(lead){
   `Pedido: ${lead.requestCode}\n`+
   `Plano: ${lead.plan||'A definir'}\n`+
   `Nome: ${lead.name}\n`+
-  `Destino: ${lead.destination}\n`+
+  `Destinos: ${lead.destination}\n`+((lead.stages||[]).length>1?`Cidades: ${lead.stages.map(x=>x.destination+" ("+x.days+" dias)").join("; ")}\n`:"")+
   `Duração: ${lead.days} dias\n`+
   `Viajantes: ${people}\n`+
   `Interesses: ${(lead.interests||[]).join(', ')||'A definir'}\n`+
@@ -2894,7 +2909,7 @@ function adminLeads(){
 }
 function ipaAdminSuggestionHtml(lead,result){
  if(!result?.count)return `<div class="planner-empty"><b>Banco de Lugares sem combinação suficiente.</b><small>Cadastre mais experiências para ${ipaEscape(lead.destination||'este destino')} e gere novamente.</small></div>`;
- return `<div class="planner-result admin-only-suggestion"><div class="planner-result-head"><span>✨</span><div><small>SUGESTÃO INTERNA · ${ipaEscape(lead.requestCode||'')}</small><h3>${ipaEscape(lead.destination)} · ${lead.days} dias</h3></div></div>${result.days.map(d=>`<div class="planner-day"><b>Dia ${d.day}</b>${d.places.map(p=>`<div><span>${p.category||'📍'}</span><p><strong>${ipaEscape(p.name)}</strong><small>${p.interests?.slice(0,2).join(' · ')||'Curadoria Indo por Aí'}</small></p><em>${ipaCatalogMoney(p.cost,p.currency||result.currency)}</em></div>`).join('')||'<small>Dia livre.</small>'}</div>`).join('')}<div class="planner-total"><span>Estimativa por pessoa</span><strong>${ipaCatalogMoney(result.spent,result.currency)}</strong><small>de ${ipaCatalogMoney(result.budget,result.currency)} informados</small></div><small>🔒 Sugestão interna. O prospect não visualiza estes lugares.</small><div class="lead-actions">${lead.tripId?`<button class="btn btn-light" data-admin-trip="${ipaEscape(lead.tripId)}">✈️ Completar viagem</button>`:`<button class="btn btn-primary" data-lead-create-trip="${ipaEscape(lead.id)}">✓ Criar roteiro e seguir para Viagens</button>`}</div></div>`;
+ return `<div class="planner-result admin-only-suggestion"><div class="planner-result-head"><span>✨</span><div><small>SUGESTÃO INTERNA · ${ipaEscape(lead.requestCode||'')}</small><h3>${ipaEscape(lead.destination)} · ${lead.days} dias</h3><small>${(lead.stages||[]).length>1?"Multidestino: "+(lead.stages||[]).map(x=>ipaEscape(x.destination)+" ("+Number(x.days)+" dias)").join(" → "):""}</small></div></div>${result.days.map(d=>`<div class="planner-day"><b>Dia ${d.day}${d.city?" · "+ipaEscape(d.city):""}</b>${d.places.map(p=>`<div><span>${p.category||'📍'}</span><p><strong>${ipaEscape(p.name)}</strong><small>${p.interests?.slice(0,2).join(' · ')||'Curadoria Indo por Aí'}</small></p><em>${ipaCatalogMoney(p.cost,p.currency||result.currency)}</em></div>`).join('')||'<small>Dia livre.</small>'}</div>`).join('')}<div class="planner-total"><span>Estimativa por pessoa</span><strong>${ipaCatalogMoney(result.spent,result.currency)}</strong><small>de ${ipaCatalogMoney(result.budget,result.currency)} informados</small></div><small>🔒 Sugestão interna. O prospect não visualiza estes lugares.</small><div class="lead-actions">${lead.tripId?`<button class="btn btn-light" data-admin-trip="${ipaEscape(lead.tripId)}">✈️ Completar viagem</button>`:`<button class="btn btn-primary" data-lead-create-trip="${ipaEscape(lead.id)}">✓ Criar roteiro e seguir para Viagens</button>`}</div></div>`;
 }
 function prospectView(){return `<section class="prospect-premium">
  <span class="eyebrow">Ainda não sou cliente</span><h1>Sua viagem começa antes do embarque.</h1><p>Escolha uma experiência e conte como você quer viajar. Nossa equipe recebe seu pedido e prepara uma proposta personalizada.</p><button class="btn btn-primary" id="openTravelPlanner">Quero viajar com o Indo por Aí</button>
@@ -2902,12 +2917,32 @@ function prospectView(){return `<section class="prospect-premium">
 ${plansSalesBlock()}
 <section class="section"><div class="instagram-showcase"><div class="instagram-mark">◎</div><div><span class="eyebrow">Conheça nossa comunidade</span><h2>Uma comunidade com mais de 23 mil apaixonados por viagens.</h2><p>Roteiros, dicas e experiências reais para inspirar sua próxima história.</p><b>@indo.por.ai.com.a.gente</b></div><button class="btn btn-primary" id="instagramBtn">Abrir Instagram</button></div></section>
 <section class="section"><div class="prospect-proof"><span>❤️</span><div><span class="eyebrow">Indo por Aí</span><h3>Não vendemos apenas um destino.</h3><p>Acompanhamos a história antes, durante e depois da viagem.</p></div></div></section>`}
+function ipaBindPlannerCities(){
+ const count=document.querySelector('#plannerCityCount'),box=document.querySelector('#plannerCities'),days=document.querySelector('#plannerDays');
+ if(!count||!box||!days)return;
+ const update=()=>{
+  const previous=[...box.querySelectorAll('[data-planner-city]')].map(r=>({city:r.querySelector('[data-city-name]')?.value||'',days:r.querySelector('[data-city-days]')?.value||''}));
+  const n=Number(count.value)||1,total=Math.max(n,Number(days.value)||n);
+  const filled=previous.reduce((v,x)=>v+(Number(x.days)||0),0);
+  box.innerHTML=`<div class="ipa-planner-cities-head"><b>Monte sua viagem cidade por cidade</b><small>Informe a sequência e quantos dias deseja ficar em cada cidade.</small></div>${Array.from({length:n},(_,i)=>`<div class="ipa-planner-city-row" data-planner-city><span class="ipa-planner-city-index">${i+1}</span><label>Cidade ${i+1}<input data-city-name class="v2-concierge-input" maxlength="120" placeholder="${i===0?'Ex.: Lisboa':i===1?'Ex.: Porto':'Nome da cidade'}" value="${ipaEscape(previous[i]?.city||'')}"></label><label>Dias nesta cidade<input data-city-days class="v2-concierge-input" type="number" min="1" max="90" value="${ipaEscape(previous[i]?.days||String(i===0?Math.max(1,total-n+1):1))}"></label></div>`).join('')}<small id="plannerCityDaysStatus"></small>`;
+  box.querySelectorAll('[data-city-days]').forEach(e=>e.addEventListener('input',validate));validate();
+ };
+ function validate(){
+  const list=[...box.querySelectorAll('[data-city-days]')].map(x=>Number(x.value)||0),sum=list.reduce((a,b)=>a+b,0),total=Number(days.value)||0,info=document.querySelector('#plannerCityDaysStatus');
+  if(info){info.textContent=`${sum} de ${total} dias distribuídos entre as cidades${sum!==total?' — ajuste para fechar a duração total.':' ✓'}`;info.classList.toggle('ipa-planner-days-error',sum!==total)}
+ }
+ count.addEventListener('change',update);days.addEventListener('input',validate);update();
+}
 function ipaBindProspectForm(){
+ ipaBindPlannerCities();
  const send=document.querySelector('#sendTravelRequest');if(!send)return;
  send.onclick=async()=>{
   const val=id=>document.querySelector(id)?.value?.trim?.()||'';
   const interests=[...document.querySelectorAll('.planner-interests input:checked')].map(x=>x.value);
-  const lead={requestCode:ipaRequestCode(),plan:ipaProspectPlan||'A definir',name:val('#plannerName'),phone:val('#plannerPhone'),email:val('#plannerEmail'),destination:val('#plannerDestination'),days:Number(val('#plannerDays')||1),adults:Number(val('#plannerAdults')||1),children:Number(val('#plannerChildren')||0),budget:Number(val('#plannerBudget')||0),currency:val('#plannerCurrency')||'EUR',pace:val('#plannerPace')||'equilibrado',interests,status:'Novo'};
+  const stages=[...document.querySelectorAll('[data-planner-city]')].map((row,i)=>({order:i+1,destination:row.querySelector('[data-city-name]')?.value.trim()||'',days:Number(row.querySelector('[data-city-days]')?.value||0)}));
+  const lead={requestCode:ipaRequestCode(),plan:ipaProspectPlan||'A definir',name:val('#plannerName'),phone:val('#plannerPhone'),email:val('#plannerEmail'),destination:stages.map(x=>x.destination).filter(Boolean).join(' → '),stages,days:Number(val('#plannerDays')||1),adults:Number(val('#plannerAdults')||1),children:Number(val('#plannerChildren')||0),budget:Number(val('#plannerBudget')||0),currency:val('#plannerCurrency')||'EUR',pace:val('#plannerPace')||'equilibrado',interests,status:'Novo'};
+  if(stages.some(x=>!x.destination||x.days<1))return toast('Informe todas as cidades e os dias de cada etapa.');
+  if(stages.reduce((sum,x)=>sum+x.days,0)!==lead.days)return toast('A soma dos dias por cidade precisa ser igual à duração total da viagem.');
   if(!lead.name){toast('Informe seu nome');return}if(!lead.phone){toast('Informe seu WhatsApp');return}if(!lead.destination){toast('Informe o destino');return}if(!interests.length){toast('Escolha pelo menos um interesse');return}
   try{
    send.disabled=true;send.textContent='Enviando pedido...';

@@ -1084,3 +1084,18 @@ dialog:has(#routeCatalogPlace) .smart-place-actions button{
 .ipa-release-summary small{display:block;line-height:1.4;color:#536b76}
 .ipa-admin-client .lead-actions{flex-wrap:wrap;gap:7px}
 .ipa-admin-client [data-client-publish-trip]{background:#fc651e;color:#fff}
+
+/* 6.29.80 – formulário multidestino e publicação compacta */
+.ipa-planner-cities{grid-column:1/-1;display:grid;gap:10px;margin:3px 0 10px;padding:14px;border:1px solid #dce9eb;border-radius:16px;background:#f6fafb}
+.ipa-planner-cities-head{display:grid;gap:3px}.ipa-planner-cities-head small{color:#657782}
+.ipa-planner-city-row{display:grid;grid-template-columns:36px minmax(0,1fr) 115px;align-items:end;gap:10px}
+.ipa-planner-city-row label{min-width:0}.ipa-planner-city-index{display:grid;place-items:center;width:34px;height:39px;border-radius:12px;background:#087d83;color:white;font-weight:800}
+.ipa-planner-days-error{color:#af4a1b!important;font-weight:700}
+.ipa-publication-choice{display:grid;gap:12px;margin-top:16px}.ipa-publication-choice .ipa-unified-checkbox{background:#f5fbf9;border-radius:12px;padding:12px}
+.ipa-publication-channel-title{font-weight:800;color:#153947;font-size:15px}
+.ipa-publication-channel{display:flex;gap:12px;align-items:center;border:1px solid #e0e9eb;border-radius:14px;padding:13px 14px;background:#fff;cursor:pointer}
+.ipa-publication-channel:has(input:checked){border-color:#07919a;background:#f0fbfb;box-shadow:0 0 0 1px #07919a}
+.ipa-publication-channel input{flex:none;accent-color:#07848e;width:18px;height:18px}
+.ipa-publication-channel span{display:grid;gap:4px;min-width:0}.ipa-publication-channel b{color:#103d51}.ipa-publication-channel small{font-size:12px;color:#637983;line-height:1.4}
+.ipa-publication-security-note{color:#637983;font-size:12px;line-height:1.45}
+@media(max-width:600px){.ipa-planner-city-row{grid-template-columns:30px minmax(0,1fr) 94px;gap:7px}.ipa-planner-cities{padding:10px}.ipa-planner-city-row label{font-size:12px}.ipa-planner-city-row input{min-width:0;width:100%;padding:10px 7px}}
