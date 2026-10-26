@@ -1,4 +1,4 @@
-Indo por Aí — Beta 6.29.94
+Indo por Aí — Beta 6.29.95
 - Tela Antes: contagem concluídos/total por checklist, calculada das mesmas chaves armazenadas na interface.
 - Contadores atualizam ao marcar/desmarcar, sem precisar recarregar o app.
 - Ícones: Documentos = passaporte; Check-in = checklist.

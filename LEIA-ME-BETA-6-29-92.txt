@@ -1,4 +1,4 @@
-Beta 6.29.94 — Ícones dos streamings preservados no Entre no Clima.
+Beta 6.29.95 — Ícones dos streamings preservados no Entre no Clima.
 - Filme/série: Netflix, Prime Video, Disney+, Apple TV.
 - Playlist: Spotify, Deezer, Apple Music.
 - Livros: Kindle, Apple Books.

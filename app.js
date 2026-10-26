@@ -1986,6 +1986,35 @@ function showPlanDetails(){
  const items=d.plans[plan]||[];
  showModal(`<span class="eyebrow">Seu plano</span><h2>Indo por Aí ${plan}</h2><div class="plan-feature-list">${items.map(x=>`<div>✓ <span>${x}</span></div>`).join('')}</div>`);
 }
+const IPA_PREP_DEFAULTS={
+ purchase:['Passagens e reservas conferidas','Hospedagem confirmada','Seguro viagem contratado','Ingressos e passeios organizados'],
+ documents:['Passaporte ou documento de viagem válido','Vistos e autorizações necessários','Comprovantes de hospedagem','Passagens e bilhetes salvos','Seguro viagem e documentos importantes'],
+ checkin:['Conferir abertura do check-in','Realizar check-in da passagem','Salvar cartão de embarque','Conferir horário e terminal','Verificar bagagem permitida'],
+ luggage:['Roupas para o clima do destino','Calçados confortáveis','Itens de higiene pessoal','Medicamentos de uso habitual','Carregadores e adaptadores','Documentos e itens essenciais na bagagem de mão']
+};
+function ipaPrepSnapshot(section){
+ const d=ipaDB(),trip=activeTrip(),original=Array.isArray(d?.prep?.[section])?d.prep[section]:[];
+ const items=original.length?original.map(x=>typeof x==='string'?{label:x}:x):(IPA_PREP_DEFAULTS[section]||[]).map(label=>({label,done:false}));
+ const email=String(window.IPAFirebase?.user?.email||'').trim().toLowerCase();
+ const userKey=window.IPAFirebase?.user?.uid||email||'visitante',tripKey=trip?.id||'sem-viagem';
+ const storageKey='ipa-client-prep-v2:'+userKey+':'+tripKey+':'+section;
+ const legacyKey='ipa-client-prep:'+userKey+':'+tripKey+':'+section;
+ let checked={};try{checked=JSON.parse(localStorage.getItem(storageKey)||'null')||{};
+  if(!Object.keys(checked).length){const legacy=JSON.parse(localStorage.getItem(legacyKey)||'{}');items.forEach((x,i)=>{if(Object.prototype.hasOwnProperty.call(legacy,i))checked[String(x.label||i)]=Boolean(legacy[i])})}
+ }catch(e){checked={}}
+ const itemKey=x=>String(x.label||'').trim();
+ const itemDone=(x,i)=>Object.prototype.hasOwnProperty.call(checked,itemKey(x))?Boolean(checked[itemKey(x)]):Boolean(x.done);
+ return {items,checked,storageKey,itemKey,itemDone,count:items.filter(itemDone).length,total:items.length};
+}
+function ipaPrepProgressUpdate(section){
+ const p=ipaPrepSnapshot(section);
+ document.querySelectorAll('[data-prep-count="'+section+'"]').forEach(el=>{el.textContent=p.count+'/'+p.total+' concluídos'});
+ document.querySelectorAll('[data-prep-progress="'+section+'"]').forEach(el=>{el.classList.toggle('done',p.total>0&&p.count===p.total);el.classList.toggle('active',p.count>0&&p.count<p.total)});
+}
+function ipaPrepJourneyCard(section,icon,title,subtitle){
+ const p=ipaPrepSnapshot(section),status=p.total&&p.count===p.total?'done':p.count?'active':'';
+ return `<button class="v2-journey-step ${status}" data-no-save-feedback data-prep-section="${section}" data-prep-progress="${section}"><span class="ipa-journey-symbol">${icon}</span><div><b>${title}</b><small>${ipaEscape(subtitle)}</small><small class="ipa-prep-counter" data-prep-count="${section}">${p.count}/${p.total} concluídos</small></div></button>`;
+}
 function prepChecklist(section,title){
  const d=ipaDB();if(!d)return;
  if(section==='exchange'){
@@ -1993,30 +2022,7 @@ function prepChecklist(section,title){
    showModal(`<div class="exchange-view"><span class="eyebrow">Indo por Aí Exchange</span><h2>Seu saldo para Portugal</h2><p>O Indo por Aí organiza seu câmbio de forma personalizada.</p><div class="exchange-balance"><small>Saldo reservado</small><strong>€ ${e.requestedEuro}</strong><span>€1 = R$ ${Number(e.sellRate).toFixed(2).replace('.',',')}</span><b>${e.status}</b></div><div class="partner-strip"><small>Benefício em parceria com</small><strong>${e.partner}</strong></div><button class="btn btn-primary btn-block" onclick="toast('Solicitação enviada ao Indo por Aí');modal.close()">Falar sobre meu câmbio</button></div>`);
    return;
  }
- const presets={
-   purchase:['Passagens e reservas conferidas','Hospedagem confirmada','Seguro viagem contratado','Ingressos e passeios organizados'],
-   documents:['Passaporte ou documento de viagem válido','Vistos e autorizações necessários','Comprovantes de hospedagem','Passagens e bilhetes salvos','Seguro viagem e documentos importantes'],
-   checkin:['Conferir abertura do check-in','Realizar check-in da passagem','Salvar cartão de embarque','Conferir horário e terminal','Verificar bagagem permitida'],
-   luggage:['Roupas para o clima do destino','Calçados confortáveis','Itens de higiene pessoal','Medicamentos de uso habitual','Carregadores e adaptadores','Documentos e itens essenciais na bagagem de mão']
- };
- const original=Array.isArray(d.prep?.[section])?d.prep[section]:[];
- const items=original.length?original.map(x=>typeof x==='string'?{label:x}:x): (presets[section]||[]).map(label=>({label,done:false}));
- const trip=activeTrip();
- const email=String(window.IPAFirebase?.user?.email||'').trim().toLowerCase();
- const userKey=window.IPAFirebase?.user?.uid||email||'visitante';
- const tripKey=trip?.id||'sem-viagem';
- // Stable identity and stable item labels; independent of changing array indices.
- const storageKey='ipa-client-prep-v2:'+userKey+':'+tripKey+':'+section;
- const legacyKey='ipa-client-prep:'+userKey+':'+tripKey+':'+section;
- let checked={};
- try{
-  checked=JSON.parse(localStorage.getItem(storageKey)||'null')||{};
-  if(!Object.keys(checked).length){const legacy=JSON.parse(localStorage.getItem(legacyKey)||'{}');
-   items.forEach((x,i)=>{if(Object.prototype.hasOwnProperty.call(legacy,i))checked[String(x.label||i)]=Boolean(legacy[i])});
-  }
- }catch(e){checked={}}
- const itemKey=x=>String(x.label||'').trim();
- const itemDone=(x,i)=>Object.prototype.hasOwnProperty.call(checked,itemKey(x))?checked[itemKey(x)]:Boolean(x.done);
+ const {items,checked,storageKey,itemKey,itemDone}=ipaPrepSnapshot(section);
  showModal(`<span class="eyebrow">Preparação da viagem</span><h2>${ipaEscape(title||section)}</h2><p>Marque cada item. Seu progresso é salvo automaticamente neste navegador.</p><div class="prep-checklist">${items.map((x,i)=>`<label><input type="checkbox" data-prep-index="${i}" ${itemDone(x,i)?'checked':''}><span>${ipaEscape(x.label||'Item '+(i+1))}</span></label>`).join('')}</div><small id="ipa-prep-saved" role="status" aria-live="polite">${items.filter((x,i)=>itemDone(x,i)).length} de ${items.length} concluídos</small>`);
  const persist=()=>{
   try{
@@ -2024,6 +2030,7 @@ function prepChecklist(section,title){
    const verified=JSON.parse(localStorage.getItem(storageKey)||'{}');
    if(JSON.stringify(verified)!==JSON.stringify(checked))throw Error('Falha de verificação');
    const count=items.filter((x,i)=>itemDone(x,i)).length;
+   ipaPrepProgressUpdate(section);
    const feedback=modalContent.querySelector('#ipa-prep-saved');
    if(feedback){feedback.textContent='✓ Salvo · '+count+' de '+items.length+' concluídos';feedback.style.color='#16805a'}
   }catch(e){console.error('Erro ao gravar checklist',e);const feedback=modalContent.querySelector('#ipa-prep-saved');if(feedback){feedback.textContent='Não foi possível salvar neste navegador.';feedback.style.color='#b33a35'};toast('Não foi possível salvar checklist neste dispositivo')}
@@ -2667,9 +2674,9 @@ ${tripModule('itinerary')?`<section class="section"><div class="section-head"><d
 ${tripModule('payments')?`<section class="section"><button class="payment-alert-card" data-go="payments"><div class="payment-alert-icon">💳</div><div><span class="eyebrow">Pagamentos</span><h3>Acompanhe sua viagem</h3><p>${(d?.payments||[]).filter(p=>p.status!=='Pago'&&(!t||p.tripId===t.id||(!p.tripId&&p.trip===t.name))).length} cobrança(s) em aberto</p></div><span>›</span></button></section>`:''}
 <section class="section"><div class="section-head"><div><span class="eyebrow">Sua jornada até o embarque</span><h2>Preparação da viagem</h2></div></div>
  <div class="v2-journey">
-  ${tripModule('documents')?`<button class="v2-journey-step done" data-no-save-feedback data-prep-section="documents"><span>✓</span><div><b>Documentos</b><small>Checklist necessário para ${country}</small></div></button>`:''}
-  ${tripModule('checkin')?`<button class="v2-journey-step active" data-no-save-feedback data-prep-section="checkin"><span>✓</span><div><b>Check-in</b><small>Acompanhe quando estiver disponível</small></div></button>`:''}
-  ${tripModule('luggage')?`<button class="v2-journey-step" data-no-save-feedback data-prep-section="luggage"><span>🧳</span><div><b>Mala inteligente</b><small>Itens recomendados para ${country}</small></div></button>`:''}
+  ${tripModule('documents')?ipaPrepJourneyCard('documents','🛂','Documentos','Documentos para '+country):''}
+  ${tripModule('checkin')?ipaPrepJourneyCard('checkin','☑️','Check-in','Preparação para o embarque'):''}
+  ${tripModule('luggage')?ipaPrepJourneyCard('luggage','🧳','Mala inteligente','Itens recomendados para '+country):''}
   ${tripModule('exchange')?`<button class="v2-journey-step" data-no-save-feedback data-prep-section="exchange"><span>💱</span><div><b>Indo por Aí Exchange</b><small>Oferta personalizada</small></div></button>`:''}
  </div>
 </section>

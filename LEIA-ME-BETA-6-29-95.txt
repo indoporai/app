@@ -1,0 +1,6 @@
+Beta 6.29.95 — correção do progresso em Antes e ampliação opcional de trailers.
+- Corrigida a ligação entre a UI de preparação e os contadores reais de checklist.
+- Ícones Documentos (passaporte) e Check-in (checklist).
+- A contagem é feita sobre os mesmos itens e estado de conclusão do modal.
+- Trailers via iTunes Movie Search, ou YouTube Data API quando YOUTUBE_API_KEY estiver configurada no Cloudflare.
+- Filmes sem vídeo identificado continuam sem botão de trailer, sem prometer link falso.

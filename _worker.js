@@ -459,6 +459,14 @@ async function ipaClimateDiscover(request,env){
     void data;
   })());
  }
+ if((type.includes('filme')||type.includes('série'))&&env.YOUTUBE_API_KEY)tasks.push((async()=>{
+  // YouTube Data API: apenas resultado de vídeo com título correspondente; sem fabricar IDs.
+  const q=title+' trailer oficial';
+  const data=await ipaClimateCatalogJson('https://www.googleapis.com/youtube/v3/search?'+new URLSearchParams({part:'snippet',type:'video',maxResults:'8',q,key:env.YOUTUBE_API_KEY}));
+  const entries=data?.items||[];
+  const match=entries.find(x=>{const name=ipaClimateNormalize(x?.snippet?.title||'');const original=ipaClimateNormalize(title);return name.includes(original)&&(/trailer|teaser/.test(name))&&x?.id?.videoId;});
+  if(match){links.Trailer='https://www.youtube.com/watch?v='+encodeURIComponent(match.id.videoId);sources.push('YouTube trailer')}
+ })());
  if(type.includes('filme')||type.includes('série'))tasks.push((async()=>{
   // Catálogo público Apple: trailers reais, sem pesquisas genéricas ou links presumidos.
   // Apenas correspondência de título. O vídeo abre diretamente onde o provedor permite.
