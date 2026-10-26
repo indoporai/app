@@ -665,6 +665,54 @@ document.addEventListener('drop',ev=>{
  void ipaMoveSuggestedPlace(d.leadId,d.day,d.from,Number(row.dataset.placeIndex));
 },true);
 document.addEventListener('dragend',()=>{ipaLeadNativeDrag=null},true);
+// Beta 6.29.87: Pedidos recria a lista ao ordenar os lugares.
+// Delegação permanente evita perder o botão de criação ao trocar innerHTML.
+async function ipaCreateLeadTripFromButton(btn){
+   if(btn.disabled)return;
+   const leadId=btn.dataset.leadCreateTrip;
+   const d=adminData(),lead=(d.travelLeads||[]).find(x=>String(x.id)===String(leadId));
+   const note=document.createElement('div');note.className='ipa-lead-save-status';note.setAttribute('role','status');note.setAttribute('aria-live','polite');
+   btn.parentElement?.appendChild(note);
+   const progress=(message,kind='pending')=>{note.textContent=message;note.dataset.kind=kind;btn.textContent=kind==='error'?'↻ Tentar salvar e seguir para Viagens':'↻ '+message};
+   if(!lead?.adminSuggestion){progress('Gere a sugestão antes de criar a viagem','error');return}
+   const client=(d.clients||[]).find(c=>c.id===lead.clientId||c.leadId===lead.id||c.requestCode===lead.requestCode||(lead.email&&String(c.email||'').toLowerCase()===String(lead.email).toLowerCase())||(lead.phone&&c.phone===lead.phone));
+   if(!client){progress('Cliente não encontrado. Verifique o cadastro em Clientes.','error');return}
+   btn.disabled=true;
+   progress('Preparando roteiro...');
+   try{
+     if(!window.IPAFirebase?.saveLeadTripConfirmed)throw new Error('Serviço de gravação indisponível. Atualize a versão do aplicativo.');
+     if(!window.IPAFirebase.user)throw new Error('Faça login como ADM antes de salvar.');
+     const existing=(d.trips||[]).find(t=>String(t.id)===String(lead.tripId)||String(t.sourceLeadId||'')===String(lead.id));
+     let trip=existing;
+     if(!trip){
+       const itinerary=(lead.adminSuggestion.days||[]).map(day=>({day:Number(day.day),title:`Dia ${day.day}${day.city?' · '+day.city:''}`,city:day.city||'',places:(day.places||[]).map((place,i)=>({...place,id:`trip-place-${Date.now()}-${day.day}-${i}`,catalogPlaceId:place.catalogPlaceId||place.id}))}));
+       if(!itinerary.length)throw new Error('Nenhum dia encontrado na sugestão de roteiro.');
+       const requestedStages=(Array.isArray(lead.stages)&&lead.stages.length?lead.stages:[{destination:lead.destination,days:lead.days}]).map((x,i)=>({id:'stage-'+Date.now()+'-'+i,order:i+1,destination:x.destination,country:x.country||'',days:Number(x.days)||1}));
+       trip=IPAData.createTrip({clientId:client.id,name:`${requestedStages.map(x=>x.destination).join(' → ')} · ${lead.name||client.name}`,destination:requestedStages[0].destination,country:'',stages:requestedStages,plan:client.plan||lead.plan||'Explore',itinerary,sourceLeadId:lead.id,sourceRequestCode:lead.requestCode,smartRouteApprovedAt:new Date().toISOString(),status:'Em preparação'});
+     }
+     IPAData.updateClientById(client.id,{activeTripId:trip.id,lastConfiguredTripId:trip.id});
+     IPAData.updateTravelLead(lead.id,{tripId:trip.id,status:'Roteiro em preparação'});
+     await window.IPAFirebase.saveLeadTripConfirmed({tripId:trip.id,clientId:client.id,leadId:lead.id,onProgress:(stage)=>progress(stage)});
+     IPAData.updateTravelLead(lead.id,{tripId:trip.id,tripSaveConfirmedAt:new Date().toISOString(),status:'Roteiro aprovado'});
+     progress('Gravação confirmada! Abrindo Viagens...','done');
+     modal?.close?.();adminSection='trips';adminTripId=trip.id;state.route='admin';render();
+     window.scrollTo({top:0,behavior:'instant'});
+     toast('Roteiro salvo no Firebase ✓ Complete os dados em Viagens.');
+   }catch(err){
+     console.error('Falha na transferência Pedidos → Viagens',err);
+     const code=err?.code?` (${err.code})`:'';
+     progress('Gravação não confirmada'+code+': '+(err?.message||'erro de conexão')+'. O roteiro continua em Pedidos.','error');
+     btn.disabled=false;
+   }
+ }
+document.addEventListener('click',event=>{
+ const btn=event.target.closest?.('[data-lead-create-trip]');
+ if(!btn)return;
+ event.preventDefault();
+ if(btn.disabled)return;
+ void ipaCreateLeadTripFromButton(btn);
+},true);
+
 function bind(){
  setTimeout(()=>ipaHydrateTripWeather(),0);
  setTimeout(()=>{ipaInitRealMap();ipaInitExploreRealMap();},60);
@@ -811,44 +859,7 @@ function bind(){
  });
  document.querySelectorAll('[data-lead-generate]').forEach(btn=>btn.onclick=async()=>{const d=adminData(),lead=(d.travelLeads||[]).find(x=>x.id===btn.dataset.leadGenerate);if(!lead)return;const result=ipaGenerateRequestedCityRoute(lead);IPAData.updateTravelLead(lead.id,{adminSuggestion:result,status:'Em análise'});const box=document.querySelector(`[data-lead-result="${lead.id}"]`);if(box)box.innerHTML=ipaAdminSuggestionHtml(lead,result);btn.textContent='↻ Gerar novamente';try{if(window.IPAFirebase?.user)await window.IPAFirebase.syncNow()}catch(e){console.warn(e)};bind()});
  // Reordenação de Pedidos é tratada pela delegação global Beta 6.29.85.
- document.querySelectorAll('[data-lead-create-trip]').forEach(btn=>btn.onclick=async()=>{
-   if(btn.disabled)return;
-   const leadId=btn.dataset.leadCreateTrip;
-   const d=adminData(),lead=(d.travelLeads||[]).find(x=>String(x.id)===String(leadId));
-   const note=document.createElement('div');note.className='ipa-lead-save-status';note.setAttribute('role','status');note.setAttribute('aria-live','polite');
-   btn.parentElement?.appendChild(note);
-   const progress=(message,kind='pending')=>{note.textContent=message;note.dataset.kind=kind;btn.textContent=kind==='error'?'↻ Tentar salvar e seguir para Viagens':'↻ '+message};
-   if(!lead?.adminSuggestion){progress('Gere a sugestão antes de criar a viagem','error');return}
-   const client=(d.clients||[]).find(c=>c.id===lead.clientId||c.leadId===lead.id||c.requestCode===lead.requestCode||(lead.email&&String(c.email||'').toLowerCase()===String(lead.email).toLowerCase())||(lead.phone&&c.phone===lead.phone));
-   if(!client){progress('Cliente não encontrado. Verifique o cadastro em Clientes.','error');return}
-   btn.disabled=true;
-   progress('Preparando roteiro...');
-   try{
-     if(!window.IPAFirebase?.saveLeadTripConfirmed)throw new Error('Serviço de gravação indisponível. Atualize a versão do aplicativo.');
-     if(!window.IPAFirebase.user)throw new Error('Faça login como ADM antes de salvar.');
-     const existing=(d.trips||[]).find(t=>String(t.id)===String(lead.tripId)||String(t.sourceLeadId||'')===String(lead.id));
-     let trip=existing;
-     if(!trip){
-       const itinerary=(lead.adminSuggestion.days||[]).map(day=>({day:Number(day.day),title:`Dia ${day.day}${day.city?' · '+day.city:''}`,city:day.city||'',places:(day.places||[]).map((place,i)=>({...place,id:`trip-place-${Date.now()}-${day.day}-${i}`,catalogPlaceId:place.catalogPlaceId||place.id}))}));
-       if(!itinerary.length)throw new Error('Nenhum dia encontrado na sugestão de roteiro.');
-       const requestedStages=(Array.isArray(lead.stages)&&lead.stages.length?lead.stages:[{destination:lead.destination,days:lead.days}]).map((x,i)=>({id:'stage-'+Date.now()+'-'+i,order:i+1,destination:x.destination,country:x.country||'',days:Number(x.days)||1}));
-       trip=IPAData.createTrip({clientId:client.id,name:`${requestedStages.map(x=>x.destination).join(' → ')} · ${lead.name||client.name}`,destination:requestedStages[0].destination,country:'',stages:requestedStages,plan:client.plan||lead.plan||'Explore',itinerary,sourceLeadId:lead.id,sourceRequestCode:lead.requestCode,smartRouteApprovedAt:new Date().toISOString(),status:'Em preparação'});
-     }
-     IPAData.updateClientById(client.id,{activeTripId:trip.id,lastConfiguredTripId:trip.id});
-     IPAData.updateTravelLead(lead.id,{tripId:trip.id,status:'Roteiro em preparação'});
-     await window.IPAFirebase.saveLeadTripConfirmed({tripId:trip.id,clientId:client.id,leadId:lead.id,onProgress:(stage)=>progress(stage)});
-     IPAData.updateTravelLead(lead.id,{tripId:trip.id,tripSaveConfirmedAt:new Date().toISOString(),status:'Roteiro aprovado'});
-     progress('Gravação confirmada! Abrindo Viagens...','done');
-     modal?.close?.();adminSection='trips';adminTripId=trip.id;state.route='admin';render();
-     window.scrollTo({top:0,behavior:'instant'});
-     toast('Roteiro salvo no Firebase ✓ Complete os dados em Viagens.');
-   }catch(err){
-     console.error('Falha na transferência Pedidos → Viagens',err);
-     const code=err?.code?` (${err.code})`:'';
-     progress('Gravação não confirmada'+code+': '+(err?.message||'erro de conexão')+'. O roteiro continua em Pedidos.','error');
-     btn.disabled=false;
-   }
- });
+ // Criação do roteiro é tratada pela delegação global Beta 6.29.87.
 
  document.querySelectorAll('[data-admin-generate-climate]').forEach(b=>b.onclick=async()=>{
    const tripId=b.dataset.adminGenerateClimate,d=adminData(),t=(d.trips||[]).find(x=>x.id===tripId);if(!t)return;

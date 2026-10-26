@@ -1,0 +1,1 @@
+Beta 6.29.87 — Pedidos: corrige botao Criar roteiro e seguir para Viagens que deixava de responder depois de reordenar locais; delegacao global de clique independente da reconstrução da lista. Mantém etapas e avisos do Firebase da Beta 6.29.86. Validar em ambiente publicado.
