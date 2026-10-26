@@ -459,6 +459,14 @@ async function ipaClimateDiscover(request,env){
     void data;
   })());
  }
+ if(type.includes('filme')||type.includes('série'))tasks.push((async()=>{
+  // Catálogo público Apple: trailers reais, sem pesquisas genéricas ou links presumidos.
+  // Apenas correspondência de título. O vídeo abre diretamente onde o provedor permite.
+  const data=await ipaClimateCatalogJson('https://itunes.apple.com/search?term='+encodeURIComponent(title)+'&media=movie&entity=movie&limit=30&country=BR');
+  const item=(data?.results||[]).find(x=>ipaClimateMatch(x.trackName||x.collectionName,title));
+  const preview=ipaClimateSafeHost(item?.previewUrl,['video-ssl.itunes.apple.com']);
+  if(preview){links.Trailer=preview;sources.push('Apple trailers')}
+ })());
  if(type.includes('livro'))tasks.push((async()=>{
   const data=await ipaClimateCatalogJson('https://itunes.apple.com/search?term='+encodeURIComponent(title)+'&media=ebook&entity=ebook&limit=20&country=BR');
   const item=(data?.results||[]).find(x=>ipaClimateMatch(x.trackName||x.collectionName,title));

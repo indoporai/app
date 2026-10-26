@@ -2486,13 +2486,14 @@ function ipaClimateProviderFromUrl(url){
   if(host==='tv.apple.com')return 'Apple TV';
   if(host==='books.apple.com')return 'Apple Books';
   if(host==='play.google.com')return 'Google Livros';
+  if(host==='video-ssl.itunes.apple.com'||host==='youtube.com'||host==='youtu.be')return 'Trailer';
  }catch(e){}
  return '';
 }
 
 function ipaClimatePlatformNames(type){
  const v=String(type||'').toLowerCase();
- return v.includes('playlist')?['Spotify','Deezer','Apple Music']:v.includes('livro')?['Kindle','Apple Books']:v.includes('filme')||v.includes('série')?['Netflix','Prime Video','Disney+','Apple TV']:[];
+ return v.includes('playlist')?['Spotify','Deezer','Apple Music']:v.includes('livro')?['Kindle','Apple Books']:v.includes('filme')||v.includes('série')?['Netflix','Prime Video','Disney+','Apple TV','Trailer']:[];
 }
 function ipaClimateEditorFields(item){
  const fields=ipaClimatePlatformNames(item.type),links=item.links||{};
@@ -2562,14 +2563,15 @@ function ipaStreamButtons(item){
  if(detected)links[detected]=oneUrl;
  const names=type.includes('playlist')?['Spotify','Deezer','Apple Music']:
    type.includes('livro')?['Kindle','Apple Books']:
-   ['Netflix','Prime Video','Disney+','Apple TV'];
- const mark={'Netflix':'N','Prime Video':'▶','Disney+':'D+','Apple TV':'●','Spotify':'≋','Deezer':'▥','Apple Music':'♫','Kindle':'K','Apple Books':'◈'};
+   ['Netflix','Prime Video','Disney+','Apple TV','Trailer'];
+ const mark={'Netflix':'N','Prime Video':'▶','Disney+':'D+','Apple TV':'●','Spotify':'≋','Deezer':'▥','Apple Music':'♫','Kindle':'K','Apple Books':'◈','Trailer':'▶'};
  const buttons=names.map(name=>{
   const url=links[name]||'';
   let direct=false;
   try{const u=new URL(url);direct=u.protocol==='https:'&&ipaClimateProviderFromUrl(url)===name;}catch(e){}
   const icon=`<span class="ipa-provider-mark ipa-provider-${ipaEscape(name.toLowerCase().replace(/[^a-z]/g,''))}" aria-hidden="true">${mark[name]||'▶'}</span>`;
   if(direct)return `<button type="button" class="ipa-stream-link" data-external-route="${ipaEscape(url)}" title="Abrir ${ipaEscape(title)} no ${ipaEscape(name)}">${icon}<span>${ipaEscape(name)} ↗</span></button>`;
+  if(name==='Trailer')return '';
   return `<span class="ipa-stream-link ipa-stream-unavailable" title="Link direto ainda não disponível no ${ipaEscape(name)}">${icon}<span>${ipaEscape(name)}</span></span>`;
  }).join('');
  const hasDirect=names.some(name=>{try{return new URL(links[name]||'').protocol==='https:'&&ipaClimateProviderFromUrl(links[name])===name;}catch(e){return false;}});

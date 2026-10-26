@@ -1,0 +1,7 @@
+Indo por Aí — Beta 6.29.94
+- Tela Antes: contagem concluídos/total por checklist, calculada das mesmas chaves armazenadas na interface.
+- Contadores atualizam ao marcar/desmarcar, sem precisar recarregar o app.
+- Ícones: Documentos = passaporte; Check-in = checklist.
+- Entre no Clima: descoberta de trailers de filmes via iTunes Movie Search pública quando houver título correspondente e prévia hospedada pela Apple.
+- Streaming: links diretos anteriores preservados; sem inventar URLs em Netflix/Prime/Disney+.
+- Sem credenciais novas obrigatórias. Nem todo título terá trailer disponível.

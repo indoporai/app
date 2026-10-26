@@ -1,4 +1,4 @@
-Indo por Aí — Beta 6.29.93
+Indo por Aí — Beta 6.29.94
 - Ícones dos streamings, música e livros continuam visíveis.
 - Procura automática no servidor via Deezer (playlists), Apple Books (livros) e Spotify (playlists, quando SPOTIFY_CLIENT_ID e SPOTIFY_CLIENT_SECRET estiverem configurados como segredos Cloudflare).
 - Links Spotify curados das versões anteriores continuam ativos.
