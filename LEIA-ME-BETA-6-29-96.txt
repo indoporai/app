@@ -1,0 +1,2 @@
+Indo por Aí Beta 6.29.96
+Ajuste pontual na tela Antes: bloco Serviços do seu pacote movido para o final da página, imediatamente antes de Benefícios exclusivos. Layout e recursos inalterados.
