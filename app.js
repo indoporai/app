@@ -813,17 +813,19 @@ function bind(){
  // Reordenação de Pedidos é tratada pela delegação global Beta 6.29.85.
  document.querySelectorAll('[data-lead-create-trip]').forEach(btn=>btn.onclick=async()=>{
    if(btn.disabled)return;
-   const initialLabel=btn.textContent;
    const leadId=btn.dataset.leadCreateTrip;
    const d=adminData(),lead=(d.travelLeads||[]).find(x=>String(x.id)===String(leadId));
-   if(!lead?.adminSuggestion){toast('Gere a sugestão antes de criar a viagem');return}
+   const note=document.createElement('div');note.className='ipa-lead-save-status';note.setAttribute('role','status');note.setAttribute('aria-live','polite');
+   btn.parentElement?.appendChild(note);
+   const progress=(message,kind='pending')=>{note.textContent=message;note.dataset.kind=kind;btn.textContent=kind==='error'?'↻ Tentar salvar e seguir para Viagens':'↻ '+message};
+   if(!lead?.adminSuggestion){progress('Gere a sugestão antes de criar a viagem','error');return}
    const client=(d.clients||[]).find(c=>c.id===lead.clientId||c.leadId===lead.id||c.requestCode===lead.requestCode||(lead.email&&String(c.email||'').toLowerCase()===String(lead.email).toLowerCase())||(lead.phone&&c.phone===lead.phone));
-   if(!client){toast('Cliente não encontrado. Verifique o cadastro na aba Clientes.');return}
+   if(!client){progress('Cliente não encontrado. Verifique o cadastro em Clientes.','error');return}
    btn.disabled=true;
-   btn.textContent='Salvando no Firebase...';
+   progress('Preparando roteiro...');
    try{
      if(!window.IPAFirebase?.saveLeadTripConfirmed)throw new Error('Serviço de gravação indisponível. Atualize a versão do aplicativo.');
-     if(!window.IPAFirebase.user)throw new Error('Faça login como ADM para salvar o roteiro.');
+     if(!window.IPAFirebase.user)throw new Error('Faça login como ADM antes de salvar.');
      const existing=(d.trips||[]).find(t=>String(t.id)===String(lead.tripId)||String(t.sourceLeadId||'')===String(lead.id));
      let trip=existing;
      if(!trip){
@@ -833,17 +835,18 @@ function bind(){
        trip=IPAData.createTrip({clientId:client.id,name:`${requestedStages.map(x=>x.destination).join(' → ')} · ${lead.name||client.name}`,destination:requestedStages[0].destination,country:'',stages:requestedStages,plan:client.plan||lead.plan||'Explore',itinerary,sourceLeadId:lead.id,sourceRequestCode:lead.requestCode,smartRouteApprovedAt:new Date().toISOString(),status:'Em preparação'});
      }
      IPAData.updateClientById(client.id,{activeTripId:trip.id,lastConfiguredTripId:trip.id});
-     IPAData.updateTravelLead(lead.id,{tripId:trip.id,status:'Roteiro aprovado'});
-     await window.IPAFirebase.saveLeadTripConfirmed({tripId:trip.id,clientId:client.id,leadId:lead.id});
+     IPAData.updateTravelLead(lead.id,{tripId:trip.id,status:'Roteiro em preparação'});
+     await window.IPAFirebase.saveLeadTripConfirmed({tripId:trip.id,clientId:client.id,leadId:lead.id,onProgress:(stage)=>progress(stage)});
+     IPAData.updateTravelLead(lead.id,{tripId:trip.id,tripSaveConfirmedAt:new Date().toISOString(),status:'Roteiro aprovado'});
+     progress('Gravação confirmada! Abrindo Viagens...','done');
      modal?.close?.();adminSection='trips';adminTripId=trip.id;state.route='admin';render();
      window.scrollTo({top:0,behavior:'instant'});
-     toast('Viagem confirmada no Firebase ✓ Complete agora os dados em Viagens.');
+     toast('Roteiro salvo no Firebase ✓ Complete os dados em Viagens.');
    }catch(err){
-     console.error('Erro ao salvar roteiro do pedido',err);
-     toast('Não foi possível salvar: '+(err?.message||'erro de conexão'));
+     console.error('Falha na transferência Pedidos → Viagens',err);
+     const code=err?.code?` (${err.code})`:'';
+     progress('Gravação não confirmada'+code+': '+(err?.message||'erro de conexão')+'. O roteiro continua em Pedidos.','error');
      btn.disabled=false;
-     btn.textContent='↻ Tentar salvar e seguir para Viagens';
-     btn.title='O roteiro permanece no pedido. Clique novamente para tentar gravar.';
    }
  });
 
@@ -3030,7 +3033,7 @@ function adminLeads(){
 function ipaAdminSuggestionHtml(lead,result){
  if(!result?.count)return `<div class="planner-empty"><b>Banco de Lugares sem combinação suficiente.</b><small>Cadastre mais experiências para ${ipaEscape(lead.destination||'este destino')} e gere novamente.</small></div>`;
  const rows=(result.days||[]).map(d=>`<div class="planner-day"><b>Dia ${d.day}${d.city?" · "+ipaEscape(d.city):""}</b>${(d.places||[]).map((place,i)=>`<div class="ipa-lead-place" data-lead-place="${ipaEscape(lead.id)}" data-day="${Number(d.day)}" data-place-index="${i}" draggable="true"><span class="ipa-lead-place-type">${ipaEscape(place.category||'📍')}</span><p><strong>${ipaEscape(place.name)}</strong><small>${(place.interests||[]).slice(0,2).map(ipaEscape).join(' · ')||'Curadoria Indo por Aí'}</small></p><em>${ipaCatalogMoney(place.cost,place.currency||result.currency)}</em><span class="ipa-lead-reorder"><button type="button" class="ipa-lead-grip" data-lead-grip title="Arraste para ordenar" aria-label="Arrastar ${ipaEscape(place.name)}">⠿</button><span class="ipa-lead-reorder-arrows"><button type="button" data-lead-move="${ipaEscape(lead.id)}" data-day="${Number(d.day)}" data-place-index="${i}" data-direction="up" aria-label="Mover ${ipaEscape(place.name)} para cima" ${i===0?'disabled':''}>↑</button><button type="button" data-lead-move="${ipaEscape(lead.id)}" data-day="${Number(d.day)}" data-place-index="${i}" data-direction="down" aria-label="Mover ${ipaEscape(place.name)} para baixo" ${i===(d.places||[]).length-1?'disabled':''}>↓</button></span></span></div>`).join('')||'<small>Dia livre.</small>'}</div>`).join('');
- return `<div class="planner-result admin-only-suggestion"><div class="planner-result-head"><span>✨</span><div><small>SUGESTÃO INTERNA · ${ipaEscape(lead.requestCode||'')}</small><h3>${ipaEscape(lead.destination)} · ${lead.days} dias</h3><small>${(lead.stages||[]).length>1?"Multidestino: "+(lead.stages||[]).map(x=>ipaEscape(x.destination)+" ("+Number(x.days)+" dias)").join(" → "):""}</small></div></div><p class="ipa-lead-order-hint">↕ Arraste pelo puxador ou use as setas para ajustar a ordem dos passeios de cada dia.</p>${rows}<div class="planner-total"><span>Estimativa por pessoa</span><strong>${ipaCatalogMoney(result.spent,result.currency)}</strong><small>de ${ipaCatalogMoney(result.budget,result.currency)} informados</small></div><small>🔒 Sugestão interna. O prospect não visualiza estes lugares.</small><div class="lead-actions">${lead.tripId?`<button class="btn btn-light" data-admin-trip="${ipaEscape(lead.tripId)}">✈️ Completar viagem</button>`:`<button class="btn btn-primary" data-lead-create-trip="${ipaEscape(lead.id)}">✓ Criar roteiro e seguir para Viagens</button>`}</div></div>`;
+ return `<div class="planner-result admin-only-suggestion"><div class="planner-result-head"><span>✨</span><div><small>SUGESTÃO INTERNA · ${ipaEscape(lead.requestCode||'')}</small><h3>${ipaEscape(lead.destination)} · ${lead.days} dias</h3><small>${(lead.stages||[]).length>1?"Multidestino: "+(lead.stages||[]).map(x=>ipaEscape(x.destination)+" ("+Number(x.days)+" dias)").join(" → "):""}</small></div></div><p class="ipa-lead-order-hint">↕ Arraste pelo puxador ou use as setas para ajustar a ordem dos passeios de cada dia.</p>${rows}<div class="planner-total"><span>Estimativa por pessoa</span><strong>${ipaCatalogMoney(result.spent,result.currency)}</strong><small>de ${ipaCatalogMoney(result.budget,result.currency)} informados</small></div><small>🔒 Sugestão interna. O prospect não visualiza estes lugares.</small><div class="lead-actions">${(lead.tripId&&lead.tripSaveConfirmedAt)?`<button class="btn btn-light" data-admin-trip="${ipaEscape(lead.tripId)}">✈️ Completar viagem</button>`:`<button class="btn btn-primary" data-lead-create-trip="${ipaEscape(lead.id)}" data-no-save-feedback>✓ Criar roteiro e seguir para Viagens</button>`}</div></div>`;
 }
 
 function prospectView(){return `<section class="prospect-premium">

@@ -1145,3 +1145,8 @@ dialog:has(#routeCatalogPlace) .smart-place-actions button{
 .admin-only-suggestion .ipa-lead-reorder{min-width:75px;gap:5px}
 .admin-only-suggestion .planner-day>.ipa-lead-place{grid-template-columns:minmax(70px,95px) minmax(0,1fr) auto 78px}
 @media(max-width:560px){.admin-only-suggestion .planner-day>.ipa-lead-place{grid-template-columns:minmax(55px,75px) minmax(0,1fr) 78px}.admin-only-suggestion .planner-day>.ipa-lead-place em{grid-column:2;grid-row:2}.admin-only-suggestion .ipa-lead-reorder{grid-column:3;grid-row:1/span 2}}
+
+/* Beta 6.29.86: feedback real do fluxo Pedidos > Viagens. */
+.ipa-lead-save-status{flex-basis:100%;font-size:.88rem;line-height:1.4;color:#286778;padding:9px 12px;border-radius:12px;background:#e9f7f7;margin-top:8px;overflow-wrap:anywhere}
+.ipa-lead-save-status[data-kind="error"]{background:#fff0e9;color:#a63b20}
+.ipa-lead-save-status[data-kind="done"]{background:#e7f6ee;color:#166b42}

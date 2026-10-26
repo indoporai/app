@@ -1,0 +1,1 @@
+Beta 6.29.86: o botão Pedidos > Viagens exibe as etapas reais de gravação e não usa o cronômetro genérico. Em erro, mantém roteiro e viagem local para nova tentativa com o mesmo ID. Salvar só navega após confirmação do Firebase. A publicação de viagem continua exclusivamente em Clientes.

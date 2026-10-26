@@ -844,7 +844,8 @@ window.IPAFirebase = {
   },
   // Beta 6.29.84: gravação confirmada do fluxo Pedidos → Viagens.
   // Não depende de syncAll, que pode retornar durante outra sincronização.
-  async saveLeadTripConfirmed({tripId,clientId,leadId}){
+  async saveLeadTripConfirmed({tripId,clientId,leadId,onProgress}){
+    const progress=typeof onProgress==='function'?onProgress:()=>{};
     if(!currentUser || currentUser.uid!==ADMIN_UID)throw new Error('Entre com a conta ADM para salvar.');
     const d=window.IPAData?.getAll?.()||{};
     const trip=(d.trips||[]).find(t=>String(t.id)===String(tripId));
@@ -853,18 +854,28 @@ window.IPAFirebase = {
     if(!trip||!client||!lead)throw new Error('Não foi possível localizar o pedido, a viagem ou o cliente.');
     if(String(trip.clientId)!==String(clientId))throw new Error('A viagem não está vinculada ao cliente selecionado.');
     if(!Array.isArray(trip.itinerary)||!trip.itinerary.length)throw new Error('O roteiro precisa ter ao menos um dia.');
+    // Evita criar uma segunda viagem quando o ADM precisar tentar outra vez.
+    clearTimeout(syncTimer);
     const tripRef=doc(firestore,'trips',String(tripId));
     const clientRef=doc(firestore,'clients',String(clientId));
     const leadRef=doc(firestore,'travelLeads',String(leadId));
-    await setDoc(tripRef,{...trip,sourceLeadId:leadId,updatedAt:serverTimestamp()},{merge:true});
-    await setDoc(clientRef,{...client,activeTripId:tripId,lastConfiguredTripId:tripId,updatedAt:serverTimestamp()},{merge:true});
-    await setDoc(leadRef,{...lead,tripId,status:'Roteiro aprovado',updatedAt:serverTimestamp()},{merge:true});
+    const steps=[
+      {name:'Gravando viagem...',ref:tripRef,data:{...trip,sourceLeadId:leadId,updatedAt:serverTimestamp()}},
+      {name:'Vinculando cliente...',ref:clientRef,data:{...client,activeTripId:tripId,lastConfiguredTripId:tripId,updatedAt:serverTimestamp()}},
+      {name:'Atualizando pedido...',ref:leadRef,data:{...lead,tripId,status:'Roteiro aprovado',updatedAt:serverTimestamp()}}
+    ];
+    for(const step of steps){
+      progress(step.name);
+      try{await setDoc(step.ref,step.data,{merge:true})}
+      catch(e){throw new Error(`${step.name.replace('...','')} falhou: ${e?.code||e?.message||'erro desconhecido'}`)}
+    }
+    progress('Conferindo dados no Firebase...');
     const [savedTrip,savedClient,savedLead]=await Promise.all([getDoc(tripRef),getDoc(clientRef),getDoc(leadRef)]);
     if(!savedTrip.exists()||!savedClient.exists()||!savedLead.exists()||
       String(savedTrip.data().clientId)!==String(clientId)||
       String(savedClient.data().activeTripId)!==String(tripId)||
       String(savedLead.data().tripId)!==String(tripId)){
-      throw new Error('O Firebase não confirmou a gravação da viagem. Tente novamente.');
+      throw new Error('A verificação não confirmou os vínculos entre pedido, cliente e viagem.');
     }
     return {tripId,clientId,leadId};
   },
