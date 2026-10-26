@@ -1,0 +1,1 @@
+Beta 6.29.85 — Corrige a ordenação na aba Pedidos com delegação de eventos de clique, toque e arraste; mantém as alterações no roteiro e salva no Firebase. Preserva os demais módulos.

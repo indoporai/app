@@ -1134,3 +1134,14 @@ dialog:has(#routeCatalogPlace) .smart-place-actions button{
 .ipa-lead-reorder-arrows button:disabled{opacity:.25;cursor:default}
 .ipa-lead-place.ipa-lead-dragging{opacity:.5;background:#e8f7f7;border-radius:12px}
 @media(max-width:560px){.admin-only-suggestion .planner-day>.ipa-lead-place{grid-template-columns:65px minmax(0,1fr) 48px;gap:7px}.admin-only-suggestion .planner-day>.ipa-lead-place em{grid-column:2;grid-row:2;font-size:12px}.ipa-lead-reorder{grid-column:3;grid-row:1 / span 2}}
+
+/* Beta 6.29.85 — ordem dos lugares: alças/setas acessíveis e clicáveis */
+.admin-only-suggestion [data-lead-place]{position:relative;min-width:0}
+.admin-only-suggestion .ipa-lead-reorder{position:relative;z-index:3;pointer-events:auto}
+.admin-only-suggestion .ipa-lead-grip{touch-action:none;-webkit-user-select:none;user-select:none;cursor:grab}
+.admin-only-suggestion .ipa-lead-reorder button{pointer-events:auto;position:relative;z-index:4;appearance:none;-webkit-appearance:none}
+.admin-only-suggestion .ipa-lead-reorder-arrows button{width:32px;min-height:32px;font-size:18px}
+.admin-only-suggestion .ipa-lead-reorder-arrows{gap:4px}
+.admin-only-suggestion .ipa-lead-reorder{min-width:75px;gap:5px}
+.admin-only-suggestion .planner-day>.ipa-lead-place{grid-template-columns:minmax(70px,95px) minmax(0,1fr) auto 78px}
+@media(max-width:560px){.admin-only-suggestion .planner-day>.ipa-lead-place{grid-template-columns:minmax(55px,75px) minmax(0,1fr) 78px}.admin-only-suggestion .planner-day>.ipa-lead-place em{grid-column:2;grid-row:2}.admin-only-suggestion .ipa-lead-reorder{grid-column:3;grid-row:1/span 2}}

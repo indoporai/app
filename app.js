@@ -583,6 +583,88 @@ function ipaBindCatalogTools(){
  if(ipaCatalogPhotoJob)ipaCatalogPhotoFeedback(ipaCatalogPhotoJob);
  const bulk=document.querySelector('#catalogLocateMissing');if(bulk)bulk.onclick=async()=>{const missing=(adminData().placeCatalog||[]).filter(p=>!Number.isFinite(Number(p.lat))||!Number.isFinite(Number(p.lng)));if(!missing.length)return toast('Todos os lugares já têm localização ✓');bulk.disabled=true;let ok=0;for(const p of missing){bulk.textContent=`📍 Localizando ${ok+1}/${missing.length}...`;try{await ipaLocateCatalogPlace(p);ok++}catch(e){console.warn('Localização pendente',p.name,e)}}try{if(window.IPAFirebase?.user)await window.IPAFirebase.syncNow()}catch{}toast(`${ok} de ${missing.length} lugares localizados ✓`);render()};
 }
+// Beta 6.29.85 — event delegation survives ADM rerenders and Firebase refreshes.
+// Always reorder the source suggestion, never a detached DOM copy.
+let ipaLeadDrag=null;
+let ipaLeadMoving=false;
+async function ipaMoveSuggestedPlace(leadId,dayNum,fromIndex,toIndex){
+ if(ipaLeadMoving)return;
+ const lead=(adminData().travelLeads||[]).find(l=>String(l.id)===String(leadId));
+ const source=lead?.adminSuggestion;
+ const day=(source?.days||[]).find(x=>Number(x.day)===Number(dayNum));
+ const from=Number(fromIndex),to=Number(toIndex);
+ if(!day||!Array.isArray(day.places)||!Number.isInteger(from)||!Number.isInteger(to)||from<0||to<0||from>=day.places.length||to>=day.places.length||from===to)return;
+ ipaLeadMoving=true;
+ try{
+  const updated=JSON.parse(JSON.stringify(source));
+  const edited=updated.days.find(x=>Number(x.day)===Number(dayNum));
+  edited.places.splice(to,0,edited.places.splice(from,1)[0]);
+  IPAData.updateTravelLead(lead.id,{adminSuggestion:updated});
+  const region=[...document.querySelectorAll('[data-lead-result]')].find(el=>el.dataset.leadResult===String(lead.id));
+  if(region){
+   region.innerHTML=ipaAdminSuggestionHtml({...lead,adminSuggestion:updated},updated);
+   // Focus is restored after drawing, so clicking an arrow never looks inert.
+   const focus=region.querySelector(`[data-lead-place][data-day="${Number(dayNum)}"][data-place-index="${to}"] [data-lead-grip]`);
+   focus?.focus({preventScroll:true});
+  }
+  if(window.IPAFirebase?.saveLeadSuggestionConfirmed){
+   try{await window.IPAFirebase.saveLeadSuggestionConfirmed(lead.id)}catch(e){console.error('Falha ao gravar nova ordem',e);toast('Ordem ajustada. Falha ao salvar no Firebase: '+(e?.message||'erro de conexão'))}
+  }else{toast('Ordem ajustada. Verifique a conexão com o Firebase antes de sair da tela.')}
+ }finally{ipaLeadMoving=false}
+}
+function ipaLeadTargetAt(clientY,source){
+ if(!source)return null;
+ const rows=[...document.querySelectorAll('[data-lead-place]')].filter(el=>el.dataset.leadPlace===source.leadId&&el.dataset.day===source.day);
+ let closest=null,distance=Infinity;
+ for(const el of rows){const r=el.getBoundingClientRect();const delta=Math.abs(clientY-(r.top+r.height/2));if(delta<distance){distance=delta;closest=el}}
+ return closest;
+}
+// Capture phase intentionally intercepts the earlier direct button handlers.
+// The DOM for Pedidos is frequently rebuilt, so delegation is critical.
+document.addEventListener('click',ev=>{
+ const arrow=ev.target.closest?.('[data-lead-move]');
+ if(!arrow)return;
+ ev.preventDefault();ev.stopImmediatePropagation();
+ if(arrow.disabled)return;
+ const from=Number(arrow.dataset.placeIndex),to=from+(arrow.dataset.direction==='up'?-1:1);
+ void ipaMoveSuggestedPlace(arrow.dataset.leadMove,arrow.dataset.day,from,to);
+},true);
+document.addEventListener('pointerdown',ev=>{
+ const grip=ev.target.closest?.('[data-lead-grip]');if(!grip||ev.button>0)return;
+ const row=grip.closest('[data-lead-place]');if(!row)return;
+ ipaLeadDrag={leadId:row.dataset.leadPlace,day:row.dataset.day,from:Number(row.dataset.placeIndex),pointerId:ev.pointerId,startY:ev.clientY,lastY:ev.clientY,moved:false,grip};
+ row.classList.add('ipa-lead-dragging');
+ try{grip.setPointerCapture(ev.pointerId)}catch(_e){}
+},true);
+document.addEventListener('pointermove',ev=>{
+ const d=ipaLeadDrag;if(!d||d.pointerId!==ev.pointerId)return;
+ d.lastY=ev.clientY;
+ if(Math.abs(ev.clientY-d.startY)>6){d.moved=true;ev.preventDefault()}
+}, {capture:true,passive:false});
+document.addEventListener('pointerup',ev=>{
+ const d=ipaLeadDrag;if(!d||d.pointerId!==ev.pointerId)return;
+ ipaLeadDrag=null;
+ document.querySelectorAll('.ipa-lead-dragging').forEach(row=>row.classList.remove('ipa-lead-dragging'));
+ if(!d.moved)return;
+ const target=ipaLeadTargetAt(ev.clientY,d);
+ if(target)void ipaMoveSuggestedPlace(d.leadId,d.day,d.from,Number(target.dataset.placeIndex));
+},true);
+document.addEventListener('pointercancel',()=>{ipaLeadDrag=null;document.querySelectorAll('.ipa-lead-dragging').forEach(row=>row.classList.remove('ipa-lead-dragging'))},true);
+let ipaLeadNativeDrag=null;
+document.addEventListener('dragstart',ev=>{
+ const row=ev.target.closest?.('[data-lead-place]');if(!row)return;
+ ipaLeadNativeDrag={leadId:row.dataset.leadPlace,day:row.dataset.day,from:Number(row.dataset.placeIndex)};
+ if(ev.dataTransfer){ev.dataTransfer.effectAllowed='move';ev.dataTransfer.setData('text/plain','reorder-trip-suggestion')}
+},true);
+document.addEventListener('dragover',ev=>{if(ipaLeadNativeDrag&&ev.target.closest?.('[data-lead-place]'))ev.preventDefault()},true);
+document.addEventListener('drop',ev=>{
+ if(!ipaLeadNativeDrag)return;
+ const row=ev.target.closest?.('[data-lead-place]');const d=ipaLeadNativeDrag;ipaLeadNativeDrag=null;
+ if(!row||row.dataset.leadPlace!==d.leadId||row.dataset.day!==d.day)return;
+ ev.preventDefault();ev.stopImmediatePropagation();
+ void ipaMoveSuggestedPlace(d.leadId,d.day,d.from,Number(row.dataset.placeIndex));
+},true);
+document.addEventListener('dragend',()=>{ipaLeadNativeDrag=null},true);
 function bind(){
  setTimeout(()=>ipaHydrateTripWeather(),0);
  setTimeout(()=>{ipaInitRealMap();ipaInitExploreRealMap();},60);
@@ -728,62 +810,7 @@ function bind(){
   },0);
  });
  document.querySelectorAll('[data-lead-generate]').forEach(btn=>btn.onclick=async()=>{const d=adminData(),lead=(d.travelLeads||[]).find(x=>x.id===btn.dataset.leadGenerate);if(!lead)return;const result=ipaGenerateRequestedCityRoute(lead);IPAData.updateTravelLead(lead.id,{adminSuggestion:result,status:'Em análise'});const box=document.querySelector(`[data-lead-result="${lead.id}"]`);if(box)box.innerHTML=ipaAdminSuggestionHtml(lead,result);btn.textContent='↻ Gerar novamente';try{if(window.IPAFirebase?.user)await window.IPAFirebase.syncNow()}catch(e){console.warn(e)};bind()});
- // Reordenação local e persistida dos passeios da sugestão do pedido.
- // Mantém as cidades/dias fixos; altera só a ordem dos lugares dentro do dia.
- const moveLeadPlace=async(leadId,dayNumber,from,to)=>{
-   const lead=(adminData().travelLeads||[]).find(l=>String(l.id)===String(leadId));
-   if(!lead?.adminSuggestion)return;
-   const suggestion=JSON.parse(JSON.stringify(lead.adminSuggestion));
-   const day=(suggestion.days||[]).find(d=>Number(d.day)===Number(dayNumber));
-   if(!day||!Array.isArray(day.places)||from<0||to<0||from>=day.places.length||to>=day.places.length||from===to)return;
-   const [place]=day.places.splice(from,1);day.places.splice(to,0,place);
-   IPAData.updateTravelLead(lead.id,{adminSuggestion:suggestion});
-   const region=Array.from(document.querySelectorAll('[data-lead-result]')).find(el=>el.dataset.leadResult===String(lead.id));
-   if(region){region.innerHTML=ipaAdminSuggestionHtml({...lead,adminSuggestion:suggestion},suggestion);bind();}
-   try{
-     if(window.IPAFirebase?.saveLeadSuggestionConfirmed)await window.IPAFirebase.saveLeadSuggestionConfirmed(lead.id);
-     else throw new Error('Serviço de gravação indisponível');
-   }catch(err){console.error('Falha ao persistir a ordem do roteiro',err);toast('Ordem ajustada nesta tela, mas não foi salva no Firebase: '+(err?.message||'erro'));}
- };
- document.querySelectorAll('[data-lead-move]').forEach(btn=>btn.onclick=()=>{
-   const from=Number(btn.dataset.placeIndex),to=from+(btn.dataset.direction==='up'?-1:1);
-   moveLeadPlace(btn.dataset.leadMove,btn.dataset.day,from,to);
- });
- document.querySelectorAll('[data-lead-place]').forEach(item=>{
-   item.addEventListener('dragstart',ev=>{
-     // A alça destaca a função; em desktop também é possível arrastar o cartão.
-     ev.dataTransfer.effectAllowed='move';ev.dataTransfer.setData('text/plain',JSON.stringify({leadId:item.dataset.leadPlace,day:item.dataset.day,index:Number(item.dataset.placeIndex)}));
-     item.classList.add('ipa-lead-dragging');
-   });
-   item.addEventListener('dragend',()=>item.classList.remove('ipa-lead-dragging'));
-   item.addEventListener('dragover',ev=>{ev.preventDefault();ev.dataTransfer.dropEffect='move'});
-   item.addEventListener('drop',ev=>{
-     ev.preventDefault();
-     try{const origin=JSON.parse(ev.dataTransfer.getData('text/plain'));if(String(origin.leadId)===item.dataset.leadPlace&&String(origin.day)===item.dataset.day)moveLeadPlace(origin.leadId,origin.day,Number(origin.index),Number(item.dataset.placeIndex));}catch(e){console.warn(e)}
-   });
- });
- // Touch: o puxador aceita arraste com o dedo, além das setas de acessibilidade.
- document.querySelectorAll('[data-lead-grip]').forEach(grip=>{
-   let origin=null,hover=null;
-   grip.addEventListener('pointerdown',ev=>{
-     if(ev.pointerType==='mouse')return;
-     const item=grip.closest('[data-lead-place]');if(!item)return;
-     origin={leadId:item.dataset.leadPlace,day:item.dataset.day,index:Number(item.dataset.placeIndex)};hover=null;
-     grip.setPointerCapture?.(ev.pointerId);
-     item.classList.add('ipa-lead-dragging');
-   });
-   grip.addEventListener('pointermove',ev=>{
-     if(!origin)return;
-     const target=document.elementFromPoint(ev.clientX,ev.clientY)?.closest('[data-lead-place]');
-     if(target&&target.dataset.leadPlace===origin.leadId&&target.dataset.day===origin.day)hover=Number(target.dataset.placeIndex);
-   });
-   grip.addEventListener('pointerup',()=>{
-     const item=grip.closest('[data-lead-place]');item?.classList.remove('ipa-lead-dragging');
-     if(origin&&hover!==null)moveLeadPlace(origin.leadId,origin.day,origin.index,hover);
-     origin=null;hover=null;
-   });
-   grip.addEventListener('pointercancel',()=>{grip.closest('[data-lead-place]')?.classList.remove('ipa-lead-dragging');origin=null;hover=null});
- });
+ // Reordenação de Pedidos é tratada pela delegação global Beta 6.29.85.
  document.querySelectorAll('[data-lead-create-trip]').forEach(btn=>btn.onclick=async()=>{
    if(btn.disabled)return;
    const initialLabel=btn.textContent;
