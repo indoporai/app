@@ -1,0 +1,9 @@
+Beta 6.29.78 — Jornada única de liberação
+
+Pedido externo → Gerar sugestão → Criar roteiro e seguir para Viagens.
+No editor da viagem: completar destinos, roteiro, hospedagem, módulos, documentos etc.
+Na última seção (Finalizar e liberar viagem): revisar, publicar e opcionalmente enviar o convite personalizado via Resend.
+Em Clientes não há mais botão de aprovação/publicação.
+A publicação é verificada pelo backend Firebase antes de disparar e-mail.
+Se falhar o Resend, a viagem permanece publicada e o erro é exibido para reenvio.
+Não altera dados de clientes ou viagens existentes.

@@ -1069,3 +1069,11 @@ dialog:has(#routeCatalogPlace) .smart-place-actions button{
 .ipa-unified-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:14px}
 .ipa-unified-actions .btn{flex:1 1 160px}
 #ipaUnifiedStatus{display:block;margin-top:10px;color:#34596b;line-height:1.5}
+
+/* Beta 6.29.78: single release step within Viagens */
+.ipa-trip-setup-hint{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:15px 18px;margin:12px 0 20px;background:#f0f8f9;color:#104c60;border:1px solid #d9eff1;border-radius:16px;font-size:14px;font-weight:650}
+.ipa-release-final{display:flex;flex-direction:column;gap:12px;margin-top:18px;padding:18px;background:#f5fafc;border:1px solid #dbe9ee;border-radius:18px}
+.ipa-release-final .ipa-unified-checkbox{display:flex;align-items:flex-start;gap:10px;line-height:1.5}
+.ipa-release-final .ipa-unified-checkbox input{margin-top:4px;flex-shrink:0}
+.ipa-release-final .btn-block{width:100%;min-height:48px}
+.ipa-release-final small{line-height:1.5;color:#55717b}
