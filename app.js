@@ -935,14 +935,36 @@ function bind(){
    view.innerHTML=adminTripEditor(adminTripId);bind();
  });
  document.querySelectorAll('[data-admin-module]').forEach(x=>x.onchange=()=>{IPAData.toggleTripModule(adminTripId,x.dataset.adminModule,x.checked);view.innerHTML=adminTripEditor(adminTripId);bind()});
- document.querySelectorAll('[data-admin-publish]').forEach(b=>b.onclick=async()=>{
-  const t=adminData().trips.find(x=>x.id===b.dataset.adminPublish);if(!t)return;
-  const next=!t.published;
-  IPAData.publishTrip(t.id,next);
-  try{if(window.IPAFirebase?.user)await window.IPAFirebase.syncNow()}catch(e){console.error('Falha ao sincronizar publicação',e);toast('Alteração salva, mas a sincronização com o cliente ficou pendente');return}
-  view.innerHTML=adminTripEditor(t.id);bind();
-  toast(next?'Viagem publicada e sincronizada com o cliente ✓':'Viagem retirada da publicação ✓');
-});
+ document.querySelectorAll('[data-publication-scroll]').forEach(b=>b.onclick=()=>document.querySelector('#ipaTripPublicationCenter')?.scrollIntoView({behavior:'smooth',block:'start'}));
+ document.querySelectorAll('[data-publication-review]').forEach(input=>input.onchange=async()=>{
+   const tripId=input.dataset.publicationReview,trip=adminData().trips.find(x=>x.id===tripId);if(!trip)return;
+   input.disabled=true;
+   try{
+     IPAData.updateTrip(tripId,{publicationReview:{...(trip.publicationReview||{}),experience:input.checked},publicationReviewedAt:new Date().toISOString()});
+     if(window.IPAFirebase?.user)await window.IPAFirebase.syncNow();
+     view.innerHTML=adminTripEditor(tripId);bind();
+     toast('Revisão da viagem atualizada ✓');
+   }catch(e){console.error(e);toast('Não foi possível sincronizar a revisão: '+(e.message||e));input.disabled=false}
+ });
+ document.querySelectorAll('[data-publication-confirm]').forEach(b=>b.onclick=()=>{
+  const t=adminData().trips.find(x=>x.id===b.dataset.publicationConfirm);if(!t)return;
+  const c=adminData().clients.find(x=>x.id===t.clientId);
+  if(!t.published&&!ipaTripPublicationReadiness(t,c).ready){toast('Conclua a revisão e os itens obrigatórios.');return}
+  const publish=!t.published;
+  showModal(`<span class="eyebrow">CENTRAL DE PUBLICAÇÃO</span><h2>${publish?'Publicar viagem?':'Retirar viagem do cliente?'}</h2><p>${ipaEscape(t.name)} · ${ipaEscape(c?.name||'Sem cliente')}</p><p>${publish?'A viagem ficará disponível no login do cliente. O convite será enviado apenas quando você escolher Enviar acesso.':'A viagem deixará de aparecer para o cliente. Reservas, pagamentos e documentos não serão excluídos.'}</p><div class="lead-actions"><button class="btn btn-light" id="ipaCancelPublication">Cancelar</button><button class="btn btn-primary" id="ipaConfirmPublication">${publish?'Confirmar publicação':'Confirmar retirada'}</button></div>`);
+  setTimeout(()=>{
+   document.querySelector('#ipaCancelPublication').onclick=()=>modal.close();
+   document.querySelector('#ipaConfirmPublication').onclick=async()=>{
+     const button=document.querySelector('#ipaConfirmPublication');button.disabled=true;button.textContent='Sincronizando...';
+     try{
+       IPAData.updateTrip(t.id,{published:publish,status:publish?'Publicado':'Em preparação',...(publish?{publishedAt:new Date().toISOString()}:{unpublishedAt:new Date().toISOString()})});
+       if(window.IPAFirebase?.user)await window.IPAFirebase.syncNow();
+       modal.close();view.innerHTML=adminTripEditor(t.id);bind();
+       toast(publish?'Viagem publicada. Você já pode enviar o acesso ✓':'Publicação retirada ✓');
+     }catch(e){console.error(e);button.disabled=false;button.textContent='Tentar novamente';toast('Erro ao sincronizar publicação: '+(e.message||e))}
+   };
+  },0);
+ });
 
  document.querySelectorAll('[data-admin-benefit]').forEach(x=>x.onchange=()=>{IPAData.setBenefit(x.dataset.adminBenefit,x.checked);render()});
  document.querySelectorAll('[data-admin-remind]').forEach(b=>b.onclick=()=>toast('Lembrete enviado ao cliente'));
@@ -992,6 +1014,7 @@ function bind(){
        inviteStatus:'sent',
        inviteSentAt:new Date().toISOString()
      });
+     IPAData.updateTrip(tripId,{publicationInviteSentAt:new Date().toISOString(),publicationInviteError:''});
      if(window.IPAFirebase?.user) await window.IPAFirebase.syncNow();
 
      const inviteResults=[{email:email,status:'enviado',role:'titular'}];
@@ -1023,6 +1046,8 @@ function bind(){
      setTimeout(()=>{b.disabled=false;b.textContent=original},1800);
    }catch(err){
      console.error(err);
+     IPAData.updateTrip(tripId,{publicationInviteError:String(err?.message||err).slice(0,240)});
+     try{if(window.IPAFirebase?.user)await window.IPAFirebase.syncNow()}catch(syncErr){console.warn('Falha ao registrar erro do convite',syncErr)}
      toast('Erro no convite: '+(err?.code||err?.message||''));
      b.disabled=false;b.textContent=original;
    }
@@ -2443,6 +2468,36 @@ function adminTemplates(){
  const d=adminData();
  return `<div class="ipa-admin-head"><div><span class="eyebrow">BIBLIOTECA</span><h1>Modelos de roteiro</h1><p>Monte roteiros reutilizáveis selecionando lugares da sua curadoria.</p></div><div class="lead-actions"><button class="btn btn-primary" data-admin-smart-template>✨ Criação inteligente</button><button class="btn btn-light" data-admin-new-template>✏️ Criação manual</button></div></div><div class="ipa-admin-template-grid">${d.itineraryTemplates.map(t=>`<div><span>🗺️</span><small>${t.destination}</small><b>${t.name}</b><p>${t.description}</p><em>${t.days} dias · ${(t.itinerary||[]).reduce((n,d)=>n+(d.places||[]).length,0)} lugares</em><button class="btn btn-light" data-admin-edit-template="${t.id}">✏️ Editar</button></div>`).join('')}</div>`;
 }
+function ipaTripPublicationReadiness(t,c){
+ const approved=!!c&&(c.approvalStatus==='Aprovado'||(!c.approvalStatus&&c.accessApproved!==false));
+ const itinerary=(t.itinerary||[]).some(d=>(d.places||[]).length>0);
+ const review=t.publicationReview||{};
+ const hasStays=Array.isArray(t.hotelBookings)&&t.hotelBookings.length>0;
+ const docs=(adminData().tripDocuments||ipaDB()?.tripDocuments||[]).some(x=>x.tripId===t.id);
+ const items=[
+  {id:'client',title:'Cliente vinculado e aprovado',description:c?`${c.name} · ${approved?'Cadastro aprovado':'Aprovação pendente no CRM'}`:'Vincule um cliente na seção abaixo',ok:approved,required:true},
+  {id:'itinerary',title:'Roteiro com passeios',description:itinerary?'Há atividades no roteiro':'Cadastre pelo menos um passeio antes de publicar',ok:itinerary,required:true},
+  {id:'review',title:'Revisei a experiência do cliente',description:'Use a prévia para conferir cidades, fotos, datas e módulos',ok:review.experience===true,required:true},
+  {id:'lodging',title:'Hospedagens',description:hasStays?'Hospedagens vinculadas':'Sem hospedagens cadastradas (não impede publicação)',ok:hasStays,required:false},
+  {id:'documents',title:'Documentos',description:docs?'Documentos vinculados':'Sem documentos anexados (não impede publicação)',ok:docs,required:false}
+ ];
+ return {items,ready:items.filter(x=>x.required).every(x=>x.ok)};
+}
+function ipaTripPublicationPanel(t,c){
+ const check=ipaTripPublicationReadiness(t,c);
+ const status=t.published?'Publicada':'Rascunho';
+ const sent=!!t.publicationInviteSentAt;
+ return `<section class="ipa-admin-panel ipa-publication-center" id="ipaTripPublicationCenter">
+ <div class="section-head"><div><span class="eyebrow">INDO POR AÍ BUSINESS · CENTRAL DE PUBLICAÇÃO</span><h2>Preparar e publicar</h2><p>Uma única jornada para revisar, publicar e enviar o acesso.</p></div><span class="ipa-publication-status ${t.published?'is-live':''}">${t.published?'● Publicada':'● Rascunho'}</span></div>
+ <div class="ipa-publication-summary"><div><small>Cliente</small><strong>${ipaEscape(c?.name||'Não vinculado')}</strong></div><div><small>Destinos</small><strong>${ipaEscape(tripStages(t).map(x=>x.destination).filter(Boolean).join(' → ')||tripDestination(t))}</strong></div><div><small>Situação</small><strong>${status}</strong></div></div>
+ <h3>Checklist antes de publicar</h3>
+ <div class="ipa-publication-checklist">${check.items.map(item=>`<div class="ipa-publication-check ${item.ok?'is-done':''}"><span class="ipa-publication-check-icon">${item.ok?'✓':item.required?'!':'·'}</span><div><b>${ipaEscape(item.title)}</b><small>${ipaEscape(item.description)}</small></div>${item.id==='review'?`<label class="ipa-publication-review"><input type="checkbox" data-publication-review="${ipaEscape(t.id)}" ${item.ok?'checked':''}> Conferido</label>`:!item.required?'<span class="ipa-publication-optional">Opcional</span>':''}</div>`).join('')}</div>
+ <div class="ipa-publication-actions"><button class="btn btn-light" data-client-preview="${ipaEscape(t.id)}" data-client-preview-client="${ipaEscape(t.clientId||'')}" ${!c?'disabled':''}>👁 Prévia do cliente</button><button class="btn ${!t.published?'btn-primary':'btn-light'}" data-publication-confirm="${ipaEscape(t.id)}" ${!t.published&&!check.ready?'disabled':''}>${t.published?'Retirar publicação':'🚀 Publicar viagem'}</button><button class="btn btn-light" data-admin-invite-trip="${ipaEscape(t.id)}" data-client-id="${ipaEscape(t.clientId||'')}" data-client-email="${ipaEscape(c?.email||'')}" ${!t.published||!c?.email?'disabled':''}>✉ ${sent?'Reenviar acesso':'Enviar acesso'}</button></div>
+ ${!t.published&&!check.ready?'<small class="ipa-publication-help">Para publicar, conclua os itens obrigatórios do checklist. Hospedagens e documentos são opcionais.</small>':''}
+ <div class="ipa-publication-history"><b>Histórico</b><small>Publicação: ${t.publishedAt?ipaEscape(new Date(t.publishedAt).toLocaleString('pt-BR')):'Ainda não publicada'}</small><small>Convite: ${sent?ipaEscape(new Date(t.publicationInviteSentAt).toLocaleString('pt-BR')):'Nenhum convite confirmado para esta viagem'}</small>${t.publicationInviteError?`<small class="ipa-publication-error">Último erro: ${ipaEscape(t.publicationInviteError)}</small>`:''}</div>
+ <small>Publicar não envia cobrança ou convite automaticamente. Clientes que já possuem login recebem a nova viagem no mesmo acesso.</small>
+ </section>`;
+}
 function adminTripEditor(id){
  const d=adminData(),t=d.trips.find(x=>x.id===id);if(!t)return adminTrips();
  adminTripId=id;
@@ -2454,6 +2509,7 @@ function adminTripEditor(id){
  const flags=countries.slice(0,5).map(x=>`<span class="trip-country-flag" title="${ipaEscape(x)}">${countryFlag(x)}</span>`).join('');
  const extra=countries.length>5?`<span class="trip-country-more">+${countries.length-5}</span>`:'';
  return `<div class="ipa-admin-editor-head trip-editor-hero"><button data-admin-section="trips">← Todas as viagens</button><div class="trip-editor-identity"><span class="eyebrow">${ipaEscape(c?.name||'VIAGEM')}</span><h1>${ipaEscape(t.name)}</h1><div class="trip-country-flags">${flags}${extra}</div><p>📍 ${ipaEscape(tripDestination(t))}${country?', '+ipaEscape(country):''}</p>${c?`<small>👤 ${ipaEscape(c.name)}</small>`:''}</div><button class="btn btn-light trip-editor-preview" data-client-preview="${t.id}" data-client-preview-client="${t.clientId}">👁 Ver como cliente</button></div>
+ ${ipaTripPublicationPanel(t,c)}
  <section class="ipa-admin-panel trip-client-panel"><div class="section-head"><div><span class="eyebrow">👤 CLIENTE DA VIAGEM</span><h2>${c?'Cliente da viagem':'Vincular cliente cadastrado'}</h2></div><span class="chip">${c?'✓ Vinculado':'Sem cliente'}</span></div>
  ${c?`<div class="trip-linked-client"><strong>${ipaEscape(c.name)}</strong><small>${ipaEscape(c.email||'')}</small></div>`:`<p>Selecione quem receberá esta viagem para publicar e enviar o acesso.</p>`}
  <div class="admin-trip-fields trip-client-fields"><label>${c?'Alterar cliente vinculado':'Cliente'}<select data-trip-client-select="${t.id}"><option value="">Selecione um cliente...</option>${(d.clients||[]).map(client=>`<option value="${client.id}" ${client.id===t.clientId?'selected':''}>${ipaEscape(client.name)}${client.email?' · '+ipaEscape(client.email):''}${client.approvalStatus?' · '+ipaEscape(client.approvalStatus):''}</option>`).join('')}</select></label><button class="btn btn-light" data-admin-link-client="${t.id}">${c?'✏️ Alterar cliente':'Vincular cliente'}</button></div>${!c?`<small>⚠️ Vincule um cliente antes de publicar/enviar o acesso.</small>`:''}</section>
@@ -2479,10 +2535,9 @@ function adminTripEditor(id){
  <div class="flight-admin-grid">${[['airline','Companhia'],['flightNumber','Número do voo'],['date','Data'],['origin','Origem'],['destination','Destino'],['time','Horário'],['terminal','Terminal'],['gate','Portão'],['seat','Assento']].map(([k,l])=>`<label>${l}<input data-flight-field="${k}" value="${t.flight?.[k]||''}" ${k==='date'?'type="date"':k==='time'?'type="time"':''}></label>`).join('')}</div>
  <label>Observações<textarea data-flight-field="notes" placeholder="Ex.: apresentação no portão 1h antes">${t.flight?.notes||''}</textarea></label>
  <button class="btn btn-primary" data-admin-save-flight="${t.id}">Salvar dados do voo</button></section>
- <div class="admin-publish-actions ipa-publish-cta"><h3>Publicação, cobrança e acesso</h3><p>A cobrança é exclusiva do cliente responsável. O acesso é individual para cada viajante.</p>
- <button class="btn btn-primary btn-block" data-admin-publish="${t.id}">${t.published?'✓ Viagem publicada':'🚀 Publicar viagem'}</button>
+ <div class="admin-publish-actions ipa-publish-cta"><h3>Finalizar a viagem</h3><p>Revise, publique e envie o acesso na Central de Publicação, no início desta página. A cobrança continua independente.</p>
+ <button class="btn btn-light btn-block" data-publication-scroll="${t.id}">↑ Ir para a Central de Publicação</button>
  <button class="btn btn-light btn-block" data-admin-charge-trip="${t.id}" data-charge-client="${t.clientId}">💳 Enviar cobrança ao cliente responsável</button>
- ${t.published?`<button class="btn btn-light btn-block" data-admin-invite-trip="${t.id}" data-client-id="${t.clientId}" data-client-email="${c?.email||''}">✉ Enviar acesso aos viajantes</button>`:''}
  </div>${ipaParticipantAdminSection(t)}`;
 }
 function ipaEditStageModal(tripId,index){const d=adminData(),t=d.trips.find(x=>x.id===tripId);if(!t)return;const stages=tripStages(t),st=index>=0?stages[index]:{};showModal(`<span class="eyebrow">VIAGEM MULTIDESTINO</span><h2>${index>=0?'Editar etapa':'Adicionar destino'}</h2><label>Destino / cidade<input id="stageDest" class="v2-concierge-input" value="${ipaEscape(st.destination||'')}"></label><label>País<input id="stageCountry" class="v2-concierge-input" value="${ipaEscape(st.country||'')}"></label><label>Chegada<input id="stageStart" type="date" class="v2-concierge-input" value="${st.startDate||''}"></label><label>Saída<input id="stageEnd" type="date" class="v2-concierge-input" value="${st.endDate||''}"></label><button id="saveStage" class="btn btn-primary btn-block">Salvar etapa</button>`);setTimeout(()=>document.querySelector('#saveStage').onclick=async()=>{const item={id:st.id||('stage-'+Date.now()),destination:document.querySelector('#stageDest').value.trim(),country:document.querySelector('#stageCountry').value.trim(),startDate:document.querySelector('#stageStart').value,endDate:document.querySelector('#stageEnd').value};if(!item.destination){toast('Informe o destino');return}let next=[...stages];if(index>=0)next[index]={...next[index],...item};else next.push(item);next.sort((a,b)=>(a.startDate||'9999').localeCompare(b.startDate||'9999'));next.forEach((x,i)=>x.order=i+1);IPAData.updateTrip(tripId,{stages:next,destination:next[0].destination,country:next[0].country,startDate:next[0].startDate,endDate:next[next.length-1].endDate});if(window.IPAFirebase?.user)await window.IPAFirebase.syncNow();modal.close();view.innerHTML=adminTripEditor(tripId);bind();toast('Etapas atualizadas ✓')},0)}

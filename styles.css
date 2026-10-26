@@ -1035,3 +1035,28 @@ dialog:has(#routeCatalogPlace) .smart-place-actions button{
 
 /* Beta 6.29.71 — teste Resend isolado do convite de autenticação */
 .ipa-admin-email-test{display:flex;gap:12px;justify-content:space-between;align-items:center;flex-wrap:wrap;background:#f2fafb;border:1px solid #dcebed;border-radius:15px;padding:14px 16px;margin:12px 0}.ipa-admin-email-test>div{display:grid;gap:5px;flex:1;min-width:220px}.ipa-admin-email-test strong{font-size:14px;color:#064e63}.ipa-admin-email-test small{font-size:12px;color:#667f87;line-height:1.5}
+
+/* Beta 6.29.76: central unificada de publicação */
+.ipa-publication-center{border:1px solid #d7e9ec;background:linear-gradient(145deg,#fff,#f5fbfc);scroll-margin-top:24px}
+.ipa-publication-center .section-head{align-items:flex-start}
+.ipa-publication-status{display:inline-flex;align-items:center;white-space:nowrap;border-radius:999px;padding:8px 12px;background:#fff1e6;color:#a45115;font-size:12px;font-weight:800}
+.ipa-publication-status.is-live{background:#dff5ee;color:#096b56}
+.ipa-publication-summary{display:grid;grid-template-columns:1fr 1.5fr 1fr;gap:10px;margin:14px 0;padding:13px;border-radius:15px;background:#eaf4f5}
+.ipa-publication-summary>div{min-width:0;display:flex;flex-direction:column;gap:6px}
+.ipa-publication-summary small{color:#557582;font-size:11px}.ipa-publication-summary strong{font-size:13px;overflow-wrap:anywhere;color:#123e4c}
+.ipa-publication-checklist{display:grid;gap:8px;margin:12px 0 16px}
+.ipa-publication-check{display:flex;gap:10px;align-items:center;padding:12px;border:1px solid #e1ebef;border-radius:13px;background:white}
+.ipa-publication-check-icon{display:grid;place-items:center;flex-shrink:0;width:30px;height:30px;border-radius:10px;background:#fff1e7;color:#a4581c;font-weight:900}
+.ipa-publication-check.is-done .ipa-publication-check-icon{background:#daf5ed;color:#08705d}
+.ipa-publication-check>div{flex:1;display:grid;gap:4px;min-width:0}
+.ipa-publication-check b{font-size:13px;color:#173c50}
+.ipa-publication-check small{font-size:12px;color:#68808e}
+.ipa-publication-review{display:flex;align-items:center;gap:6px;white-space:nowrap;font-size:12px;font-weight:700;color:#0d686e}
+.ipa-publication-review input{accent-color:#0d828c;width:18px;height:18px}
+.ipa-publication-optional{font-size:10px;font-weight:700;color:#788b94}
+.ipa-publication-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.ipa-publication-actions .btn{min-height:45px;white-space:normal;font-size:12px}
+.ipa-publication-help{display:block;color:#a55c28;margin:10px 0}
+.ipa-publication-history{margin-top:15px;padding:12px;border-top:1px solid #d9e7ec;display:grid;gap:5px}
+.ipa-publication-history b{font-size:12px}.ipa-publication-history small{font-size:11px;color:#596f7a}.ipa-publication-error{color:#b42318!important}
+@media(max-width:700px){.ipa-publication-summary{grid-template-columns:1fr 1fr}.ipa-publication-actions{grid-template-columns:1fr}.ipa-publication-check{flex-wrap:wrap}}

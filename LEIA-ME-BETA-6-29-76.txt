@@ -1,0 +1,19 @@
+Indo por Aí — Beta 6.29.76
+
+CENTRAL DE PUBLICAÇÃO
+- Central no topo do editor de cada viagem: cliente, destinos, checklist, prévia, publicar e envio de acesso.
+- Regras obrigatórias: cliente aprovado e vinculado, roteiro com passeio e experiência revisada pelo ADM.
+- Hospedagens e documentos são itens informativos/opcionais.
+- Confirmação antes de publicar ou retirar da publicação.
+- Envio pelo Resend separado da publicação; grava data e erros na viagem.
+- A aprovação do CRM continua independente. A cobrança permanece independente.
+- A imagem aprovada do ícone do app e o restante da Beta 6.29.75 foram preservados.
+
+Testes sugeridos:
+1. Rascunho: verificar que publicar fica bloqueado até completar obrigatórios.
+2. Vincular cliente aprovado e roteiro, marcar Conferido; abrir a prévia.
+3. Publicar e confirmar que aparece para login do cliente.
+4. Enviar acesso e conferir email e data no histórico.
+5. Retirar publicação, conferir ausência no login e re-publicar.
+
+A publicação e o envio real dependem das credenciais/regras do Firebase e Resend do ambiente publicado.
