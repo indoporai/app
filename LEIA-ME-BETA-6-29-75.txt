@@ -1,0 +1,7 @@
+Indo por Aí Beta 6.29.75 — Correção EXCLUSIVA do ícone do aplicativo.
+
+A imagem de referência é a última arte aprovada pelo usuário (ícone tropical Indo por Aí com a Gente). Os assets icon-192, icon-512, apple-touch-icon e favicon foram derivados diretamente da mesma imagem, sem redesenhar o conteúdo.
+
+Publicação: substitua os arquivos no Cloudflare Pages. Para atualizar o atalho no iPhone, exclua APENAS o atalho da tela de início e adicione novamente pelo Safari (Compartilhar > Adicionar à Tela de Início). Não é necessário excluir conta, viagem ou dados do navegador.
+
+A lógica de envio de e-mails da versão 6.29.74 permanece inalterada e exige teste em ambiente publicado.

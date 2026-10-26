@@ -1,0 +1,11 @@
+INDO POR AÍ — BETA 6.29.74
+
+1. Convites: ADM (aprovar, enviar acesso, vincular viagem, convidar acompanhante e reenviar) usa exclusivamente /api/email/invite + Resend.
+2. O backend usa a credencial Firebase dedicada para gerar EMAIL_SIGNIN com returnOobLink:true, sem disparar email do Firebase.
+3. Apenas o e-mail personalizado chega ao viajante. A redefinição de senha solicitada manualmente permanece sendo feita pelo Firebase e pode usar seu email padrão.
+4. Novos ícones de instalação criados a partir da arte enviada pelo usuário: 192x192, 512x512, Apple Touch Icon e favicon.
+5. Mantenha as variáveis de Production RESEND_API_KEY e FIREBASE_SERVICE_ACCOUNT_JSON como Secret. Não inclua chaves privadas no ZIP.
+6. Após publicar, envie novo convite de teste pelo ADM e confira no Resend/caixa de entrada. Um email Firebase previamente solicitado antes da publicação pode continuar chegando; novos envios devem sair apenas do Resend.
+7. No iPhone, remova o atalho antigo e adicione à Tela de Início novamente para atualizar o ícone.
+8. Se falhar o convite, o app informa erro, não aciona envio padrão automaticamente.
+9. O login por email do Firebase permanece necessário, assim como a criação de senha após o primeiro acesso.

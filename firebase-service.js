@@ -6,7 +6,6 @@ import {
   onAuthStateChanged,
   setPersistence,
   browserLocalPersistence,
-  sendSignInLinkToEmail,
   isSignInWithEmailLink,
   signInWithEmailLink,
   updatePassword,
@@ -687,23 +686,10 @@ window.IPAFirebase = {
     if(!response.ok||!data.ok)throw new Error(data.error||'Falha no envio personalizado.');
     return data;
   },
-  async sendClientInvite(email,clientId,tripId=""){
-    if(!currentUser || currentUser.uid!==ADMIN_UID) throw new Error("Entre como administrador.");
-    if(!email) throw new Error("Cliente sem e-mail cadastrado.");
-    const url=new URL("https://app.indoporaicomagente.com/");
-    url.searchParams.set("clientInvite","1");
-    if(clientId) url.searchParams.set("clientId",clientId);
-    if(tripId) url.searchParams.set("tripId",tripId);
-    // redundância simples para facilitar diagnóstico/compatibilidade
-    if(clientId||tripId){
-      url.searchParams.set("ipaInvite",btoa(unescape(encodeURIComponent(JSON.stringify({clientId:clientId||"",tripId:tripId||""})))));
-    }
-    const normalizedEmail=email.trim().toLowerCase();
-    await sendSignInLinkToEmail(auth,normalizedEmail,{url:url.toString(),handleCodeInApp:true});
-    localStorage.setItem("ipa-email-for-signin",normalizedEmail);
-    localStorage.setItem("ipa-client-id-for-signin",clientId||"");
-    if(tripId) localStorage.setItem("ipa-trip-id-for-signin",tripId);
-    return {email:normalizedEmail,clientId:clientId||"",tripId:tripId||"",continueUrl:url.toString()};
+  // Compatibilidade: qualquer fluxo antigo de convites também usa somente o Resend.
+  // Nunca chamar sendSignInLinkToEmail aqui, pois ele dispara o email genérico do Firebase.
+  async sendClientInvite(email,clientId,tripId="",name="Viajante"){
+    return this.sendCustomClientInvite(email,clientId,tripId,name);
   },
   isEmailSignInLink(){ return isSignInWithEmailLink(auth,window.location.href); },
   async completeEmailLink(email){

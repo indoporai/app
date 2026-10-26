@@ -393,7 +393,7 @@ async function ipaCustomInvite(request,env){
  if(!env.RESEND_API_KEY||!env.FIREBASE_SERVICE_ACCOUNT_JSON)return json({ok:false,error:'Segredos do Resend ou Firebase ainda não configurados em Production.'},503);
  let body;try{body=await request.json()}catch{return json({ok:false,error:'Dados do convite inválidos.'},400)}
  const email=String(body.email||'').trim().toLowerCase(),name=String(body.name||'').trim().slice(0,120),clientId=String(body.clientId||'').slice(0,100),tripId=String(body.tripId||'').slice(0,100);
- if(!validEmail(email)||!name||!/^[\w-]{3,100}$/.test(clientId)||tripId&&!/^[\w-]{3,100}$/.test(tripId))return json({ok:false,error:'Nome, e-mail ou identificadores inválidos.'},400);
+ if(!validEmail(email)||!name||(!clientId&&!tripId)||(clientId&&!/^[\w-]{3,100}$/.test(clientId))||(tripId&&!/^[\w-]{3,100}$/.test(tripId)))return json({ok:false,error:'Nome, e-mail ou identificadores inválidos.'},400);
  // Valida que o cliente existe e pertence ao destinatário. Não confia apenas nos campos enviados pelo navegador.
  // Firestore REST via OAuth não é necessário aqui: o ID token de administrador já foi validado.
  // A interface envia o ID e o e-mail cadastrado no CRM; qualquer envio requer autenticação do ADM.
@@ -419,7 +419,7 @@ async function ipaCustomInvite(request,env){
   const response=await fetch('https://api.resend.com/emails',{method:'POST',headers:{Authorization:'Bearer '+env.RESEND_API_KEY,'content-type':'application/json'},body:JSON.stringify({from:'Indo por Aí <acesso@indoporaicomagente.com>',to:[email],subject:'✈️ Seu acesso ao Indo por Aí foi aprovado!',html})});
   const data=await response.json();
   if(!response.ok||!data.id){console.error('Resend invite rejected',response.status);return json({ok:false,error:'Link criado, mas Resend não aceitou o e-mail ('+response.status+'). Reenvie pelo ADM.'},502)}
-  return json({ok:true,delivery:'resend',emailId:data.id,message:'Convite personalizado aceito pelo Resend.'});
+  return json({ok:true,delivery:'resend',firebaseDefaultEmailSent:false,emailId:data.id,message:'Convite personalizado aceito pelo Resend (sem disparo do e-mail padrão do Firebase).'});
  }catch(err){console.error('Resend invite network failed');return json({ok:false,error:'Falha ao enviar convite pelo Resend.'},502)}
 }
 

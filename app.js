@@ -984,7 +984,7 @@ function bind(){
      if(window.IPAFirebase?.user) await window.IPAFirebase.syncNow();
 
      b.textContent='Enviando acesso...';
-     await window.IPAFirebase.sendClientInvite(email,clientId,tripId);
+     await window.IPAFirebase.sendCustomClientInvite(email,clientId,tripId,adminData().clients.find(c=>c.id===clientId)?.name||"Viajante");
 
      IPAData.updateClientById(clientId,{
        activeTripId:tripId,
@@ -1003,7 +1003,7 @@ function bind(){
        unique.add(recipient);
        try{
          // Não transmitir o ID do cliente titular a outro usuário.
-         await window.IPAFirebase.sendClientInvite(recipient,'',tripId);
+         await window.IPAFirebase.sendCustomClientInvite(recipient,'',tripId,participant.name||'Viajante');
          participant.inviteStatus='sent';participant.inviteSentAt=new Date().toISOString();
          inviteResults.push({email:recipient,status:'enviado',role:'participante'});
        }catch(e){
@@ -1016,7 +1016,7 @@ function bind(){
        if(window.IPAFirebase?.user)await window.IPAFirebase.syncNow();
      }
      const failures=inviteResults.filter(x=>x.status!=='enviado');
-     showModal(`<h2>Resultado do envio</h2><div class="ipa-invite-results">${inviteResults.map(x=>`<div><b>${ipaEscape(x.email)}</b><small>${ipaEscape(x.role)} · ${ipaEscape(x.status)}</small></div>`).join('')}</div><p>${failures.length?failures.length+' convite(s) com erro. Verifique os endereços e reenvie individualmente.':'Convites processados pelo serviço de autenticação.'}</p><button class="btn btn-light btn-block" id="closeInviteResults">Fechar</button>`);
+     showModal(`<h2>Resultado do envio</h2><div class="ipa-invite-results">${inviteResults.map(x=>`<div><b>${ipaEscape(x.email)}</b><small>${ipaEscape(x.role)} · ${ipaEscape(x.status)}</small></div>`).join('')}</div><p>${failures.length?failures.length+' convite(s) com erro. Verifique os endereços e reenvie individualmente.':'Convites personalizados enviados pelo Resend.'}</p><button class="btn btn-light btn-block" id="closeInviteResults">Fechar</button>`);
      setTimeout(()=>{const close=document.querySelector('#closeInviteResults');if(close)close.onclick=()=>modal.close()},0);
      toast('Viagem vinculada e acesso enviado ✓');
      b.textContent='✓ Convite enviado';
@@ -1032,7 +1032,7 @@ function bind(){
    if(!email){toast('Cadastre o e-mail do cliente');return}
    b.disabled=true;b.textContent='Enviando...';
    try{
-     await window.IPAFirebase.sendClientInvite(email,id,"");
+     await window.IPAFirebase.sendCustomClientInvite(email,id,"",adminData().clients.find(c=>c.id===id)?.name||"Viajante");
      IPAData.updateClientById(id,{inviteStatus:'sent',inviteSentAt:new Date().toISOString()});
      await window.IPAFirebase.syncNow();
      toast('Convite enviado por e-mail ✓');render();
@@ -1344,7 +1344,7 @@ function bind(){
  });
  document.querySelectorAll('[data-admin-approve-client]').forEach(b=>b.onclick=()=>{
   const c=adminData().clients.find(x=>x.id===b.dataset.adminApproveClient);if(!c)return;const a=ipaAccessUsage(c);if(a.total!==Infinity&&a.used>=a.total){toast(`Limite do ${a.root.plan||c.plan} atingido`);return}
-  showModal(`<span class="eyebrow">LIBERAR ACESSO</span><h2>Aprovar ${ipaEscape(c.name)}</h2><p>${ipaEscape(c.plan||'Explore')} · ${ipaEscape(c.clientType||'Titular')}</p><label>Como deseja avisar?</label><select id="approveChannel" class="v2-concierge-input"><option value="email">📧 E-mail</option><option value="whatsapp">💬 WhatsApp</option><option value="both">📧💬 E-mail e WhatsApp</option></select><div class="ipa-invite-notice"><b>✉️ Mensagem de boas-vindas</b><p>Seu acesso ao Indo por Aí foi aprovado! Sua viagem começa muito antes do embarque.</p><small>O convite será enviado pelo Resend com sua mensagem personalizada e um link seguro do Firebase. Se falhar, utilize Reenviar acesso pelo Firebase.</small></div><button id="approveConfirm" class="btn btn-primary btn-block">Aprovar e liberar acesso</button>`);
+  showModal(`<span class="eyebrow">LIBERAR ACESSO</span><h2>Aprovar ${ipaEscape(c.name)}</h2><p>${ipaEscape(c.plan||'Explore')} · ${ipaEscape(c.clientType||'Titular')}</p><label>Como deseja avisar?</label><select id="approveChannel" class="v2-concierge-input"><option value="email">📧 E-mail</option><option value="whatsapp">💬 WhatsApp</option><option value="both">📧💬 E-mail e WhatsApp</option></select><div class="ipa-invite-notice"><b>✉️ Mensagem de boas-vindas</b><p>Seu acesso ao Indo por Aí foi aprovado! Sua viagem começa muito antes do embarque.</p><small>O convite será enviado pelo Resend com sua mensagem personalizada e um link seguro do Firebase. Em caso de falha, tente reenviar pelo Resend; o app não dispara outro e-mail automaticamente.</small></div><button id="approveConfirm" class="btn btn-primary btn-block">Aprovar e liberar acesso</button>`);
   setTimeout(()=>document.querySelector('#approveConfirm').onclick=async()=>{
    const button=document.querySelector('#approveConfirm'),ch=document.querySelector('#approveChannel').value;
    button.disabled=true;button.textContent='Aprovando e preparando convite...';
@@ -1357,7 +1357,7 @@ function bind(){
       await window.IPAFirebase.sendCustomClientInvite(c.email,c.id,c.activeTripId||'',c.name||'Viajante');delivered=true;
     }
     if((ch==='whatsapp'||ch==='both')&&c.phone){
-      const txt=`Olá, ${c.name}! 🌍\n\nSeu acesso ao Indo por Aí foi aprovado! 🎉\nAcesse https://app.indoporaicomagente.com/ para acompanhar sua viagem.\n\nEquipe Indo por Aí`;
+      const txt=`Olá, ${c.name}!\n\nSeu acesso ao Indo por Aí foi aprovado!\nAcesse https://app.indoporaicomagente.com/ para acompanhar sua viagem.\n\nEquipe Indo por Aí`;
       const r=await fetch('/api/contact/whatsapp?text='+encodeURIComponent(txt),{cache:'no-store'}),j=await r.json();if(j.url)window.open(j.url,'_blank');
     }
     if(delivered){IPAData.updateClientById(c.id,{accessNotifiedAt:new Date().toISOString()});await window.IPAFirebase.syncNow()}
@@ -1365,7 +1365,7 @@ function bind(){
    }catch(err){console.error('Convite personalizado',err);toast('Cliente aprovado, mas e-mail NÃO enviado: '+(err.message||'erro')+' Use Reenviar acesso.');button.disabled=false;button.textContent='Tentar envio novamente';}
   },0);
  });
- document.querySelectorAll('[data-admin-resend-access]').forEach(b=>b.onclick=async()=>{const d=adminData(),c=d.clients.find(x=>x.id===b.dataset.adminResendAccess);if(!c?.email)return toast('Cliente sem e-mail');const tripId=c.activeTripId||c.lastInvitedTripId||'';const trip=tripId?d.trips.find(t=>t.id===tripId):null;if(!trip)return toast('Vincule uma viagem ao cliente antes de reenviar');if(trip.published!==true)return toast('Publique a viagem antes de reenviar o acesso');try{await window.IPAFirebase.syncNow();await window.IPAFirebase.sendCustomClientInvite(c.email,c.id,trip.id,c.name||'Viajante');IPAData.updateClientById(c.id,{activeTripId:trip.id,lastInvitedTripId:trip.id,accessNotifiedAt:new Date().toISOString()});await window.IPAFirebase.syncNow();toast('Convite personalizado reenviado com a viagem vinculada ✓')}catch(e){console.error(e);toast('Resend não enviou: '+(e.message||'erro')+'. Envie pelo Firebase se necessário.');if(confirm('O envio personalizado falhou. Deseja usar o convite padrão do Firebase como alternativa?')){try{await window.IPAFirebase.sendClientInvite(c.email,c.id,trip.id);toast('Convite padrão enviado pelo Firebase ✓')}catch(err){toast('Firebase também não enviou: '+(err.message||'erro'))}}}});
+ document.querySelectorAll('[data-admin-resend-access]').forEach(b=>b.onclick=async()=>{const d=adminData(),c=d.clients.find(x=>x.id===b.dataset.adminResendAccess);if(!c?.email)return toast('Cliente sem e-mail');const tripId=c.activeTripId||c.lastInvitedTripId||'';const trip=tripId?d.trips.find(t=>t.id===tripId):null;if(!trip)return toast('Vincule uma viagem ao cliente antes de reenviar');if(trip.published!==true)return toast('Publique a viagem antes de reenviar o acesso');try{await window.IPAFirebase.syncNow();await window.IPAFirebase.sendCustomClientInvite(c.email,c.id,trip.id,c.name||'Viajante');IPAData.updateClientById(c.id,{activeTripId:trip.id,lastInvitedTripId:trip.id,accessNotifiedAt:new Date().toISOString()});await window.IPAFirebase.syncNow();toast('Convite personalizado reenviado com a viagem vinculada ✓')}catch(e){console.error(e);toast('Convite personalizado não enviado: '+(e.message||'erro')+'. Confira o backend e tente novamente.');}});
  document.querySelectorAll('[data-admin-edit-place]').forEach(b=>b.onclick=()=>{
   const p=adminData().placeCatalog.find(x=>x.id===b.dataset.adminEditPlace);if(!p)return;
   showModal(`<span class="eyebrow">BANCO DE LUGARES</span><h2>Editar lugar</h2>
@@ -2622,8 +2622,22 @@ function ipaGenerateCuratedRoute(input){
 function ipaRequestCode(){return 'IPA-'+String(Date.now()).slice(-6)}
 function ipaLeadWhatsappText(lead){
  const people=`${lead.adults} adulto${Number(lead.adults)===1?'':'s'}${Number(lead.children)>0?` + ${lead.children} criança${Number(lead.children)===1?'':'s'}`:''}`;
- return `Olá! 👋 Acabei de preencher meu pedido de viagem pelo Indo por Aí.\n\nPedido: ${lead.requestCode}\n✨ Plano: ${lead.plan||'A definir'}\n👤 Nome: ${lead.name}\n🌍 Destino: ${lead.destination}\n📅 Duração: ${lead.days} dias\n👥 Viajantes: ${people}\n❤️ Interesses: ${(lead.interests||[]).join(', ')||'A definir'}\n🚶 Ritmo: ${lead.pace}\n💰 Orçamento para experiências: ${ipaCatalogMoney(lead.budget,lead.currency)} por pessoa${lead.email?`\n✉️ E-mail: ${lead.email}`:''}\n\nGostaria de receber uma proposta personalizada. ✈️`;
+ // WhatsApp previews on some devices replace decorative emoji with �.
+ // Keep the commercial summary plain-text, legible and URL-safe.
+ return `Olá! Acabei de preencher meu pedido de viagem pelo Indo por Aí.\n\n`+
+  `Pedido: ${lead.requestCode}\n`+
+  `Plano: ${lead.plan||'A definir'}\n`+
+  `Nome: ${lead.name}\n`+
+  `Destino: ${lead.destination}\n`+
+  `Duração: ${lead.days} dias\n`+
+  `Viajantes: ${people}\n`+
+  `Interesses: ${(lead.interests||[]).join(', ')||'A definir'}\n`+
+  `Ritmo: ${lead.pace}\n`+
+  `Orçamento para experiências: ${ipaCatalogMoney(lead.budget,lead.currency)} por pessoa`+
+  (lead.email?`\nE-mail: ${lead.email}`:'')+
+  `\n\nGostaria de receber uma proposta personalizada.`;
 }
+
 function adminLeads(){
  const leads=adminData().travelLeads||[];
  return `<div class="ipa-admin-head"><div><span class="eyebrow">NOVOS NEGÓCIOS</span><h1>Pedidos de viagem</h1><p>Gerencie pedidos externos ou crie uma viagem inteligente diretamente para um cliente cadastrado.</p></div><div class="lead-actions"><button class="btn btn-primary" data-admin-smart-client-trip>✨ Criar viagem inteligente para cliente</button><span class="chip">${leads.filter(x=>(x.status||'Novo')==='Novo').length} novos</span></div></div>
