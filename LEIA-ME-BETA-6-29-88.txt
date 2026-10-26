@@ -1,0 +1,1 @@
+Beta 6.29.88 — Publicação e convite independentes. Elimina syncNow global no envio, confirma publicação explicitamente, mostra fase e erro; mantém WhatsApp manual. Validar no Firebase e Resend publicados.

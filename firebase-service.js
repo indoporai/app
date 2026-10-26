@@ -831,6 +831,15 @@ window.IPAFirebase = {
     }
     return {clientId,tripId};
   },
+  async saveClientPublicationNotice(clientId,tripId,{channel,sentAt}){
+    if(!currentUser||currentUser.uid!==ADMIN_UID)throw Error('Entre como ADM.');
+    if(!clientId||!tripId||!sentAt)throw Error('Dados do convite incompletos.');
+    await Promise.all([
+      setDoc(doc(firestore,'clients',String(clientId)),{inviteStatus:'sent',inviteSentAt:sentAt,updatedAt:serverTimestamp()},{merge:true}),
+      setDoc(doc(firestore,'trips',String(tripId)),{publicationInviteSentAt:sentAt,publicationInviteError:'',notificationChannel:channel,updatedAt:serverTimestamp()},{merge:true})
+    ]);
+    return true;
+  },
   // Salva a ordem escolhida pelo ADM sem depender de sincronização global.
   async saveLeadSuggestionConfirmed(leadId){
     if(!currentUser||currentUser.uid!==ADMIN_UID)throw new Error('Entre como ADM para salvar a ordem.');

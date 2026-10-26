@@ -2626,7 +2626,7 @@ function ipaSelectClientTripAction(clientId,action){
   }else if(action==='delete'){
    controls.innerHTML='<p class="ipa-publication-error">A exclusão é definitiva e não apaga documentos vinculados automaticamente.</p><button class="btn btn-light btn-block" id="ipaClientDoAction">🗑 Excluir esta viagem</button>';
   }else{
-   controls.innerHTML=`<div class="ipa-publication-choice"><label class="ipa-unified-checkbox"><input type="checkbox" id="ipaClientReviewConfirmed"> Conferi os dados da viagem e autorizo a publicação.</label><div class="ipa-publication-channel-title">Como deseja avisar o viajante?</div><label class="ipa-publication-channel"><input type="radio" name="ipaClientNotifyChannel" value="email" checked><span><b>✉️ Enviar por e-mail</b><small>Convite personalizado com acesso seguro pelo Resend.</small></span></label><label class="ipa-publication-channel"><input type="radio" name="ipaClientNotifyChannel" value="whatsapp"><span><b>📱 Avisar pelo WhatsApp</b><small>Abre a mensagem pronta. O envio é confirmado por você.</small></span></label><small class="ipa-publication-security-note">No primeiro acesso, a criação da senha exige um link seguro enviado por e-mail.</small><button class="btn btn-primary btn-block" id="ipaClientDoAction">🚀 Publicar viagem e avisar</button><small id="ipaClientPublicationStatus" role="status"></small></div>`;
+   controls.innerHTML=`<div class="ipa-publication-choice"><label class="ipa-unified-checkbox"><input type="checkbox" id="ipaClientReviewConfirmed"> Conferi os dados da viagem e autorizo a publicação.</label><div class="ipa-publication-channel-title">Como deseja avisar o viajante?</div><label class="ipa-publication-channel"><input type="radio" name="ipaClientNotifyChannel" value="email" checked><span><b>✉️ Enviar por e-mail</b><small>Convite personalizado com acesso seguro pelo Resend.</small></span></label><label class="ipa-publication-channel"><input type="radio" name="ipaClientNotifyChannel" value="whatsapp"><span><b>📱 Avisar pelo WhatsApp</b><small>Abre a mensagem pronta. O envio é confirmado por você.</small></span></label><small class="ipa-publication-security-note">No primeiro acesso, a criação da senha exige um link seguro enviado por e-mail.</small><button class="btn btn-primary btn-block" id="ipaClientDoAction" data-no-save-feedback>🚀 Publicar viagem e avisar</button><small id="ipaClientPublicationStatus" role="status"></small></div>`;
   }
   document.querySelector('#ipaClientDoAction').onclick=async()=>{
    if(action==='edit'){modal.close();adminTripId=trip.id;adminSection='trips';render();return}
@@ -2645,36 +2645,62 @@ function ipaSelectClientTripAction(clientId,action){
    if(channel==='whatsapp'&&!phone)return toast('Cadastre o telefone do cliente para usar WhatsApp.');
    if(!confirm('Confirmar publicação de '+trip.name+' para '+client.name+'? Canal: '+(channel==='email'?'e-mail':'WhatsApp')+'.'))return;
    const button=document.querySelector('#ipaClientDoAction'),status=document.querySelector('#ipaClientPublicationStatus');
-   button.disabled=true;select.disabled=true;button.textContent='Publicando no Firebase...';status.textContent='Conferindo vínculo e publicação...';
-   let published=false;
+   const latestTrip=(adminData().trips||[]).find(x=>x.id===trip.id)||trip;
+   let published=latestTrip.published===true, inviteSucceeded=false;
+   const setProgress=(label,detail)=>{if(button?.isConnected)button.textContent=label;if(status?.isConnected)status.textContent=detail};
+   button.disabled=true;select.disabled=true;
+   const withDeadline=(promise,label,ms=30000)=>{
+    let timer;
+    return Promise.race([Promise.resolve(promise),new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error(label+' demorou para responder. O resultado é incerto; confira o status antes de tentar outra vez.')),ms)})]).finally(()=>clearTimeout(timer));
+   };
    try{
     if(!window.IPAFirebase?.user)throw Error('Entre como ADM antes de publicar.');
-    await window.IPAFirebase.confirmClientTripPublication(client.id,trip.id,true);
-    published=true;
+    // Do not call syncNow here. It synchronizes the entire database and can silently
+    // return when a sync is already running. Publication must be a confirmed write.
+    if(!published){
+     setProgress('Publicando viagem...','Etapa 1/2: gravando e confirmando viagem e vínculo do cliente no Firebase.');
+     await withDeadline(window.IPAFirebase.confirmClientTripPublication(client.id,trip.id,true),'A confirmação de publicação');
+     published=true;
+    }else{
+     setProgress('Conferindo publicação...','Viagem já publicada; não será publicada novamente.');
+     await withDeadline(window.IPAFirebase.confirmClientTripPublication(client.id,trip.id,true),'A conferência da publicação');
+    }
     const now=new Date().toISOString();
     IPAData.updateClientById(client.id,{approvalStatus:'Aprovado',accessApproved:true,approvedAt:client.approvedAt||now,activeTripId:trip.id,lastConfiguredTripId:trip.id});
     IPAData.updateTrip(trip.id,{published:true,status:'Publicado',publishedAt:trip.publishedAt||now,publicationReview:{...(trip.publicationReview||{}),experience:true},publicationReviewedAt:now});
-    await window.IPAFirebase.syncNow();
     if(channel==='email'){
-     button.textContent='Enviando e-mail...';status.textContent='Viagem publicada; enviando convite personalizado pelo Resend...';
-     await window.IPAFirebase.sendCustomClientInvite(client.email,client.id,trip.id,client.name||'Viajante');
-     IPAData.updateClientById(client.id,{inviteStatus:'sent',inviteSentAt:new Date().toISOString()});
-     IPAData.updateTrip(trip.id,{publicationInviteSentAt:new Date().toISOString(),publicationInviteError:'',notificationChannel:'email'});
-     await window.IPAFirebase.syncNow();
-     modal.close();adminSection='clients';render();toast('Viagem publicada e e-mail personalizado enviado ✓');
+     setProgress('Enviando convite...','Etapa 2/2: publicação confirmada. Enviando e-mail personalizado via Resend.');
+     // A separate request; a timeout must not trigger an automatic resend.
+     await withDeadline(window.IPAFirebase.sendCustomClientInvite(client.email,client.id,trip.id,client.name||'Viajante'),'O servidor de e-mail');
+     inviteSucceeded=true;
+     const sentAt=new Date().toISOString();
+     IPAData.updateClientById(client.id,{inviteStatus:'sent',inviteSentAt:sentAt});
+     IPAData.updateTrip(trip.id,{publicationInviteSentAt:sentAt,publicationInviteError:'',notificationChannel:'email'});
+     try{await window.IPAFirebase.saveClientPublicationNotice?.(client.id,trip.id,{channel:'email',sentAt})}
+     catch(auditError){console.warn('Convite enviado; histórico não confirmado',auditError)}
+     modal.close();adminSection='clients';render();toast('Viagem publicada e convite enviado pelo Resend ✓');
     }else{
      const number=phone.startsWith('55')?phone:'55'+phone;
      const msg=`Olá, ${client.name}! Sua viagem ${trip.name} no Indo por Aí foi liberada! Acesse https://app.indoporaicomagente.com para acompanhar seu roteiro, documentos e informações. Se for seu primeiro acesso, solicite o link seguro de criação de senha por e-mail. Equipe Indo por Aí.`;
      const url='https://wa.me/'+number+'?text='+encodeURIComponent(msg);
      IPAData.updateTrip(trip.id,{notificationChannel:'whatsapp',notificationPreparedAt:new Date().toISOString()});
-     await window.IPAFirebase.syncNow();
-     status.textContent='✓ Viagem publicada. Abra o WhatsApp e pressione Enviar; a mensagem não é disparada automaticamente.';
-     controls.innerHTML='<p>Viagem publicada no Firebase. A mensagem está pronta; confirme o envio no WhatsApp.</p><button class="btn btn-primary btn-block" id="ipaClientOpenWhatsapp">📱 Abrir WhatsApp e enviar</button><button class="btn btn-light btn-block" id="ipaClientDone">Fechar</button>';
+     setProgress('✓ Publicada','A viagem está liberada. A mensagem do WhatsApp ainda precisa ser enviada manualmente.');
+     controls.innerHTML='<p>✓ Viagem publicada no Firebase. Clique abaixo para abrir o WhatsApp e confirmar o envio.</p><button class="btn btn-primary btn-block" id="ipaClientOpenWhatsapp" data-no-save-feedback>📱 Abrir WhatsApp</button><button class="btn btn-light btn-block" id="ipaClientDone" data-no-save-feedback>Fechar</button>';
      document.querySelector('#ipaClientOpenWhatsapp').onclick=()=>window.open(url,'_blank','noopener,noreferrer');
      document.querySelector('#ipaClientDone').onclick=()=>{modal.close();adminSection='clients';render()};
-     toast('Viagem publicada. Confirme o envio no WhatsApp.');
+     toast('Viagem publicada. Abra o WhatsApp para enviar o aviso.');
     }
-   }catch(e){console.error('Publicação em Clientes',e);const err=e?.message||String(e);status.textContent=(published?'A viagem foi publicada, mas o aviso falhou: ':'Falha na publicação: ')+err;button.disabled=false;select.disabled=false;button.textContent=published?'Tentar enviar aviso':'Tentar publicar';toast(status.textContent)}
+   }catch(e){
+    console.error('Publicação em Clientes',e);
+    const err=e?.message||String(e);
+    const message=published?(inviteSucceeded?'Convite enviado, mas houve falha ao atualizar o histórico.':'Viagem publicada. Não foi possível confirmar o envio do aviso: '+err):'Falha ao confirmar a publicação: '+err;
+    status.textContent=message;
+    button.disabled=false;select.disabled=false;
+    button.textContent=published?'Revisar / tentar enviar aviso':'Tentar publicar';
+    // Never automatically retry a possibly completed email request.
+    toast(message);
+   }
+
   };
  }
  select.onchange=refresh;refresh();
