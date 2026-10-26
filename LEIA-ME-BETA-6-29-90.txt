@@ -1,0 +1,5 @@
+Beta 6.29.90 — Entre no Clima
+- São Paulo: recomendações culturais reais em seis categorias, com alternância mensal.
+- Visitas a viagens antigas com conteúdo automático recebem a curadoria atual sem exigir atualização manual; conteúdos do ADM editados manualmente são mantidos.
+- Buscas nas plataformas não garantem disponibilidade.
+- Para demais destinos, presets existentes são preservados; atualização online contínua exige serviço de curadoria/API adicional.

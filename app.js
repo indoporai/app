@@ -864,14 +864,14 @@ function bind(){
  document.querySelectorAll('[data-admin-generate-climate]').forEach(b=>b.onclick=async()=>{
    const tripId=b.dataset.adminGenerateClimate,d=adminData(),t=(d.trips||[]).find(x=>x.id===tripId);if(!t)return;
    const generated=climateForTrip({...t,climateContent:[]}).map(x=>({icon:x[0],type:x[1],title:x[2],description:x[3],url:x[4]||''}));
-   IPAData.updateTrip(tripId,{climateContent:generated,climateGeneratedAt:new Date().toISOString(),climateSource:'destination-curation'});
+   IPAData.updateTrip(tripId,{climateContent:generated,climateGeneratedAt:new Date().toISOString(),climateSource:'destination-curation',climateCurationVersion:IPA_CLIMATE_CURATED_VERSION});
    try{if(window.IPAFirebase?.user)await window.IPAFirebase.syncNow()}catch(e){console.warn(e);toast('Conteúdo salvo; sincronização com o cliente ficou pendente');return}
    toast('Entre no Clima preparado e salvo ✓');view.innerHTML=adminTripEditor(tripId);bind();
  });
  document.querySelectorAll('[data-admin-edit-climate]').forEach(b=>b.onclick=()=>{
    const [tripId,idxRaw]=b.dataset.adminEditClimate.split(':'),idx=Number(idxRaw),d=adminData(),t=(d.trips||[]).find(x=>x.id===tripId),item=t?.climateContent?.[idx];if(!item)return;
    showModal(`<span class="eyebrow">ENTRE NO CLIMA</span><h2>Editar ${ipaEscape(item.type||'conteúdo')}</h2><label>Título<input id="climateEditTitle" class="v2-concierge-input" value="${ipaEscape(item.title||'')}"></label><label>Descrição<textarea id="climateEditDescription" class="rating-text">${ipaEscape(item.description||'')}</textarea></label><label>Link opcional<input id="climateEditUrl" class="v2-concierge-input" value="${ipaEscape(item.url||'')}"></label><button id="saveClimateEdit" class="btn btn-primary btn-block">Salvar alteração</button>`);
-   setTimeout(()=>{const save=document.querySelector('#saveClimateEdit');if(save)save.onclick=async()=>{const list=[...(t.climateContent||[])];list[idx]={...item,title:document.querySelector('#climateEditTitle').value.trim(),description:document.querySelector('#climateEditDescription').value.trim(),url:document.querySelector('#climateEditUrl').value.trim()};IPAData.updateTrip(tripId,{climateContent:list,climateEditedAt:new Date().toISOString()});if(window.IPAFirebase?.user)await window.IPAFirebase.syncNow();modal.close();view.innerHTML=adminTripEditor(tripId);bind();toast('Entre no Clima atualizado ✓')}},0);
+   setTimeout(()=>{const save=document.querySelector('#saveClimateEdit');if(save)save.onclick=async()=>{const list=[...(t.climateContent||[])];list[idx]={...item,title:document.querySelector('#climateEditTitle').value.trim(),description:document.querySelector('#climateEditDescription').value.trim(),url:document.querySelector('#climateEditUrl').value.trim(),manuallyEdited:true};IPAData.updateTrip(tripId,{climateContent:list,climateEditedAt:new Date().toISOString()});if(window.IPAFirebase?.user)await window.IPAFirebase.syncNow();modal.close();view.innerHTML=adminTripEditor(tripId);bind();toast('Entre no Clima atualizado ✓')}},0);
  });
  document.querySelectorAll('[data-remove-smart-route]').forEach(b=>b.onclick=()=>{
   const t=activeTrip();if(!t)return;
@@ -2334,7 +2334,46 @@ function paymentsView(){
 }
 
 
+// Curadoria identificada por versão: publicações novas são exibidas sem exigir que o
+// cliente ou ADM recadastrem a viagem. Conteúdo personalizado permanece intocado.
+const IPA_CLIMATE_CURATED_VERSION='2026-10-sp-1';
+function ipaClimateLegacyAutomatic(t){
+ const list=t?.climateContent;
+ if(!Array.isArray(list)||!list.length)return false;
+ // Edições anteriores não identificavam cada item; conservadoramente preservá-las.
+ if(t.climateEditedAt || list.some(x=>x?.manuallyEdited||x?.manual))return false;
+ if(t.climateSource==='destination-curation')return true;
+ // Conteúdos gerados automaticamente antes da implementação do controle de origem.
+ const dest=tripDestination(t);
+ return list.some(x=>String(x?.title||'')===dest+' em cena'||String(x?.title||'')==='Sons de '+dest||String(x?.title||'')==='Fale como um local');
+}
+function ipaClimateCuratedRows(t){
+ const dest=tripDestination(t), country=tripCountry(t), k=(dest+' '+country).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+ if(k.includes('sao paulo')||k.includes('sampa')){
+  // Duas seleções verificáveis da cultura paulistana: alternância mensal, sem
+  // insinuar disponibilidade de streaming ou criar títulos fictícios.
+  const alternative=(new Date().getUTCFullYear()*12+new Date().getUTCMonth())%2===1;
+  return alternative?[
+   ['🎬','Filme / série','São Paulo, Sociedade Anônima','Filme de Luís Sérgio Person que retrata a cidade em transformação na década de 1960.'],
+   ['🎵','Playlist','Sampa e clássicos paulistanos','Ouça Sampa, Trem das Onze e outras canções associadas à cidade. Busque os títulos na sua plataforma favorita.'],
+   ['📚','Livro','Eles Eram Muitos Cavalos','Romance de Luiz Ruffato composto por retratos de um dia na cidade de São Paulo.'],
+   ['🗣️','Expressão local','Meu!','Interjeição informal bastante associada à fala paulistana, embora o uso varie entre pessoas e regiões.'],
+   ['🍽️','Prato típico','Pastel de feira','O pastel acompanhado de caldo de cana é um clássico das feiras livres paulistanas.'],
+   ['💡','Curiosidade','Avenida Paulista','A Avenida Paulista foi inaugurada em 1891 e se tornou um dos símbolos da cidade.']
+  ]:[
+   ['🎬','Filme / série','Que Horas Ela Volta?','Drama de Anna Muylaert ambientado em São Paulo que explora relações familiares e diferenças sociais.'],
+   ['🎵','Playlist','Sons de Sampa','Busque Sampa, de Caetano Veloso, Trem das Onze, de Adoniran Barbosa, e outros clássicos da cidade.'],
+   ['📚','Livro','Pauliceia Desvairada','Obra de Mário de Andrade ligada ao modernismo e à experiência urbana de São Paulo.'],
+   ['🗣️','Expressão local','Meu!','Uma interjeição informal que você pode ouvir em conversas pela cidade.'],
+   ['🍽️','Prato típico','Virado à paulista','Prato tradicional paulista geralmente servido com feijão, farinha, bisteca e acompanhamentos.'],
+   ['💡','Curiosidade','Semana de Arte Moderna','Em 1922, o Theatro Municipal de São Paulo sediou a Semana de Arte Moderna.']
+  ];
+ }
+ return null;
+}
 function climateForTrip(t){
+ const curated=ipaClimateCuratedRows(t);
+ if(curated && (!Array.isArray(t?.climateContent)||!t.climateContent.length||ipaClimateLegacyAutomatic(t)))return curated;
  if(Array.isArray(t?.climateContent)&&t.climateContent.length) return t.climateContent.map(x=>[x.icon||'✨',x.type||'',x.title||'',x.description||'',x.url||'']);
  const dest=tripDestination(t), country=tripCountry(t), k=(dest+" "+country).toLowerCase();
  const presets=[
@@ -2878,7 +2917,7 @@ function adminTripEditor(id){
  <div class="smart-route-banner"><span>✨</span><div><b>Dica Inteligente</b><small>Cadastre atrações, cafés, restaurantes, lojas e experiências. Use “Adicionar como dica” para recomendações fora do roteiro principal.</small></div></div>
  <div class="ipa-admin-days">${(t.itinerary||[]).sort((a,b)=>a.day-b.day).map(day=>`<div class="admin-day-expanded"><div class="admin-day-title"><strong>${day.day}</strong><span><b>${day.title}</b><small>${day.date||''}</small></span><button class="admin-add-place-btn" data-admin-add-place="${t.id}:${day.day}">+ Lugar / dica</button></div><div class="admin-place-list">${normalizedPlaces(day).map((p,i)=>`<div><span>${i+1}</span><div><b>${p.time?`${p.time} · `:''}${p.category||'📍'} ${p.name}</b><small>${p.address||p.note||''}</small>${p.smartTip?`<em>💡 ${p.smartTip}</em>`:''}</div>${p.mapsUrl?`<button type="button" class="admin-place-map" data-external-route="${ipaEscape(p.mapsUrl)}" aria-label="Abrir ${ipaEscape(p.name)} no Google Maps">↗ Maps</button>`:''}</div>`).join('')||'<small>Nenhum local neste dia.</small>'}</div></div>`).join('')||'<p>Comece adicionando o primeiro dia.</p>'}</div>
  <div class="network-tip-list">${(d.recommendations||[]).filter(r=>r.tripId===t.id).map(r=>`<div><span>💡</span><div><b>${r.category||'Dica'} · ${r.name}</b><small>${r.address||''}</small><em>${r.smartTip||'Indo por Aí recomenda'}</em></div></div>`).join('')||'<small>Nenhuma dica extra cadastrada.</small>'}</div></section>
- <section class="ipa-admin-panel"><div class="section-head"><div><span class="eyebrow">✨ ANTES · ENTRE NO CLIMA</span><h2>Conteúdo do destino</h2></div><button class="btn btn-primary" data-admin-generate-climate="${t.id}">${t.climateContent?.length?'🔄 Atualizar conteúdo':'✨ Preparar conteúdo'}</button></div><p>O app prepara filme/série, playlist, livro, expressão local, prato típico e curiosidade conforme o destino, sem depender de API externa. O conteúdo fica salvo nesta viagem e você pode editar antes de publicar.</p><div class="climate-admin-grid">${climateForTrip(t).map((x,i)=>`<div><span>${x[0]}</span><small>${x[1]}</small><b>${x[2]}</b><p>${x[3]}</p>${ipaStreamButtons(x)}${t.climateContent?.length?`<button class="btn btn-light" data-admin-edit-climate="${t.id}:${i}">✏️ Editar</button>`:''}</div>`).join('')}</div></section>
+ <section class="ipa-admin-panel"><div class="section-head"><div><span class="eyebrow">✨ ANTES · ENTRE NO CLIMA</span><h2>Conteúdo do destino</h2></div><button class="btn btn-primary" data-admin-generate-climate="${t.id}">${t.climateContent?.length?'🔄 Atualizar conteúdo':'✨ Preparar conteúdo'}</button></div><p>Sugestões culturais reais são atualizadas pela curadoria do app, inclusive em viagens antigas. Conteúdo editado manualmente pelo ADM é preservado. As plataformas exibem buscas; disponibilidade não é verificada em tempo real.</p><div class="climate-admin-grid">${climateForTrip(t).map((x,i)=>`<div><span>${x[0]}</span><small>${x[1]}</small><b>${x[2]}</b><p>${x[3]}</p>${ipaStreamButtons(x)}${t.climateContent?.length?`<button class="btn btn-light" data-admin-edit-climate="${t.id}:${i}">✏️ Editar</button>`:''}</div>`).join('')}</div></section>
  <section class="ipa-admin-panel"><div class="section-head"><div><span class="eyebrow">ANTES · CARTEIRA DA VIAGEM</span><h2>Documentos do cliente</h2></div><button class="btn btn-light" data-admin-document="${t.id}" data-client-id="${t.clientId}">+ Documento</button></div><p>Passagens, hotel, vouchers, seguro, ingressos e transfer. O ADM cadastra e o cliente consulta no Antes.</p><div class="admin-doc-list">${(d.tripDocuments||[]).filter(x=>x.tripId===t.id).map(x=>`<div><span>${x.type==='Passagem aérea'?'✈️':x.type.includes('Hospedagem')?'🏨':x.type.includes('trem')?'🚆':x.type.includes('ônibus')?'🚌':x.type.includes('Ingresso')?'🎟️':x.type.includes('Seguro')?'🛡️':'📄'}</span><div><b>${x.title}</b><small>${[x.date,x.time,x.terminal&&('Terminal '+x.terminal),x.gate&&('Portão '+x.gate)].filter(Boolean).join(' · ')}</small></div>${x.url?`<button data-external-route="${ipaEscape(x.url)}">Abrir</button>`:''}<button type="button" class="btn btn-light doc-delete-btn" data-admin-delete-document="${ipaEscape(x.id)}" data-document-trip="${ipaEscape(t.id)}" aria-label="Excluir documento ${ipaEscape(x.title)}">🗑 Excluir</button></div>`).join('')||'<small>Nenhum documento cadastrado.</small>'}</div></section>
 
  <section class="ipa-admin-panel"><div class="section-head"><div><span class="eyebrow">👥 PARTICIPANTES</span><h2>Quem vai nessa viagem?</h2></div><button class="btn btn-light" data-admin-add-participant="${t.id}">+ Participante</button></div>
