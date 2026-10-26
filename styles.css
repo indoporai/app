@@ -1150,3 +1150,38 @@ dialog:has(#routeCatalogPlace) .smart-place-actions button{
 .ipa-lead-save-status{flex-basis:100%;font-size:.88rem;line-height:1.4;color:#286778;padding:9px 12px;border-radius:12px;background:#e9f7f7;margin-top:8px;overflow-wrap:anywhere}
 .ipa-lead-save-status[data-kind="error"]{background:#fff0e9;color:#a63b20}
 .ipa-lead-save-status[data-kind="done"]{background:#e7f6ee;color:#166b42}
+
+
+/* Beta 6.29.89 — cards do roteiro na visão cliente (Antes/Hoje): três colunas estáveis */
+.client-itinerary-preview{display:flex;flex-direction:column;gap:10px;min-width:0}
+.client-itinerary-preview>div{
+  display:grid!important;grid-template-columns:38px 64px minmax(0,1fr)!important;
+  align-items:start!important;gap:12px!important;
+  width:100%;min-width:0;min-height:0;height:auto!important;
+  padding:14px!important;background:#f5f9f8;border:1px solid #eaf0ef;
+  border-radius:17px;box-sizing:border-box;
+}
+.client-itinerary-preview>div>span:first-child{grid-column:1;grid-row:1;width:38px;height:38px;min-width:38px;border-radius:12px;font-size:16px;line-height:1}
+.client-itinerary-preview>div>.ipa-preview-thumbnail,
+.client-itinerary-preview>div>.ipa-place-photo,
+.client-itinerary-preview>div>.ipa-place-photo-fallback{
+  grid-column:2;grid-row:1;width:64px!important;min-width:64px!important;height:64px!important;
+  max-width:64px;min-height:64px;border-radius:14px;margin:0!important;
+}
+.client-itinerary-preview>div>div:last-child:not(.ipa-place-photo):not(.ipa-place-photo-fallback){
+  grid-column:3;grid-row:1;min-width:0;width:100%;max-width:100%;align-self:center;
+  overflow-wrap:break-word;word-break:normal;
+}
+.client-itinerary-preview b{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden;
+  font-size:16px;line-height:1.28;color:#173440;font-weight:800;white-space:normal;word-break:normal;overflow-wrap:break-word}
+.client-itinerary-preview small{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden;
+  margin-top:5px;font-size:12px;line-height:1.42;color:#6a7b82;white-space:normal;word-break:normal;overflow-wrap:anywhere}
+@media(max-width:420px){
+ .client-itinerary-preview>div{grid-template-columns:32px 52px minmax(0,1fr)!important;gap:9px!important;padding:11px!important}
+ .client-itinerary-preview>div>span:first-child{width:32px;height:32px;min-width:32px;font-size:14px}
+ .client-itinerary-preview>div>.ipa-preview-thumbnail,
+ .client-itinerary-preview>div>.ipa-place-photo,
+ .client-itinerary-preview>div>.ipa-place-photo-fallback{width:52px!important;min-width:52px!important;height:52px!important;min-height:52px!important;max-width:52px}
+ .client-itinerary-preview b{font-size:14px}
+ .client-itinerary-preview small{font-size:11px}
+}
