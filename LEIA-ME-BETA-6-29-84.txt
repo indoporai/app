@@ -1,0 +1,1 @@
+Beta 6.29.84 — Botão de Pedidos com gravação confirmada no Firestore e navegação para Viagens. Prévia de roteiro permite arrastar lugares por dia (desktop e touch) ou usar setas; ordem persistida e utilizada ao criar a viagem. Não publica nem envia convite automaticamente. Testar em ambiente Cloudflare/Firebase.

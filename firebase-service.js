@@ -831,6 +831,43 @@ window.IPAFirebase = {
     }
     return {clientId,tripId};
   },
+  // Salva a ordem escolhida pelo ADM sem depender de sincronização global.
+  async saveLeadSuggestionConfirmed(leadId){
+    if(!currentUser||currentUser.uid!==ADMIN_UID)throw new Error('Entre como ADM para salvar a ordem.');
+    const lead=(window.IPAData?.getAll?.().travelLeads||[]).find(l=>String(l.id)===String(leadId));
+    if(!lead)throw new Error('Pedido não encontrado.');
+    const ref=doc(firestore,'travelLeads',String(leadId));
+    await setDoc(ref,{adminSuggestion:lead.adminSuggestion,updatedAt:serverTimestamp()},{merge:true});
+    const check=await getDoc(ref);
+    if(!check.exists()||!check.data().adminSuggestion)throw new Error('A ordem não foi confirmada no Firebase.');
+    return true;
+  },
+  // Beta 6.29.84: gravação confirmada do fluxo Pedidos → Viagens.
+  // Não depende de syncAll, que pode retornar durante outra sincronização.
+  async saveLeadTripConfirmed({tripId,clientId,leadId}){
+    if(!currentUser || currentUser.uid!==ADMIN_UID)throw new Error('Entre com a conta ADM para salvar.');
+    const d=window.IPAData?.getAll?.()||{};
+    const trip=(d.trips||[]).find(t=>String(t.id)===String(tripId));
+    const client=(d.clients||[]).find(c=>String(c.id)===String(clientId));
+    const lead=(d.travelLeads||[]).find(l=>String(l.id)===String(leadId));
+    if(!trip||!client||!lead)throw new Error('Não foi possível localizar o pedido, a viagem ou o cliente.');
+    if(String(trip.clientId)!==String(clientId))throw new Error('A viagem não está vinculada ao cliente selecionado.');
+    if(!Array.isArray(trip.itinerary)||!trip.itinerary.length)throw new Error('O roteiro precisa ter ao menos um dia.');
+    const tripRef=doc(firestore,'trips',String(tripId));
+    const clientRef=doc(firestore,'clients',String(clientId));
+    const leadRef=doc(firestore,'travelLeads',String(leadId));
+    await setDoc(tripRef,{...trip,sourceLeadId:leadId,updatedAt:serverTimestamp()},{merge:true});
+    await setDoc(clientRef,{...client,activeTripId:tripId,lastConfiguredTripId:tripId,updatedAt:serverTimestamp()},{merge:true});
+    await setDoc(leadRef,{...lead,tripId,status:'Roteiro aprovado',updatedAt:serverTimestamp()},{merge:true});
+    const [savedTrip,savedClient,savedLead]=await Promise.all([getDoc(tripRef),getDoc(clientRef),getDoc(leadRef)]);
+    if(!savedTrip.exists()||!savedClient.exists()||!savedLead.exists()||
+      String(savedTrip.data().clientId)!==String(clientId)||
+      String(savedClient.data().activeTripId)!==String(tripId)||
+      String(savedLead.data().tripId)!==String(tripId)){
+      throw new Error('O Firebase não confirmou a gravação da viagem. Tente novamente.');
+    }
+    return {tripId,clientId,leadId};
+  },
   async syncNow(){
     if(!currentUser) throw new Error("Faça login primeiro.");
     return syncAll(window.IPAData?.getAll?.());

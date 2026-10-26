@@ -728,18 +728,96 @@ function bind(){
   },0);
  });
  document.querySelectorAll('[data-lead-generate]').forEach(btn=>btn.onclick=async()=>{const d=adminData(),lead=(d.travelLeads||[]).find(x=>x.id===btn.dataset.leadGenerate);if(!lead)return;const result=ipaGenerateRequestedCityRoute(lead);IPAData.updateTravelLead(lead.id,{adminSuggestion:result,status:'Em análise'});const box=document.querySelector(`[data-lead-result="${lead.id}"]`);if(box)box.innerHTML=ipaAdminSuggestionHtml(lead,result);btn.textContent='↻ Gerar novamente';try{if(window.IPAFirebase?.user)await window.IPAFirebase.syncNow()}catch(e){console.warn(e)};bind()});
+ // Reordenação local e persistida dos passeios da sugestão do pedido.
+ // Mantém as cidades/dias fixos; altera só a ordem dos lugares dentro do dia.
+ const moveLeadPlace=async(leadId,dayNumber,from,to)=>{
+   const lead=(adminData().travelLeads||[]).find(l=>String(l.id)===String(leadId));
+   if(!lead?.adminSuggestion)return;
+   const suggestion=JSON.parse(JSON.stringify(lead.adminSuggestion));
+   const day=(suggestion.days||[]).find(d=>Number(d.day)===Number(dayNumber));
+   if(!day||!Array.isArray(day.places)||from<0||to<0||from>=day.places.length||to>=day.places.length||from===to)return;
+   const [place]=day.places.splice(from,1);day.places.splice(to,0,place);
+   IPAData.updateTravelLead(lead.id,{adminSuggestion:suggestion});
+   const region=Array.from(document.querySelectorAll('[data-lead-result]')).find(el=>el.dataset.leadResult===String(lead.id));
+   if(region){region.innerHTML=ipaAdminSuggestionHtml({...lead,adminSuggestion:suggestion},suggestion);bind();}
+   try{
+     if(window.IPAFirebase?.saveLeadSuggestionConfirmed)await window.IPAFirebase.saveLeadSuggestionConfirmed(lead.id);
+     else throw new Error('Serviço de gravação indisponível');
+   }catch(err){console.error('Falha ao persistir a ordem do roteiro',err);toast('Ordem ajustada nesta tela, mas não foi salva no Firebase: '+(err?.message||'erro'));}
+ };
+ document.querySelectorAll('[data-lead-move]').forEach(btn=>btn.onclick=()=>{
+   const from=Number(btn.dataset.placeIndex),to=from+(btn.dataset.direction==='up'?-1:1);
+   moveLeadPlace(btn.dataset.leadMove,btn.dataset.day,from,to);
+ });
+ document.querySelectorAll('[data-lead-place]').forEach(item=>{
+   item.addEventListener('dragstart',ev=>{
+     // A alça destaca a função; em desktop também é possível arrastar o cartão.
+     ev.dataTransfer.effectAllowed='move';ev.dataTransfer.setData('text/plain',JSON.stringify({leadId:item.dataset.leadPlace,day:item.dataset.day,index:Number(item.dataset.placeIndex)}));
+     item.classList.add('ipa-lead-dragging');
+   });
+   item.addEventListener('dragend',()=>item.classList.remove('ipa-lead-dragging'));
+   item.addEventListener('dragover',ev=>{ev.preventDefault();ev.dataTransfer.dropEffect='move'});
+   item.addEventListener('drop',ev=>{
+     ev.preventDefault();
+     try{const origin=JSON.parse(ev.dataTransfer.getData('text/plain'));if(String(origin.leadId)===item.dataset.leadPlace&&String(origin.day)===item.dataset.day)moveLeadPlace(origin.leadId,origin.day,Number(origin.index),Number(item.dataset.placeIndex));}catch(e){console.warn(e)}
+   });
+ });
+ // Touch: o puxador aceita arraste com o dedo, além das setas de acessibilidade.
+ document.querySelectorAll('[data-lead-grip]').forEach(grip=>{
+   let origin=null,hover=null;
+   grip.addEventListener('pointerdown',ev=>{
+     if(ev.pointerType==='mouse')return;
+     const item=grip.closest('[data-lead-place]');if(!item)return;
+     origin={leadId:item.dataset.leadPlace,day:item.dataset.day,index:Number(item.dataset.placeIndex)};hover=null;
+     grip.setPointerCapture?.(ev.pointerId);
+     item.classList.add('ipa-lead-dragging');
+   });
+   grip.addEventListener('pointermove',ev=>{
+     if(!origin)return;
+     const target=document.elementFromPoint(ev.clientX,ev.clientY)?.closest('[data-lead-place]');
+     if(target&&target.dataset.leadPlace===origin.leadId&&target.dataset.day===origin.day)hover=Number(target.dataset.placeIndex);
+   });
+   grip.addEventListener('pointerup',()=>{
+     const item=grip.closest('[data-lead-place]');item?.classList.remove('ipa-lead-dragging');
+     if(origin&&hover!==null)moveLeadPlace(origin.leadId,origin.day,origin.index,hover);
+     origin=null;hover=null;
+   });
+   grip.addEventListener('pointercancel',()=>{grip.closest('[data-lead-place]')?.classList.remove('ipa-lead-dragging');origin=null;hover=null});
+ });
  document.querySelectorAll('[data-lead-create-trip]').forEach(btn=>btn.onclick=async()=>{
-   const d=adminData(),lead=(d.travelLeads||[]).find(x=>x.id===btn.dataset.leadCreateTrip);if(!lead?.adminSuggestion)return toast('Gere a sugestão antes de criar a viagem');
-   if(lead.tripId){adminSection='trips';adminTripId=lead.tripId;render();return}
+   if(btn.disabled)return;
+   const initialLabel=btn.textContent;
+   const leadId=btn.dataset.leadCreateTrip;
+   const d=adminData(),lead=(d.travelLeads||[]).find(x=>String(x.id)===String(leadId));
+   if(!lead?.adminSuggestion){toast('Gere a sugestão antes de criar a viagem');return}
    const client=(d.clients||[]).find(c=>c.id===lead.clientId||c.leadId===lead.id||c.requestCode===lead.requestCode||(lead.email&&String(c.email||'').toLowerCase()===String(lead.email).toLowerCase())||(lead.phone&&c.phone===lead.phone));
-   if(!client)return toast('Cliente do pedido não encontrado');
-   const itinerary=(lead.adminSuggestion.days||[]).map(day=>({day:Number(day.day),title:`Dia ${day.day}`,places:(day.places||[]).map((p,i)=>({...p,id:`trip-place-${Date.now()}-${day.day}-${i}`,catalogPlaceId:p.catalogPlaceId||p.id}))}));
-   const requestedStages=(Array.isArray(lead.stages)&&lead.stages.length?lead.stages:[{destination:lead.destination,days:lead.days}]).map((x,i)=>({id:'stage-'+Date.now()+'-'+i,order:i+1,destination:x.destination,country:x.country||'',days:Number(x.days)||1}));
-   const trip=IPAData.createTrip({clientId:client.id,name:`${requestedStages.map(x=>x.destination).join(' → ')} · ${lead.name||client.name}`,destination:requestedStages[0].destination,country:'',stages:requestedStages,plan:client.plan||lead.plan||'Explore',itinerary,sourceLeadId:lead.id,sourceRequestCode:lead.requestCode,smartRouteApprovedAt:new Date().toISOString(),status:'Em preparação'});
-   IPAData.updateClientById(client.id,{activeTripId:trip.id,lastConfiguredTripId:trip.id});
-   IPAData.updateTravelLead(lead.id,{tripId:trip.id,status:'Roteiro aprovado'});
-   try{if(window.IPAFirebase?.user)await window.IPAFirebase.syncNow()}catch(e){console.error(e);toast('Viagem criada, mas a sincronização ficou pendente');return}
-   modal?.close?.();adminSection='trips';adminTripId=trip.id;render();toast('Roteiro salvo em Viagens! Complete os dados e clique em Salvar e seguir para Clientes.');
+   if(!client){toast('Cliente não encontrado. Verifique o cadastro na aba Clientes.');return}
+   btn.disabled=true;
+   btn.textContent='Salvando no Firebase...';
+   try{
+     if(!window.IPAFirebase?.saveLeadTripConfirmed)throw new Error('Serviço de gravação indisponível. Atualize a versão do aplicativo.');
+     if(!window.IPAFirebase.user)throw new Error('Faça login como ADM para salvar o roteiro.');
+     const existing=(d.trips||[]).find(t=>String(t.id)===String(lead.tripId)||String(t.sourceLeadId||'')===String(lead.id));
+     let trip=existing;
+     if(!trip){
+       const itinerary=(lead.adminSuggestion.days||[]).map(day=>({day:Number(day.day),title:`Dia ${day.day}${day.city?' · '+day.city:''}`,city:day.city||'',places:(day.places||[]).map((place,i)=>({...place,id:`trip-place-${Date.now()}-${day.day}-${i}`,catalogPlaceId:place.catalogPlaceId||place.id}))}));
+       if(!itinerary.length)throw new Error('Nenhum dia encontrado na sugestão de roteiro.');
+       const requestedStages=(Array.isArray(lead.stages)&&lead.stages.length?lead.stages:[{destination:lead.destination,days:lead.days}]).map((x,i)=>({id:'stage-'+Date.now()+'-'+i,order:i+1,destination:x.destination,country:x.country||'',days:Number(x.days)||1}));
+       trip=IPAData.createTrip({clientId:client.id,name:`${requestedStages.map(x=>x.destination).join(' → ')} · ${lead.name||client.name}`,destination:requestedStages[0].destination,country:'',stages:requestedStages,plan:client.plan||lead.plan||'Explore',itinerary,sourceLeadId:lead.id,sourceRequestCode:lead.requestCode,smartRouteApprovedAt:new Date().toISOString(),status:'Em preparação'});
+     }
+     IPAData.updateClientById(client.id,{activeTripId:trip.id,lastConfiguredTripId:trip.id});
+     IPAData.updateTravelLead(lead.id,{tripId:trip.id,status:'Roteiro aprovado'});
+     await window.IPAFirebase.saveLeadTripConfirmed({tripId:trip.id,clientId:client.id,leadId:lead.id});
+     modal?.close?.();adminSection='trips';adminTripId=trip.id;state.route='admin';render();
+     window.scrollTo({top:0,behavior:'instant'});
+     toast('Viagem confirmada no Firebase ✓ Complete agora os dados em Viagens.');
+   }catch(err){
+     console.error('Erro ao salvar roteiro do pedido',err);
+     toast('Não foi possível salvar: '+(err?.message||'erro de conexão'));
+     btn.disabled=false;
+     btn.textContent='↻ Tentar salvar e seguir para Viagens';
+     btn.title='O roteiro permanece no pedido. Clique novamente para tentar gravar.';
+   }
  });
 
  document.querySelectorAll('[data-admin-generate-climate]').forEach(b=>b.onclick=async()=>{
@@ -2924,8 +3002,10 @@ function adminLeads(){
 }
 function ipaAdminSuggestionHtml(lead,result){
  if(!result?.count)return `<div class="planner-empty"><b>Banco de Lugares sem combinação suficiente.</b><small>Cadastre mais experiências para ${ipaEscape(lead.destination||'este destino')} e gere novamente.</small></div>`;
- return `<div class="planner-result admin-only-suggestion"><div class="planner-result-head"><span>✨</span><div><small>SUGESTÃO INTERNA · ${ipaEscape(lead.requestCode||'')}</small><h3>${ipaEscape(lead.destination)} · ${lead.days} dias</h3><small>${(lead.stages||[]).length>1?"Multidestino: "+(lead.stages||[]).map(x=>ipaEscape(x.destination)+" ("+Number(x.days)+" dias)").join(" → "):""}</small></div></div>${result.days.map(d=>`<div class="planner-day"><b>Dia ${d.day}${d.city?" · "+ipaEscape(d.city):""}</b>${d.places.map(p=>`<div><span>${p.category||'📍'}</span><p><strong>${ipaEscape(p.name)}</strong><small>${p.interests?.slice(0,2).join(' · ')||'Curadoria Indo por Aí'}</small></p><em>${ipaCatalogMoney(p.cost,p.currency||result.currency)}</em></div>`).join('')||'<small>Dia livre.</small>'}</div>`).join('')}<div class="planner-total"><span>Estimativa por pessoa</span><strong>${ipaCatalogMoney(result.spent,result.currency)}</strong><small>de ${ipaCatalogMoney(result.budget,result.currency)} informados</small></div><small>🔒 Sugestão interna. O prospect não visualiza estes lugares.</small><div class="lead-actions">${lead.tripId?`<button class="btn btn-light" data-admin-trip="${ipaEscape(lead.tripId)}">✈️ Completar viagem</button>`:`<button class="btn btn-primary" data-lead-create-trip="${ipaEscape(lead.id)}">✓ Criar roteiro e seguir para Viagens</button>`}</div></div>`;
+ const rows=(result.days||[]).map(d=>`<div class="planner-day"><b>Dia ${d.day}${d.city?" · "+ipaEscape(d.city):""}</b>${(d.places||[]).map((place,i)=>`<div class="ipa-lead-place" data-lead-place="${ipaEscape(lead.id)}" data-day="${Number(d.day)}" data-place-index="${i}" draggable="true"><span class="ipa-lead-place-type">${ipaEscape(place.category||'📍')}</span><p><strong>${ipaEscape(place.name)}</strong><small>${(place.interests||[]).slice(0,2).map(ipaEscape).join(' · ')||'Curadoria Indo por Aí'}</small></p><em>${ipaCatalogMoney(place.cost,place.currency||result.currency)}</em><span class="ipa-lead-reorder"><button type="button" class="ipa-lead-grip" data-lead-grip title="Arraste para ordenar" aria-label="Arrastar ${ipaEscape(place.name)}">⠿</button><span class="ipa-lead-reorder-arrows"><button type="button" data-lead-move="${ipaEscape(lead.id)}" data-day="${Number(d.day)}" data-place-index="${i}" data-direction="up" aria-label="Mover ${ipaEscape(place.name)} para cima" ${i===0?'disabled':''}>↑</button><button type="button" data-lead-move="${ipaEscape(lead.id)}" data-day="${Number(d.day)}" data-place-index="${i}" data-direction="down" aria-label="Mover ${ipaEscape(place.name)} para baixo" ${i===(d.places||[]).length-1?'disabled':''}>↓</button></span></span></div>`).join('')||'<small>Dia livre.</small>'}</div>`).join('');
+ return `<div class="planner-result admin-only-suggestion"><div class="planner-result-head"><span>✨</span><div><small>SUGESTÃO INTERNA · ${ipaEscape(lead.requestCode||'')}</small><h3>${ipaEscape(lead.destination)} · ${lead.days} dias</h3><small>${(lead.stages||[]).length>1?"Multidestino: "+(lead.stages||[]).map(x=>ipaEscape(x.destination)+" ("+Number(x.days)+" dias)").join(" → "):""}</small></div></div><p class="ipa-lead-order-hint">↕ Arraste pelo puxador ou use as setas para ajustar a ordem dos passeios de cada dia.</p>${rows}<div class="planner-total"><span>Estimativa por pessoa</span><strong>${ipaCatalogMoney(result.spent,result.currency)}</strong><small>de ${ipaCatalogMoney(result.budget,result.currency)} informados</small></div><small>🔒 Sugestão interna. O prospect não visualiza estes lugares.</small><div class="lead-actions">${lead.tripId?`<button class="btn btn-light" data-admin-trip="${ipaEscape(lead.tripId)}">✈️ Completar viagem</button>`:`<button class="btn btn-primary" data-lead-create-trip="${ipaEscape(lead.id)}">✓ Criar roteiro e seguir para Viagens</button>`}</div></div>`;
 }
+
 function prospectView(){return `<section class="prospect-premium">
  <span class="eyebrow">Ainda não sou cliente</span><h1>Sua viagem começa antes do embarque.</h1><p>Escolha uma experiência e conte como você quer viajar. Nossa equipe recebe seu pedido e prepara uma proposta personalizada.</p><button class="btn btn-primary" id="openTravelPlanner">Quero viajar com o Indo por Aí</button>
 </section>
