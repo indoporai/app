@@ -1198,6 +1198,15 @@ function bind(){
      };
    },0);
  });
+ const adminPasswordToggle=document.querySelector('#firebaseAdminPasswordToggle');
+ if(adminPasswordToggle)adminPasswordToggle.onclick=()=>{
+   const field=document.querySelector('#firebaseAdminPassword');
+   if(!field)return;
+   const visible=field.type==='password';
+   field.type=visible?'text':'password';
+   adminPasswordToggle.textContent=visible?'Ocultar senha':'Mostrar senha';
+   adminPasswordToggle.setAttribute('aria-pressed',String(visible));
+ };
  const firebaseLogin=document.querySelector('#firebaseAdminLogin');
  if(firebaseLogin) firebaseLogin.onclick=async()=>{
    const email=document.querySelector('#firebaseAdminEmail')?.value.trim();
@@ -1227,7 +1236,12 @@ function bind(){
      toast('ADM conectado ✓');
    }catch(err){
      clearTimeout(watchdog);
-     toast(err?.message||'Não foi possível entrar');
+     const code=String(err?.code||'');
+     const msg=(code==='auth/invalid-credential'||code==='auth/wrong-password'||code==='auth/user-not-found')
+       ?'O Firebase recusou as credenciais deste acesso. Use Mostrar senha para conferir o texto digitado; se no computador funciona, confirme que a conta foi testada após sair e entrar novamente.'
+       :(err?.message||'Não foi possível entrar');
+     const notice=document.querySelector('#firebaseAdminInlineError');
+     if(notice){notice.textContent=msg;notice.hidden=false;}
      const btn=document.querySelector('#firebaseAdminLogin');
      if(btn){btn.disabled=false;btn.textContent='Entrar no ADM'}
    }
@@ -2751,11 +2765,12 @@ function adminLoginView(){
    <span class="eyebrow">INDO POR AÍ BUSINESS</span>
    <h1>Entrar como administrador</h1>
    <p>Use o usuário ADM que você criou no Firebase Authentication.</p>
-   ${error?`<div class="firebase-error">${error}</div>`:''}
-   <label>E-mail</label>
-   <input id="firebaseAdminEmail" type="email" autocomplete="username" placeholder="seu@email.com">
-   <label>Senha</label>
-   <input id="firebaseAdminPassword" type="password" autocomplete="current-password" placeholder="Sua senha">
+   <div class="firebase-error" id="firebaseAdminInlineError" role="alert" ${error?'':'hidden'}>${error?'Não foi possível autenticar. Confira o e-mail e a senha digitados.':''}</div>
+   <label for="firebaseAdminEmail">E-mail</label>
+   <input id="firebaseAdminEmail" type="email" inputmode="email" autocapitalize="none" autocorrect="off" spellcheck="false" autocomplete="username" placeholder="seu@email.com">
+   <label for="firebaseAdminPassword">Senha</label>
+   <input id="firebaseAdminPassword" type="password" autocapitalize="none" autocorrect="off" spellcheck="false" autocomplete="current-password" placeholder="Sua senha">
+   <button type="button" id="firebaseAdminPasswordToggle" class="ipa-admin-password-toggle" aria-pressed="false">Mostrar senha</button>
    <button id="firebaseAdminLogin" class="btn btn-primary btn-block" ${status==='signing-in'?'disabled':''}>${status==='signing-in'?'Entrando...':'Entrar no ADM'}</button>
    <button class="btn btn-light btn-block" data-admin-exit>← Voltar</button>
    <small class="firebase-security-note">🔒 Firestore protegido pelo UID do seu administrador.</small>
@@ -3439,7 +3454,10 @@ window.addEventListener('ipa-admin-login-success',()=>{
   render();
 });
 window.addEventListener('ipa-admin-login-error',()=>{
-  if(state.profile==='admin'||state.route==='admin')render();
+  // Não reconstruir o formulário em caso de erro: Safari pode perder/autopreencher
+  // incorretamente os campos. A mensagem é exibida pelo próprio handler de login.
+  const btn=document.querySelector('#firebaseAdminLogin');
+  if(btn){btn.disabled=false;btn.textContent='Entrar no ADM';}
 });
 window.addEventListener('ipa-firebase-service-loaded',()=>{if(state.profile==='admin'||state.route==='admin')render()});
 window.addEventListener('ipa-firebase-ready',()=>{

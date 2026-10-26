@@ -1,0 +1,1 @@
+Beta 6.29.83: diagnóstico login ADM mobile; o erro do Firebase não recria o formulário; visualização de senha opcional; autocorreção/deslocamento de maiúsculas desligado; mensagens mais claras. Não altera senhas, UID, Firebase config ou permissões.
