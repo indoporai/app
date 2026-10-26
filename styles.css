@@ -1152,7 +1152,7 @@ dialog:has(#routeCatalogPlace) .smart-place-actions button{
 .ipa-lead-save-status[data-kind="done"]{background:#e7f6ee;color:#166b42}
 
 
-/* Beta 6.29.90 — cards do roteiro na visão cliente (Antes/Hoje): três colunas estáveis */
+/* Beta 6.29.91 — cards do roteiro na visão cliente (Antes/Hoje): três colunas estáveis */
 .client-itinerary-preview{display:flex;flex-direction:column;gap:10px;min-width:0}
 .client-itinerary-preview>div{
   display:grid!important;grid-template-columns:38px 64px minmax(0,1fr)!important;

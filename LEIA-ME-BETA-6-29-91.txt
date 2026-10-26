@@ -1,0 +1,6 @@
+Beta 6.29.91 — Entre no Clima: abertura direta de conteúdos
+- Spotify São Paulo: playlist pública São Paulo Vibes, com Sampa e Trem das Onze, link verificado.
+- Lisboa: playlist de fado específica; Porto: playlist de fado Taste Porto.
+- Botões de serviços sem link direto verificado não são exibidos como se fossem conteúdo pronto.
+- Link opcional do ADM, quando fornecido, aparece com o provedor correto.
+- Contas, direitos e disponibilidade dependem da plataforma.

@@ -2336,7 +2336,7 @@ function paymentsView(){
 
 // Curadoria identificada por versão: publicações novas são exibidas sem exigir que o
 // cliente ou ADM recadastrem a viagem. Conteúdo personalizado permanece intocado.
-const IPA_CLIMATE_CURATED_VERSION='2026-10-sp-1';
+const IPA_CLIMATE_CURATED_VERSION='2026-10-direct-links-1';
 function ipaClimateLegacyAutomatic(t){
  const list=t?.climateContent;
  if(!Array.isArray(list)||!list.length)return false;
@@ -2355,14 +2355,14 @@ function ipaClimateCuratedRows(t){
   const alternative=(new Date().getUTCFullYear()*12+new Date().getUTCMonth())%2===1;
   return alternative?[
    ['🎬','Filme / série','São Paulo, Sociedade Anônima','Filme de Luís Sérgio Person que retrata a cidade em transformação na década de 1960.'],
-   ['🎵','Playlist','Sampa e clássicos paulistanos','Ouça Sampa, Trem das Onze e outras canções associadas à cidade. Busque os títulos na sua plataforma favorita.'],
+   ['🎵','Playlist','Sampa e clássicos paulistanos','Uma playlist paulistana com Sampa, Trem das Onze e outras músicas da cidade, pronta para abrir no Spotify.'],
    ['📚','Livro','Eles Eram Muitos Cavalos','Romance de Luiz Ruffato composto por retratos de um dia na cidade de São Paulo.'],
    ['🗣️','Expressão local','Meu!','Interjeição informal bastante associada à fala paulistana, embora o uso varie entre pessoas e regiões.'],
    ['🍽️','Prato típico','Pastel de feira','O pastel acompanhado de caldo de cana é um clássico das feiras livres paulistanas.'],
    ['💡','Curiosidade','Avenida Paulista','A Avenida Paulista foi inaugurada em 1891 e se tornou um dos símbolos da cidade.']
   ]:[
    ['🎬','Filme / série','Que Horas Ela Volta?','Drama de Anna Muylaert ambientado em São Paulo que explora relações familiares e diferenças sociais.'],
-   ['🎵','Playlist','Sons de Sampa','Busque Sampa, de Caetano Veloso, Trem das Onze, de Adoniran Barbosa, e outros clássicos da cidade.'],
+   ['🎵','Playlist','Sons de Sampa','Uma playlist de São Paulo com Sampa, Trem das Onze e outros clássicos, pronta para abrir no Spotify.'],
    ['📚','Livro','Pauliceia Desvairada','Obra de Mário de Andrade ligada ao modernismo e à experiência urbana de São Paulo.'],
    ['🗣️','Expressão local','Meu!','Uma interjeição informal que você pode ouvir em conversas pela cidade.'],
    ['🍽️','Prato típico','Virado à paulista','Prato tradicional paulista geralmente servido com feijão, farinha, bisteca e acompanhamentos.'],
@@ -2374,7 +2374,7 @@ function ipaClimateCuratedRows(t){
 function climateForTrip(t){
  const curated=ipaClimateCuratedRows(t);
  if(curated && (!Array.isArray(t?.climateContent)||!t.climateContent.length||ipaClimateLegacyAutomatic(t)))return curated;
- if(Array.isArray(t?.climateContent)&&t.climateContent.length) return t.climateContent.map(x=>[x.icon||'✨',x.type||'',x.title||'',x.description||'',x.url||'']);
+ if(Array.isArray(t?.climateContent)&&t.climateContent.length) return t.climateContent.map(x=>[x.icon||'✨',x.type||'',x.title||'',x.description||'',x.url||'',x.links||{}]);
  const dest=tripDestination(t), country=tripCountry(t), k=(dest+" "+country).toLowerCase();
  const presets=[
   {keys:['paris','frança','france'],items:[
@@ -2442,22 +2442,65 @@ function hotelStaySection(t){
  if(!stays.length)return '';
  return `<section class="section"><div class="section-head"><div><span class="eyebrow">🏨 SUA HOSPEDAGEM</span><h2>Onde você vai ficar</h2></div></div><div class="hotel-client-grid">${stays.map(st=>{const h=ipaFindBookedHotel(st,d.hotelCatalog);return `<article class="hotel-client-card"><div class="hotel-client-photo">${ipaBookedHotelImage(h,st)}</div><div><small>${ipaEscape([st.city||h.city,st.country||h.country].filter(Boolean).join(', '))}</small><h3>${ipaEscape(h.name||st.hotelName||'Hospedagem')}</h3><div class="hotel-rating">⭐ ${ipaEscape(String(h.ipaRating||'Indo por Aí'))}</div><p>${ipaEscape([st.checkIn&&('Check-in '+st.checkIn),st.checkOut&&('Check-out '+st.checkOut),st.roomType,st.mealPlan].filter(Boolean).join(' · '))}</p><small>${ipaEscape(h.address||'')}</small><div class="hotel-client-actions">${h.address?`<button class="btn btn-light" data-map="${ipaEscape(h.address)}">Como chegar</button>`:''}${st.voucherUrl?`<button class="btn btn-primary" data-external-route="${ipaEscape(st.voucherUrl)}">Ver voucher</button>`:''}</div></div></article>`}).join('')}</div></section>`;
 }
+// Endereços de conteúdos específicos confirmados, e não páginas de busca.
+// Os links para outras plataformas só são apresentados quando houver um URL
+// direto cadastrado na curadoria ou manualmente pelo ADM.
+const IPA_CLIMATE_DIRECT_LINKS={
+ 'sampa e clássicos paulistanos':{
+  Spotify:'https://open.spotify.com/playlist/0c4eSo8ApvAfXoiGoCGXup'
+ },
+ 'sons de sampa':{
+  Spotify:'https://open.spotify.com/playlist/0c4eSo8ApvAfXoiGoCGXup'
+ },
+ 'lisboa em sons':{
+  Spotify:'https://open.spotify.com/playlist/6iuut2HKZz2eNUagNnGLYy'
+ },
+ 'sons de portugal':{
+  Spotify:'https://open.spotify.com/playlist/5quuUNghzfsekfLPPoBkN1'
+ }
+};
+function ipaClimateProviderFromUrl(url){
+ try{
+  const host=new URL(url).hostname.toLowerCase().replace(/^www\./,'');
+  if(host==='open.spotify.com')return 'Spotify';
+  if(host==='deezer.com')return 'Deezer';
+  if(host==='music.apple.com')return 'Apple Music';
+  if(host==='netflix.com')return 'Netflix';
+  if(host==='primevideo.com'||host==='amazon.com'||host==='amazon.com.br')return 'Prime Video';
+  if(host==='disneyplus.com')return 'Disney+';
+  if(host==='tv.apple.com')return 'Apple TV';
+  if(host==='books.apple.com')return 'Apple Books';
+  if(host==='play.google.com')return 'Google Livros';
+ }catch(e){}
+ return '';
+}
 function ipaStreamButtons(item){
  const type=String(item[1]||'').toLowerCase(),title=String(item[2]||'').trim();
- if(!title)return '';
- const q=encodeURIComponent(title);
- const providers=type.includes('filme')||type.includes('série')?[
-  ['Netflix','https://www.netflix.com/search?q='+q],['Prime Video','https://www.primevideo.com/search/ref=atv_nb_sr?phrase='+q],['Disney+','https://www.disneyplus.com/search'],['Apple TV','https://tv.apple.com/search?term='+q]
- ]:type.includes('playlist')?[
-  ['Spotify','https://open.spotify.com/search/'+q],['Deezer','https://www.deezer.com/search/'+q],['Apple Music','https://music.apple.com/search?term='+q]
- ]:type.includes('livro')?[
-  ['Kindle','https://www.amazon.com.br/s?k='+q],['Google Livros','https://play.google.com/store/search?q='+q+'&c=books'],['Apple Books','https://books.apple.com/br/search?term='+q]
- ]:[];
- return providers.length?`<div class="ipa-stream-links">${providers.map(([name,url])=>`<button type="button" class="ipa-stream-link" data-external-route="${ipaEscape(url)}" title="Buscar ${ipaEscape(title)} em ${name}"><span class="ipa-provider-mark ipa-provider-${ipaEscape(name.toLowerCase().replace(/[^a-z]/g,''))}" aria-hidden="true">${name==='Netflix'?'N':name==='Prime Video'?'▶':name==='Disney+'?'D+':name==='Apple TV'?'●':name==='Spotify'?'≋':name==='Deezer'?'▥':name==='Apple Music'?'♫':name==='Kindle'?'K':name==='Google Livros'?'G':'◈'}</span><span>${ipaEscape(name)}</span><span aria-hidden="true">↗</span></button>`).join('')}</div><small class="ipa-stream-note">Buscar na plataforma · disponibilidade não verificada</small>`:'';
+ if(!title||!/(filme|série|playlist|livro)/.test(type))return '';
+ const key=title.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+ const links={...(IPA_CLIMATE_DIRECT_LINKS[key]||{})};
+ // Curadoria salva no Firebase pode conter vários links verificados por serviço.
+ const extra=item[5];
+ if(extra && typeof extra==='object' && !Array.isArray(extra)){
+  const supplied=extra.links||extra;
+  for(const [name,url] of Object.entries(supplied)){
+   if(typeof url==='string' && ipaClimateProviderFromUrl(url)===name)links[name]=url;
+  }
+ }
+ const oneUrl=String(item[4]||'');
+ const detected=ipaClimateProviderFromUrl(oneUrl);
+ if(detected)links[detected]=oneUrl;
+ const providers=Object.entries(links).filter(([name,url])=>{
+  try{const u=new URL(url);return u.protocol==='https:'&&ipaClimateProviderFromUrl(url)===name;}catch(e){return false;}
+ });
+ if(!providers.length)return '<small class="ipa-stream-note">Link direto ainda não cadastrado para este conteúdo.</small>';
+ const mark={'Netflix':'N','Prime Video':'▶','Disney+':'D+','Apple TV':'●','Spotify':'≋','Deezer':'▥','Apple Music':'♫','Kindle':'K','Google Livros':'G','Apple Books':'◈'};
+ return `<div class="ipa-stream-links">${providers.map(([name,url])=>`<button type="button" class="ipa-stream-link" data-external-route="${ipaEscape(url)}" title="Abrir ${ipaEscape(title)} diretamente no ${ipaEscape(name)}"><span class="ipa-provider-mark ipa-provider-${ipaEscape(name.toLowerCase().replace(/[^a-z]/g,''))}" aria-hidden="true">${mark[name]||'▶'}</span><span>${ipaEscape(name)} · Abrir ${type.includes('playlist')?'playlist':'conteúdo'}</span><span aria-hidden="true">↗</span></button>`).join('')}</div><small class="ipa-stream-note">Link direto do conteúdo · pode exigir conta no serviço.</small>`;
 }
+
 function climateSection(t){
  const dest=tripDestination(t),cards=climateForTrip(t);
- return `<section class="section climate-section"><div class="section-head"><div><span class="eyebrow">✨ ENTRE NO CLIMA</span><h2>${dest} começa antes do embarque</h2></div></div><div class="climate-grid">${cards.map((x,i)=>`<article><span>${x[0]}</span><small>${x[1]}</small><b>${x[2]}</b><p>${x[3]}</p>${ipaStreamButtons(x)}${x[4]?`<button data-external-route="${ipaEscape(x[4])}">Abrir sugestão ↗</button>`:i===4?`<button data-climate-explore="${encodeURIComponent(x[2])}">📍 Ver no Explorar</button>`:''}</article>`).join('')}</div></section>`;
+ return `<section class="section climate-section"><div class="section-head"><div><span class="eyebrow">✨ ENTRE NO CLIMA</span><h2>${dest} começa antes do embarque</h2></div></div><div class="climate-grid">${cards.map((x,i)=>`<article><span>${x[0]}</span><small>${x[1]}</small><b>${x[2]}</b><p>${x[3]}</p>${ipaStreamButtons(x)}${x[4]&&!ipaClimateProviderFromUrl(x[4])?`<button data-external-route="${ipaEscape(x[4])}">Abrir sugestão ↗</button>`:i===4?`<button data-climate-explore="${encodeURIComponent(x[2])}">📍 Ver no Explorar</button>`:''}</article>`).join('')}</div></section>`;
 }
 function flightWalletSection(t,d){
  const flight=t?.flight||{};
@@ -2917,7 +2960,7 @@ function adminTripEditor(id){
  <div class="smart-route-banner"><span>✨</span><div><b>Dica Inteligente</b><small>Cadastre atrações, cafés, restaurantes, lojas e experiências. Use “Adicionar como dica” para recomendações fora do roteiro principal.</small></div></div>
  <div class="ipa-admin-days">${(t.itinerary||[]).sort((a,b)=>a.day-b.day).map(day=>`<div class="admin-day-expanded"><div class="admin-day-title"><strong>${day.day}</strong><span><b>${day.title}</b><small>${day.date||''}</small></span><button class="admin-add-place-btn" data-admin-add-place="${t.id}:${day.day}">+ Lugar / dica</button></div><div class="admin-place-list">${normalizedPlaces(day).map((p,i)=>`<div><span>${i+1}</span><div><b>${p.time?`${p.time} · `:''}${p.category||'📍'} ${p.name}</b><small>${p.address||p.note||''}</small>${p.smartTip?`<em>💡 ${p.smartTip}</em>`:''}</div>${p.mapsUrl?`<button type="button" class="admin-place-map" data-external-route="${ipaEscape(p.mapsUrl)}" aria-label="Abrir ${ipaEscape(p.name)} no Google Maps">↗ Maps</button>`:''}</div>`).join('')||'<small>Nenhum local neste dia.</small>'}</div></div>`).join('')||'<p>Comece adicionando o primeiro dia.</p>'}</div>
  <div class="network-tip-list">${(d.recommendations||[]).filter(r=>r.tripId===t.id).map(r=>`<div><span>💡</span><div><b>${r.category||'Dica'} · ${r.name}</b><small>${r.address||''}</small><em>${r.smartTip||'Indo por Aí recomenda'}</em></div></div>`).join('')||'<small>Nenhuma dica extra cadastrada.</small>'}</div></section>
- <section class="ipa-admin-panel"><div class="section-head"><div><span class="eyebrow">✨ ANTES · ENTRE NO CLIMA</span><h2>Conteúdo do destino</h2></div><button class="btn btn-primary" data-admin-generate-climate="${t.id}">${t.climateContent?.length?'🔄 Atualizar conteúdo':'✨ Preparar conteúdo'}</button></div><p>Sugestões culturais reais são atualizadas pela curadoria do app, inclusive em viagens antigas. Conteúdo editado manualmente pelo ADM é preservado. As plataformas exibem buscas; disponibilidade não é verificada em tempo real.</p><div class="climate-admin-grid">${climateForTrip(t).map((x,i)=>`<div><span>${x[0]}</span><small>${x[1]}</small><b>${x[2]}</b><p>${x[3]}</p>${ipaStreamButtons(x)}${t.climateContent?.length?`<button class="btn btn-light" data-admin-edit-climate="${t.id}:${i}">✏️ Editar</button>`:''}</div>`).join('')}</div></section>
+ <section class="ipa-admin-panel"><div class="section-head"><div><span class="eyebrow">✨ ANTES · ENTRE NO CLIMA</span><h2>Conteúdo do destino</h2></div><button class="btn btn-primary" data-admin-generate-climate="${t.id}">${t.climateContent?.length?'🔄 Atualizar conteúdo':'✨ Preparar conteúdo'}</button></div><p>Sugestões culturais reais são atualizadas pela curadoria do app, inclusive em viagens antigas. Conteúdo editado manualmente pelo ADM é preservado. Os botões só aparecem com links diretos de conteúdo; adicione o link exato de outros serviços pelo campo de edição. Disponibilidade pode variar.</p><div class="climate-admin-grid">${climateForTrip(t).map((x,i)=>`<div><span>${x[0]}</span><small>${x[1]}</small><b>${x[2]}</b><p>${x[3]}</p>${ipaStreamButtons(x)}${t.climateContent?.length?`<button class="btn btn-light" data-admin-edit-climate="${t.id}:${i}">✏️ Editar</button>`:''}</div>`).join('')}</div></section>
  <section class="ipa-admin-panel"><div class="section-head"><div><span class="eyebrow">ANTES · CARTEIRA DA VIAGEM</span><h2>Documentos do cliente</h2></div><button class="btn btn-light" data-admin-document="${t.id}" data-client-id="${t.clientId}">+ Documento</button></div><p>Passagens, hotel, vouchers, seguro, ingressos e transfer. O ADM cadastra e o cliente consulta no Antes.</p><div class="admin-doc-list">${(d.tripDocuments||[]).filter(x=>x.tripId===t.id).map(x=>`<div><span>${x.type==='Passagem aérea'?'✈️':x.type.includes('Hospedagem')?'🏨':x.type.includes('trem')?'🚆':x.type.includes('ônibus')?'🚌':x.type.includes('Ingresso')?'🎟️':x.type.includes('Seguro')?'🛡️':'📄'}</span><div><b>${x.title}</b><small>${[x.date,x.time,x.terminal&&('Terminal '+x.terminal),x.gate&&('Portão '+x.gate)].filter(Boolean).join(' · ')}</small></div>${x.url?`<button data-external-route="${ipaEscape(x.url)}">Abrir</button>`:''}<button type="button" class="btn btn-light doc-delete-btn" data-admin-delete-document="${ipaEscape(x.id)}" data-document-trip="${ipaEscape(t.id)}" aria-label="Excluir documento ${ipaEscape(x.title)}">🗑 Excluir</button></div>`).join('')||'<small>Nenhum documento cadastrado.</small>'}</div></section>
 
  <section class="ipa-admin-panel"><div class="section-head"><div><span class="eyebrow">👥 PARTICIPANTES</span><h2>Quem vai nessa viagem?</h2></div><button class="btn btn-light" data-admin-add-participant="${t.id}">+ Participante</button></div>
