@@ -423,6 +423,51 @@ async function ipaCustomInvite(request,env){
  }catch(err){console.error('Resend invite network failed');return json({ok:false,error:'Falha ao enviar convite pelo Resend.'},502)}
 }
 
+
+// Catálogos públicos: descoberta por correspondência estrita; nunca inventar links.
+// Spotify requer credenciais próprias opcionais guardadas SOMENTE no Worker.
+const ipaClimateNormalize=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+const ipaClimateSafeHost=(v,allowed)=>{try{const u=new URL(v);return u.protocol==='https:'&&allowed.includes(u.hostname.replace(/^www\./,''))?u.href:''}catch{return ''}};
+async function ipaClimateCatalogJson(url,init={}){
+ const ctrl=new AbortController(),tm=setTimeout(()=>ctrl.abort(),4500);
+ try{const r=await fetch(url,{...init,signal:ctrl.signal,headers:{accept:'application/json',...(init.headers||{})}});if(!r.ok)return null;return await r.json()}catch{return null}finally{clearTimeout(tm)}
+}
+function ipaClimateMatch(candidate,requested){
+ const a=ipaClimateNormalize(candidate),b=ipaClimateNormalize(requested);
+ if(!a||!b)return false;
+ return a===b||a.startsWith(b+' ')||b.startsWith(a+' ');
+}
+async function ipaClimateDiscover(request,env){
+ const u=new URL(request.url),type=String(u.searchParams.get('type')||'').slice(0,30).toLowerCase(),title=String(u.searchParams.get('title')||'').slice(0,140).trim(),dest=String(u.searchParams.get('destination')||'').slice(0,100).trim();
+ if(!title||!/(playlist|livro|filme|série)/.test(type))return json({ok:false,error:'Recomendação inválida'},400);
+ const links={},sources=[];
+ const tasks=[];
+ if(type.includes('playlist')){
+  // Deezer playlist search: exige título realmente coincidente, sem links a pesquisas.
+  tasks.push((async()=>{const data=await ipaClimateCatalogJson('https://api.deezer.com/search/playlist?q='+encodeURIComponent(title));const item=(data?.data||[]).find(x=>ipaClimateMatch(x.title,title));const link=ipaClimateSafeHost(item?.link,['deezer.com']);if(link){links.Deezer=link;sources.push('Deezer')}})());
+  // Spotify Web API só se o responsável configurar Client ID/Secret no Cloudflare.
+  if(env.SPOTIFY_CLIENT_ID&&env.SPOTIFY_CLIENT_SECRET)tasks.push((async()=>{
+    const basic=btoa(env.SPOTIFY_CLIENT_ID+':'+env.SPOTIFY_CLIENT_SECRET);
+    const token=await ipaClimateCatalogJson('https://accounts.spotify.com/api/token',{method:'POST',headers:{authorization:'Basic '+basic,'content-type':'application/x-www-form-urlencoded'},body:'grant_type=client_credentials'});
+    if(!token?.access_token)return;
+    const data=await ipaClimateCatalogJson('https://api.spotify.com/v1/search?type=playlist&limit=15&q='+encodeURIComponent(title),{headers:{authorization:'Bearer '+token.access_token}});
+    const item=(data?.playlists?.items||[]).find(x=>x&&ipaClimateMatch(x.name,title));const link=ipaClimateSafeHost(item?.external_urls?.spotify,['open.spotify.com']);if(link){links.Spotify=link;sources.push('Spotify')}
+  })());
+  // Apple catalog: somente playlists que coincidam exatamente com o título.
+  tasks.push((async()=>{const data=await ipaClimateCatalogJson('https://itunes.apple.com/search?term='+encodeURIComponent(title)+'&media=music&entity=musicTrack&limit=10&country=BR');
+    // A API pública do iTunes não devolve playlists. Não apresentar músicas isoladas como playlists.
+    void data;
+  })());
+ }
+ if(type.includes('livro'))tasks.push((async()=>{
+  const data=await ipaClimateCatalogJson('https://itunes.apple.com/search?term='+encodeURIComponent(title)+'&media=ebook&entity=ebook&limit=20&country=BR');
+  const item=(data?.results||[]).find(x=>ipaClimateMatch(x.trackName||x.collectionName,title));
+  const link=ipaClimateSafeHost(item?.trackViewUrl,['books.apple.com']);if(link){links['Apple Books']=link;sources.push('Apple Books')}
+ })());
+ await Promise.allSettled(tasks);
+ return new Response(JSON.stringify({ok:true,links,sources,disclaimer:'Links específicos encontrados em catálogos públicos; a disponibilidade e o acesso dependem da plataforma.'}),{headers:{'content-type':'application/json; charset=utf-8','cache-control':'public, max-age=3600, s-maxage=43200','x-content-type-options':'nosniff'}});
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -438,6 +483,7 @@ export default {
     if (url.pathname === "/api/places/photo" && request.method === "GET") return googlePlacePhoto(request,env);
     if (url.pathname === "/api/places/photo-info" && request.method === "GET") return googlePlacePhotoInfo(request,env);
     if (url.pathname === "/api/routes/compute" && request.method === "POST") return computeRoadRoute(request,env);
+    if (url.pathname === "/api/climate/discover" && request.method === "GET") return ipaClimateDiscover(request,env);
     if (url.pathname === "/api/climate/generate" && request.method === "POST") return generateClimate(request,env);
     if (url.pathname === "/api/live/create" && request.method === "POST") return createLiveRoom(env);
     if (url.pathname === "/api/live/join" && request.method === "POST") return joinLiveRoom(request,env);

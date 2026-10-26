@@ -1,0 +1,9 @@
+Indo por Aí — Beta 6.29.93
+- Ícones dos streamings, música e livros continuam visíveis.
+- Procura automática no servidor via Deezer (playlists), Apple Books (livros) e Spotify (playlists, quando SPOTIFY_CLIENT_ID e SPOTIFY_CLIENT_SECRET estiverem configurados como segredos Cloudflare).
+- Links Spotify curados das versões anteriores continuam ativos.
+- A API pública do iTunes não oferece pesquisa de playlists da Apple Music: não criamos links falsos.
+- Netflix, Prime Video, Disney+ e Apple TV continuam inativos até que haja link direto específico verificável.
+- Nova edição de links separados por plataforma no ADM (opcional), preservando personalizações.
+- Links automáticos são consultados e armazenados em cache por até 12 horas, sem sobrescrever os dados da viagem no Firebase.
+- Links são validados por domínio HTTPS e correspondência textual. As plataformas podem exigir assinatura e disponibilidade local.

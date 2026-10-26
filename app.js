@@ -713,7 +713,22 @@ document.addEventListener('click',event=>{
  void ipaCreateLeadTripFromButton(btn);
 },true);
 
+if(!window.__ipaClimateLinkDelegate){
+ window.__ipaClimateLinkDelegate=true;
+ document.addEventListener('click',e=>{
+  const el=e.target.closest('[data-ipa-climate-card] [data-external-route]');
+  if(!el)return;
+  e.preventDefault();e.stopImmediatePropagation();
+  try{const url=new URL(el.dataset.externalRoute);if(url.protocol!=='https:')return;
+   const a=document.createElement('a');a.href=url.href;a.target='_blank';a.rel='noopener noreferrer';document.body.appendChild(a);a.click();a.remove();
+  }catch(err){toast('Link de conteúdo inválido.')}
+ },true);
+}
 function bind(){
+ if(document.querySelector("[data-ipa-climate-card]")){
+  const t=activeTrip();if(t){for(const item of climateForTrip(t)){ipaClimateClientItems.set(ipaClimateDiscoveryKey(item,tripDestination(t)),item[5]||{});}}
+  void ipaClimateRefreshLinks();
+ }
  setTimeout(()=>ipaHydrateTripWeather(),0);
  setTimeout(()=>{ipaInitRealMap();ipaInitExploreRealMap();},60);
  setTimeout(()=>ipaBindCatalogTools(),0);
@@ -870,8 +885,8 @@ function bind(){
  });
  document.querySelectorAll('[data-admin-edit-climate]').forEach(b=>b.onclick=()=>{
    const [tripId,idxRaw]=b.dataset.adminEditClimate.split(':'),idx=Number(idxRaw),d=adminData(),t=(d.trips||[]).find(x=>x.id===tripId),item=t?.climateContent?.[idx];if(!item)return;
-   showModal(`<span class="eyebrow">ENTRE NO CLIMA</span><h2>Editar ${ipaEscape(item.type||'conteúdo')}</h2><label>Título<input id="climateEditTitle" class="v2-concierge-input" value="${ipaEscape(item.title||'')}"></label><label>Descrição<textarea id="climateEditDescription" class="rating-text">${ipaEscape(item.description||'')}</textarea></label><label>Link opcional<input id="climateEditUrl" class="v2-concierge-input" value="${ipaEscape(item.url||'')}"></label><button id="saveClimateEdit" class="btn btn-primary btn-block">Salvar alteração</button>`);
-   setTimeout(()=>{const save=document.querySelector('#saveClimateEdit');if(save)save.onclick=async()=>{const list=[...(t.climateContent||[])];list[idx]={...item,title:document.querySelector('#climateEditTitle').value.trim(),description:document.querySelector('#climateEditDescription').value.trim(),url:document.querySelector('#climateEditUrl').value.trim(),manuallyEdited:true};IPAData.updateTrip(tripId,{climateContent:list,climateEditedAt:new Date().toISOString()});if(window.IPAFirebase?.user)await window.IPAFirebase.syncNow();modal.close();view.innerHTML=adminTripEditor(tripId);bind();toast('Entre no Clima atualizado ✓')}},0);
+   showModal(`<span class="eyebrow">ENTRE NO CLIMA</span><h2>Editar ${ipaEscape(item.type||'conteúdo')}</h2><label>Título<input id="climateEditTitle" class="v2-concierge-input" value="${ipaEscape(item.title||'')}"></label><label>Descrição<textarea id="climateEditDescription" class="rating-text">${ipaEscape(item.description||'')}</textarea></label><label>Link principal opcional<input id="climateEditUrl" class="v2-concierge-input" value="${ipaEscape(item.url||'')}"></label><p class="ipa-climate-links-help">Links específicos por plataforma (opcionais). Os encontrados automaticamente dispensam cadastro.</p>${ipaClimateEditorFields(item)}<button id="saveClimateEdit" class="btn btn-primary btn-block">Salvar alteração</button>`);
+   setTimeout(()=>{const save=document.querySelector('#saveClimateEdit');if(save)save.onclick=async()=>{const list=[...(t.climateContent||[])];list[idx]={...item,title:document.querySelector('#climateEditTitle').value.trim(),description:document.querySelector('#climateEditDescription').value.trim(),url:document.querySelector('#climateEditUrl').value.trim(),links:ipaClimateEditorValues(item),manuallyEdited:true};IPAData.updateTrip(tripId,{climateContent:list,climateEditedAt:new Date().toISOString()});if(window.IPAFirebase?.user)await window.IPAFirebase.syncNow();modal.close();view.innerHTML=adminTripEditor(tripId);bind();toast('Entre no Clima atualizado ✓')}},0);
  });
  document.querySelectorAll('[data-remove-smart-route]').forEach(b=>b.onclick=()=>{
   const t=activeTrip();if(!t)return;
@@ -2336,7 +2351,7 @@ function paymentsView(){
 
 // Curadoria identificada por versão: publicações novas são exibidas sem exigir que o
 // cliente ou ADM recadastrem a viagem. Conteúdo personalizado permanece intocado.
-const IPA_CLIMATE_CURATED_VERSION='2026-10-direct-links-1';
+const IPA_CLIMATE_CURATED_VERSION='2026-10-auto-links-3';
 function ipaClimateLegacyAutomatic(t){
  const list=t?.climateContent;
  if(!Array.isArray(list)||!list.length)return false;
@@ -2446,7 +2461,7 @@ function hotelStaySection(t){
 // Os links para outras plataformas só são apresentados quando houver um URL
 // direto cadastrado na curadoria ou manualmente pelo ADM.
 const IPA_CLIMATE_DIRECT_LINKS={
- 'sampa e clássicos paulistanos':{
+ 'sampa e classicos paulistanos':{
   Spotify:'https://open.spotify.com/playlist/0c4eSo8ApvAfXoiGoCGXup'
  },
  'sons de sampa':{
@@ -2474,12 +2489,67 @@ function ipaClimateProviderFromUrl(url){
  }catch(e){}
  return '';
 }
+
+function ipaClimatePlatformNames(type){
+ const v=String(type||'').toLowerCase();
+ return v.includes('playlist')?['Spotify','Deezer','Apple Music']:v.includes('livro')?['Kindle','Apple Books']:v.includes('filme')||v.includes('série')?['Netflix','Prime Video','Disney+','Apple TV']:[];
+}
+function ipaClimateEditorFields(item){
+ const fields=ipaClimatePlatformNames(item.type),links=item.links||{};
+ return fields.map((name,i)=>`<label class="ipa-climate-platform-field">${ipaEscape(name)}<input type="url" class="v2-concierge-input" data-ipa-climate-platform="${ipaEscape(name)}" placeholder="https://..." value="${ipaEscape(links[name]||'')}"></label>`).join('');
+}
+function ipaClimateEditorValues(item){
+ const result={...(item.links||{})};
+ document.querySelectorAll('[data-ipa-climate-platform]').forEach(input=>{
+  const name=input.dataset.ipaClimatePlatform,url=input.value.trim();
+  if(!url){delete result[name];return;}
+  if(ipaClimateProviderFromUrl(url)===name)result[name]=url;
+ });
+ return result;
+}
+// Links públicos encontrados são mantidos em memória e atualizados por TTL.
+// Não escrevemos no Firestore durante leitura do cliente e não sobrepomos links do ADM.
+const ipaClimateDiscoveryCache=new Map();
+const ipaClimateDiscoveryPending=new Map();
+function ipaClimateDiscoveryKey(item,destination){return JSON.stringify([item[1]||'',item[2]||'',destination||''])}
+async function ipaClimateFindLinks(item,destination){
+ const key=ipaClimateDiscoveryKey(item,destination),old=ipaClimateDiscoveryCache.get(key);
+ if(old&&Date.now()-old.at<12*3600*1000)return old.links;
+ if(ipaClimateDiscoveryPending.has(key))return ipaClimateDiscoveryPending.get(key);
+ const query=new URLSearchParams({type:item[1]||'',title:item[2]||'',destination:destination||''});
+ const pending=(async()=>{
+  try{const response=await fetch('/api/climate/discover?'+query.toString(),{headers:{accept:'application/json'}});
+   if(!response.ok)return {};
+   const data=await response.json(),links={};
+   for(const [name,url] of Object.entries(data.links||{}))if(ipaClimateProviderFromUrl(url)===name)links[name]=url;
+   ipaClimateDiscoveryCache.set(key,{at:Date.now(),links});return links;
+  }catch{return {}}
+  finally{ipaClimateDiscoveryPending.delete(key)}
+ })();ipaClimateDiscoveryPending.set(key,pending);return pending;
+}
+// Atualiza exclusivamente as ações do Entre no Clima, sem renderizar toda a tela.
+async function ipaClimateRefreshLinks(){
+ const cards=[...document.querySelectorAll('[data-ipa-climate-card]')];
+ await Promise.allSettled(cards.map(async card=>{
+  const type=card.dataset.ipaClimateType,title=card.dataset.ipaClimateTitle,dest=card.dataset.ipaClimateDestination;
+  const item=[null,type,title,null,card.dataset.ipaClimateUrl||'',{}];
+  const explicit=ipaClimateClientItems.get(ipaClimateDiscoveryKey(item,dest));
+  if(explicit)item[5]=explicit;
+  const discovered=await ipaClimateFindLinks(item,dest);
+  if(!card.isConnected)return;
+  // Prioridade do ADM sobre catálogos; links curados permanecem prioritários em seguida.
+  item[5]={...discovered,...(explicit||{})};
+  const target=card.querySelector('.ipa-climate-actions');if(target){target.innerHTML=ipaStreamButtons(item);}
+ }));
+}
+const ipaClimateClientItems=new Map();
+
 function ipaStreamButtons(item){
  const type=String(item[1]||'').toLowerCase(),title=String(item[2]||'').trim();
  if(!title||!/(filme|série|playlist|livro)/.test(type))return '';
  const key=title.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
  const links={...(IPA_CLIMATE_DIRECT_LINKS[key]||{})};
- // Curadoria salva no Firebase pode conter vários links verificados por serviço.
+ // Manter links próprios que tenham sido cadastrados pelo ADM.
  const extra=item[5];
  if(extra && typeof extra==='object' && !Array.isArray(extra)){
   const supplied=extra.links||extra;
@@ -2490,17 +2560,25 @@ function ipaStreamButtons(item){
  const oneUrl=String(item[4]||'');
  const detected=ipaClimateProviderFromUrl(oneUrl);
  if(detected)links[detected]=oneUrl;
- const providers=Object.entries(links).filter(([name,url])=>{
-  try{const u=new URL(url);return u.protocol==='https:'&&ipaClimateProviderFromUrl(url)===name;}catch(e){return false;}
- });
- if(!providers.length)return '<small class="ipa-stream-note">Link direto ainda não cadastrado para este conteúdo.</small>';
- const mark={'Netflix':'N','Prime Video':'▶','Disney+':'D+','Apple TV':'●','Spotify':'≋','Deezer':'▥','Apple Music':'♫','Kindle':'K','Google Livros':'G','Apple Books':'◈'};
- return `<div class="ipa-stream-links">${providers.map(([name,url])=>`<button type="button" class="ipa-stream-link" data-external-route="${ipaEscape(url)}" title="Abrir ${ipaEscape(title)} diretamente no ${ipaEscape(name)}"><span class="ipa-provider-mark ipa-provider-${ipaEscape(name.toLowerCase().replace(/[^a-z]/g,''))}" aria-hidden="true">${mark[name]||'▶'}</span><span>${ipaEscape(name)} · Abrir ${type.includes('playlist')?'playlist':'conteúdo'}</span><span aria-hidden="true">↗</span></button>`).join('')}</div><small class="ipa-stream-note">Link direto do conteúdo · pode exigir conta no serviço.</small>`;
+ const names=type.includes('playlist')?['Spotify','Deezer','Apple Music']:
+   type.includes('livro')?['Kindle','Apple Books']:
+   ['Netflix','Prime Video','Disney+','Apple TV'];
+ const mark={'Netflix':'N','Prime Video':'▶','Disney+':'D+','Apple TV':'●','Spotify':'≋','Deezer':'▥','Apple Music':'♫','Kindle':'K','Apple Books':'◈'};
+ const buttons=names.map(name=>{
+  const url=links[name]||'';
+  let direct=false;
+  try{const u=new URL(url);direct=u.protocol==='https:'&&ipaClimateProviderFromUrl(url)===name;}catch(e){}
+  const icon=`<span class="ipa-provider-mark ipa-provider-${ipaEscape(name.toLowerCase().replace(/[^a-z]/g,''))}" aria-hidden="true">${mark[name]||'▶'}</span>`;
+  if(direct)return `<button type="button" class="ipa-stream-link" data-external-route="${ipaEscape(url)}" title="Abrir ${ipaEscape(title)} no ${ipaEscape(name)}">${icon}<span>${ipaEscape(name)} ↗</span></button>`;
+  return `<span class="ipa-stream-link ipa-stream-unavailable" title="Link direto ainda não disponível no ${ipaEscape(name)}">${icon}<span>${ipaEscape(name)}</span></span>`;
+ }).join('');
+ const hasDirect=names.some(name=>{try{return new URL(links[name]||'').protocol==='https:'&&ipaClimateProviderFromUrl(links[name])===name;}catch(e){return false;}});
+ return `<div class="ipa-stream-links">${buttons}</div><small class="ipa-stream-note">${hasDirect?'Toque nos serviços com link para abrir o conteúdo. Outros aguardam link direto.':'Links diretos ainda não cadastrados · ícones mantidos para referência.'}</small>`;
 }
 
 function climateSection(t){
  const dest=tripDestination(t),cards=climateForTrip(t);
- return `<section class="section climate-section"><div class="section-head"><div><span class="eyebrow">✨ ENTRE NO CLIMA</span><h2>${dest} começa antes do embarque</h2></div></div><div class="climate-grid">${cards.map((x,i)=>`<article><span>${x[0]}</span><small>${x[1]}</small><b>${x[2]}</b><p>${x[3]}</p>${ipaStreamButtons(x)}${x[4]&&!ipaClimateProviderFromUrl(x[4])?`<button data-external-route="${ipaEscape(x[4])}">Abrir sugestão ↗</button>`:i===4?`<button data-climate-explore="${encodeURIComponent(x[2])}">📍 Ver no Explorar</button>`:''}</article>`).join('')}</div></section>`;
+ return `<section class="section climate-section"><div class="section-head"><div><span class="eyebrow">✨ ENTRE NO CLIMA</span><h2>${dest} começa antes do embarque</h2></div></div><div class="climate-grid">${cards.map((x,i)=>`<article data-ipa-climate-card="1" data-ipa-climate-type="${ipaEscape(x[1])}" data-ipa-climate-title="${ipaEscape(x[2])}" data-ipa-climate-destination="${ipaEscape(dest)}" data-ipa-climate-url="${ipaEscape(x[4]||'')}"><span>${x[0]}</span><small>${x[1]}</small><b>${x[2]}</b><p>${x[3]}</p><div class="ipa-climate-actions">${ipaStreamButtons(x)}</div>${x[4]&&!ipaClimateProviderFromUrl(x[4])?`<button data-external-route="${ipaEscape(x[4])}">Abrir sugestão ↗</button>`:i===4?`<button data-climate-explore="${encodeURIComponent(x[2])}">📍 Ver no Explorar</button>`:''}</article>`).join('')}</div></section>`;
 }
 function flightWalletSection(t,d){
  const flight=t?.flight||{};
@@ -2960,7 +3038,7 @@ function adminTripEditor(id){
  <div class="smart-route-banner"><span>✨</span><div><b>Dica Inteligente</b><small>Cadastre atrações, cafés, restaurantes, lojas e experiências. Use “Adicionar como dica” para recomendações fora do roteiro principal.</small></div></div>
  <div class="ipa-admin-days">${(t.itinerary||[]).sort((a,b)=>a.day-b.day).map(day=>`<div class="admin-day-expanded"><div class="admin-day-title"><strong>${day.day}</strong><span><b>${day.title}</b><small>${day.date||''}</small></span><button class="admin-add-place-btn" data-admin-add-place="${t.id}:${day.day}">+ Lugar / dica</button></div><div class="admin-place-list">${normalizedPlaces(day).map((p,i)=>`<div><span>${i+1}</span><div><b>${p.time?`${p.time} · `:''}${p.category||'📍'} ${p.name}</b><small>${p.address||p.note||''}</small>${p.smartTip?`<em>💡 ${p.smartTip}</em>`:''}</div>${p.mapsUrl?`<button type="button" class="admin-place-map" data-external-route="${ipaEscape(p.mapsUrl)}" aria-label="Abrir ${ipaEscape(p.name)} no Google Maps">↗ Maps</button>`:''}</div>`).join('')||'<small>Nenhum local neste dia.</small>'}</div></div>`).join('')||'<p>Comece adicionando o primeiro dia.</p>'}</div>
  <div class="network-tip-list">${(d.recommendations||[]).filter(r=>r.tripId===t.id).map(r=>`<div><span>💡</span><div><b>${r.category||'Dica'} · ${r.name}</b><small>${r.address||''}</small><em>${r.smartTip||'Indo por Aí recomenda'}</em></div></div>`).join('')||'<small>Nenhuma dica extra cadastrada.</small>'}</div></section>
- <section class="ipa-admin-panel"><div class="section-head"><div><span class="eyebrow">✨ ANTES · ENTRE NO CLIMA</span><h2>Conteúdo do destino</h2></div><button class="btn btn-primary" data-admin-generate-climate="${t.id}">${t.climateContent?.length?'🔄 Atualizar conteúdo':'✨ Preparar conteúdo'}</button></div><p>Sugestões culturais reais são atualizadas pela curadoria do app, inclusive em viagens antigas. Conteúdo editado manualmente pelo ADM é preservado. Os botões só aparecem com links diretos de conteúdo; adicione o link exato de outros serviços pelo campo de edição. Disponibilidade pode variar.</p><div class="climate-admin-grid">${climateForTrip(t).map((x,i)=>`<div><span>${x[0]}</span><small>${x[1]}</small><b>${x[2]}</b><p>${x[3]}</p>${ipaStreamButtons(x)}${t.climateContent?.length?`<button class="btn btn-light" data-admin-edit-climate="${t.id}:${i}">✏️ Editar</button>`:''}</div>`).join('')}</div></section>
+ <section class="ipa-admin-panel"><div class="section-head"><div><span class="eyebrow">✨ ANTES · ENTRE NO CLIMA</span><h2>Conteúdo do destino</h2></div><button class="btn btn-primary" data-admin-generate-climate="${t.id}">${t.climateContent?.length?'🔄 Atualizar conteúdo':'✨ Preparar conteúdo'}</button></div><p>Sugestões culturais reais são atualizadas pela curadoria do app, inclusive em viagens antigas. Conteúdo editado manualmente pelo ADM é preservado. Os ícones dos serviços são exibidos; aqueles com link direto confirmado podem ser abertos. O aplicativo procura links públicos automaticamente; links individuais podem ser editados como alternativa. Disponibilidade pode variar.</p><div class="climate-admin-grid">${climateForTrip(t).map((x,i)=>`<div><span>${x[0]}</span><small>${x[1]}</small><b>${x[2]}</b><p>${x[3]}</p>${ipaStreamButtons(x)}${t.climateContent?.length?`<button class="btn btn-light" data-admin-edit-climate="${t.id}:${i}">✏️ Editar</button>`:''}</div>`).join('')}</div></section>
  <section class="ipa-admin-panel"><div class="section-head"><div><span class="eyebrow">ANTES · CARTEIRA DA VIAGEM</span><h2>Documentos do cliente</h2></div><button class="btn btn-light" data-admin-document="${t.id}" data-client-id="${t.clientId}">+ Documento</button></div><p>Passagens, hotel, vouchers, seguro, ingressos e transfer. O ADM cadastra e o cliente consulta no Antes.</p><div class="admin-doc-list">${(d.tripDocuments||[]).filter(x=>x.tripId===t.id).map(x=>`<div><span>${x.type==='Passagem aérea'?'✈️':x.type.includes('Hospedagem')?'🏨':x.type.includes('trem')?'🚆':x.type.includes('ônibus')?'🚌':x.type.includes('Ingresso')?'🎟️':x.type.includes('Seguro')?'🛡️':'📄'}</span><div><b>${x.title}</b><small>${[x.date,x.time,x.terminal&&('Terminal '+x.terminal),x.gate&&('Portão '+x.gate)].filter(Boolean).join(' · ')}</small></div>${x.url?`<button data-external-route="${ipaEscape(x.url)}">Abrir</button>`:''}<button type="button" class="btn btn-light doc-delete-btn" data-admin-delete-document="${ipaEscape(x.id)}" data-document-trip="${ipaEscape(t.id)}" aria-label="Excluir documento ${ipaEscape(x.title)}">🗑 Excluir</button></div>`).join('')||'<small>Nenhum documento cadastrado.</small>'}</div></section>
 
  <section class="ipa-admin-panel"><div class="section-head"><div><span class="eyebrow">👥 PARTICIPANTES</span><h2>Quem vai nessa viagem?</h2></div><button class="btn btn-light" data-admin-add-participant="${t.id}">+ Participante</button></div>

@@ -1,0 +1,7 @@
+Beta 6.29.93 — Ícones dos streamings preservados no Entre no Clima.
+- Filme/série: Netflix, Prime Video, Disney+, Apple TV.
+- Playlist: Spotify, Deezer, Apple Music.
+- Livros: Kindle, Apple Books.
+- Apenas ícones com links específicos confirmados são clicáveis. Os demais permanecem visíveis, mas inativos, sem simular reprodução.
+- Corrigida a correspondência do título com acentos para reconhecer a playlist Sampa e clássicos paulistanos.
+- Preservados conteúdos personalizados do ADM e demais recursos do app.
