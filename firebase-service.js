@@ -622,7 +622,7 @@ window.IPAFirebase = {
     // O notify anterior fazia o app re-renderizar o formulário no meio do login,
     // recriando o botão "Entrando..." e causando o looping visual.
     try{
-      const credential = await signInWithEmailAndPassword(auth,email,password);
+      const credential = await signInWithEmailAndPassword(auth,String(email||"").trim().toLowerCase(),password);
       currentUser=credential.user;
 
       if(currentUser.uid!==ADMIN_UID){
@@ -665,13 +665,23 @@ window.IPAFirebase = {
   async setClientPassword(password){
     if(!currentUser || currentUser.uid===ADMIN_UID) throw new Error("Acesso de cliente não autenticado.");
     if(String(password||"").length<6) throw new Error("A senha precisa ter pelo menos 6 caracteres.");
+    // A operação de senha é independente do carregamento dos dados de viagem.
+    // Depois do sucesso, nunca pedir para o cliente cadastrar a senha novamente
+    // só porque uma consulta ao Firestore falhou.
     await updatePassword(currentUser,password);
     sessionStorage.removeItem("ipa-client-password-setup");
-    // Remove os parâmetros do link mágico sem trocar o domínio/rota do app.
     history.replaceState({},document.title,window.location.pathname);
-    await loadClientExperience();
-    notify("ipa-client-experience-ready");
-    return true;
+    try{
+      await loadClientExperience();
+    }catch(err){
+      console.error('Senha salva; falha ao carregar experiência:',err);
+      status='client-load-error';
+      lastError=err?.message||'Falha ao carregar os dados da viagem.';
+      notify('ipa-client-experience-ready');
+      return {passwordSaved:true,experienceLoaded:false,status,error:lastError};
+    }
+    notify('ipa-client-experience-ready');
+    return {passwordSaved:true,experienceLoaded:status==='client-connected',status,error:lastError};
   },
   async resetClientPassword(email){
     const normalized=String(email||"").trim().toLowerCase();

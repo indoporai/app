@@ -1,0 +1,1 @@
+Beta 6.29.82 — Ajuste visual na aba Clientes: card compacto, ações de cadastro e viagens separadas, publicação em destaque e layout responsivo. Nenhuma regra de negócio alterada.
