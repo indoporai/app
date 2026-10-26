@@ -1077,3 +1077,10 @@ dialog:has(#routeCatalogPlace) .smart-place-actions button{
 .ipa-release-final .ipa-unified-checkbox input{margin-top:4px;flex-shrink:0}
 .ipa-release-final .btn-block{width:100%;min-height:48px}
 .ipa-release-final small{line-height:1.5;color:#55717b}
+
+/* Beta 6.29.79: jornada Pedidos > Viagens > Clientes */
+.ipa-save-to-clients{border:1px solid #b8e0e3;background:linear-gradient(135deg,#f0fafa,#fff)}
+.ipa-release-summary{display:grid;gap:7px;padding:15px;margin:12px 0;border-radius:14px;background:#f2f8f9;color:#163d49}
+.ipa-release-summary small{display:block;line-height:1.4;color:#536b76}
+.ipa-admin-client .lead-actions{flex-wrap:wrap;gap:7px}
+.ipa-admin-client [data-client-publish-trip]{background:#fc651e;color:#fff}

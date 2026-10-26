@@ -1,0 +1,5 @@
+Indo por Aí Beta 6.29.79
+Fluxo: Pedidos -> criar roteiro -> Viagens (salvar dados) -> Clientes (editar/excluir/publicar).
+Ao publicar em Clientes, escolher Email Resend (envio seguro) ou WhatsApp (abre mensagem pronta, exige confirmação de envio pelo ADM).
+WhatsApp informativo não substitui o link seguro de primeiro acesso via e-mail.
+Testar em Firebase real com cliente de teste; a publicação só é liberada após confirmação no backend.

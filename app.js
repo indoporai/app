@@ -738,7 +738,7 @@ function bind(){
    IPAData.updateClientById(client.id,{activeTripId:trip.id,lastConfiguredTripId:trip.id});
    IPAData.updateTravelLead(lead.id,{tripId:trip.id,status:'Roteiro aprovado'});
    try{if(window.IPAFirebase?.user)await window.IPAFirebase.syncNow()}catch(e){console.error(e);toast('Viagem criada, mas a sincronização ficou pendente');return}
-   modal?.close?.();adminSection='trips';adminTripId=trip.id;render();toast('Roteiro criado! Complete os dados em Viagens e finalize a liberação apenas por lá.');
+   modal?.close?.();adminSection='trips';adminTripId=trip.id;render();toast('Roteiro salvo em Viagens! Complete os dados e clique em Salvar e seguir para Clientes.');
  });
 
  document.querySelectorAll('[data-admin-generate-climate]').forEach(b=>b.onclick=async()=>{
@@ -861,7 +861,7 @@ function bind(){
   }catch(e){toast('Não foi possível excluir: '+(e.message||'erro'));b.disabled=false;b.textContent='🗑 Excluir'}
  });
  document.querySelectorAll('[data-concierge-save]').forEach(b=>b.onclick=async()=>{const id=b.dataset.conciergeSave,status=document.querySelector('[data-concierge-status="'+id+'"]')?.value,adminReply=document.querySelector('[data-concierge-reply="'+id+'"]')?.value;b.disabled=true;try{await window.IPAFirebase.updateConciergeRequest(id,{status,adminReply});const r=ipaConciergeAdminRequests.find(x=>x.id===id);if(r)Object.assign(r,{status,adminReply});toast('Atendimento salvo no Firebase ✓');render()}catch(e){toast('Falha ao salvar atendimento: '+(e.message||'erro'));b.disabled=false}});
- document.querySelectorAll('[data-admin-section]').forEach(b=>b.onclick=()=>{adminSection=b.dataset.adminSection;state.route='admin';render()});
+ document.querySelectorAll('[data-admin-section]').forEach(b=>b.onclick=()=>{adminSection=b.dataset.adminSection;adminTripId=null;state.route='admin';render()});
  document.querySelectorAll('[data-admin-delete-trip]').forEach(b=>b.onclick=async()=>{
    const id=b.dataset.adminDeleteTrip,trip=(adminData().trips||[]).find(t=>t.id===id);
    if(!trip)return toast('Viagem não encontrada');
@@ -1380,6 +1380,29 @@ function bind(){
   try{IPAData.updateTrip(t.id,{publicationReview:{...(t.publicationReview||{}),experience:input.checked},publicationReviewedAt:new Date().toISOString()});await window.IPAFirebase.syncNow();input.disabled=false;}
   catch(e){input.disabled=false;input.checked=!input.checked;toast('Erro ao registrar revisão: '+(e?.message||e));}
  });
+ document.querySelectorAll('[data-trip-save-to-clients]').forEach(btn=>btn.onclick=async()=>{
+  const t=adminData().trips.find(x=>x.id===btn.dataset.tripSaveToClients);
+  if(!t)return toast('Viagem não encontrada');
+  if(!t.clientId)return toast('Vincule um cliente antes de continuar.');
+  btn.disabled=true;btn.textContent='Salvando no Firebase...';
+  try{
+   if(!window.IPAFirebase?.user)throw Error('É necessário estar autenticado no ADM.');
+   await window.IPAFirebase.syncNow();
+   const now=new Date().toISOString();
+   IPAData.updateTrip(t.id,{adminPreparedAt:now});
+   await window.IPAFirebase.syncNow();
+   adminTripId=null;adminSection='clients';render();
+   toast('Viagem salva. Vá ao cartão do cliente para publicar e avisar.');
+  }catch(e){console.error('Salvar viagem',e);toast('Falha ao salvar no Firebase: '+(e.message||e));btn.disabled=false;btn.textContent='💾 Salvar e seguir para Clientes'}
+ });
+ document.querySelectorAll('[data-client-manage-trip]').forEach(btn=>btn.onclick=()=>{
+  const trips=adminData().trips.filter(t=>t.clientId===btn.dataset.clientManageTrip);
+  if(!trips.length){toast('Este cliente ainda não tem viagem. Crie uma em Viagens.');return}
+  if(trips.length===1){adminTripId=trips[0].id;adminSection='trips';render();return}
+  ipaSelectClientTripAction(btn.dataset.clientManageTrip,'edit');
+ });
+ document.querySelectorAll('[data-client-delete-trip]').forEach(btn=>btn.onclick=()=>ipaSelectClientTripAction(btn.dataset.clientDeleteTrip,'delete'));
+ document.querySelectorAll('[data-client-publish-trip]').forEach(btn=>btn.onclick=()=>ipaSelectClientTripAction(btn.dataset.clientPublishTrip,'publish'));
  document.querySelectorAll('[data-trip-finalize]').forEach(button=>button.onclick=async()=>{
   const d=adminData(),t=d.trips.find(x=>x.id===button.dataset.tripFinalize),c=d.clients.find(x=>x.id===t?.clientId),status=document.querySelector('#ipaTripFinalStatus');
   if(!t||!c)return toast('Vincule a viagem ao cliente primeiro.');
@@ -2453,12 +2476,81 @@ function ipaOpenUnifiedPublication(clientId,selectedTripId=''){
   }
  };
 }
+function ipaSelectClientTripAction(clientId,action){
+ const d=adminData(),client=d.clients.find(c=>c.id===clientId),trips=d.trips.filter(t=>t.clientId===clientId);
+ if(!client)return toast('Cliente não encontrado');
+ if(!trips.length)return toast('Crie o roteiro e complete a viagem antes de publicar.');
+ const label=action==='publish'?'Publicar e notificar':action==='delete'?'Excluir viagem':'Editar viagem';
+ showModal(`<span class="eyebrow">INDO POR AÍ BUSINESS · CLIENTES</span><h2>${label}</h2><p>${ipaEscape(client.name)} · Selecione a viagem.</p><label>Viagem<select id="ipaClientActionTrip" class="v2-concierge-input">${trips.map(t=>`<option value="${ipaEscape(t.id)}">${ipaEscape(t.name)} · ${t.published?'Publicada':'Rascunho'}</option>`).join('')}</select></label><div id="ipaClientActionReview"></div><div id="ipaClientActionControls"></div>`);
+ const select=document.querySelector('#ipaClientActionTrip'),review=document.querySelector('#ipaClientActionReview'),controls=document.querySelector('#ipaClientActionControls');
+ function refresh(){
+  const trip=trips.find(t=>t.id===select.value);if(!trip)return;
+  const places=(trip.itinerary||[]).reduce((n,day)=>n+(day.places||[]).length,0);
+  review.innerHTML=`<div class="ipa-release-summary"><b>${ipaEscape(trip.name)}</b><small>${ipaEscape(tripStages(trip).map(st=>st.destination).filter(Boolean).join(' → ')||tripDestination(trip))}</small><small>${(trip.itinerary||[]).length} dias · ${places} passeios · ${(trip.hotelBookings||[]).length} hospedagens · ${(d.tripDocuments||[]).filter(x=>x.tripId===trip.id).length} documentos</small><small>${trip.published?'✓ Publicada':'Rascunho — cliente ainda não vê esta viagem'} · ${trip.adminPreparedAt?'Dados salvos e revisáveis':'Confira os dados em Viagens antes de publicar'}</small></div>`;
+  if(action==='edit'){
+   controls.innerHTML='<button class="btn btn-primary btn-block" id="ipaClientDoAction">✏️ Abrir edição em Viagens</button>';
+  }else if(action==='delete'){
+   controls.innerHTML='<p class="ipa-publication-error">A exclusão é definitiva e não apaga documentos vinculados automaticamente.</p><button class="btn btn-light btn-block" id="ipaClientDoAction">🗑 Excluir esta viagem</button>';
+  }else{
+   controls.innerHTML=`<label class="ipa-unified-checkbox"><input type="checkbox" id="ipaClientReviewConfirmed"> Conferi roteiro, documentos, voo e financeiro em Viagens</label><label>Como deseja avisar o cliente?<select id="ipaClientNotifyChannel" class="v2-concierge-input"><option value="email">✉️ E-mail personalizado (Resend)</option><option value="whatsapp">📱 WhatsApp (abrir mensagem pronta)</option></select></label><small>O e-mail envia o link seguro de primeiro acesso. No WhatsApp será enviada somente uma mensagem informativa, sem credenciais. Para o primeiro login, o link seguro de e-mail ainda será necessário.</small><button class="btn btn-primary btn-block" id="ipaClientDoAction">🚀 Publicar e preparar aviso</button><small id="ipaClientPublicationStatus" role="status"></small>`;
+  }
+  document.querySelector('#ipaClientDoAction').onclick=async()=>{
+   if(action==='edit'){modal.close();adminTripId=trip.id;adminSection='trips';render();return}
+   if(action==='delete'){
+    if(!confirm('Excluir definitivamente "'+trip.name+'"? Esta ação não pode ser desfeita.'))return;
+    const button=document.querySelector('#ipaClientDoAction');button.disabled=true;button.textContent='Excluindo...';
+    try{if(!window.IPAFirebase?.deleteTrip)throw Error('Serviço de exclusão indisponível');await window.IPAFirebase.deleteTrip(trip.id);IPAData.removeTrip(trip.id);modal.close();adminSection='clients';render();toast('Viagem excluída do Firebase ✓')}
+    catch(e){toast('Não foi possível excluir: '+(e.message||e));button.disabled=false;button.textContent='Tentar excluir'}
+    return;
+   }
+   if(!document.querySelector('#ipaClientReviewConfirmed')?.checked)return toast('Confirme a revisão da viagem antes de publicar.');
+   if(!places)return toast('A viagem precisa ter passeios antes da publicação.');
+   const channel=document.querySelector('#ipaClientNotifyChannel').value;
+   if(channel==='email'&&!client.email)return toast('Cadastre o e-mail do cliente antes de publicar por e-mail.');
+   const phone=String(client.phone||'').replace(/\D/g,'');
+   if(channel==='whatsapp'&&!phone)return toast('Cadastre o telefone do cliente para usar WhatsApp.');
+   if(!confirm('Confirmar publicação de '+trip.name+' para '+client.name+'? Canal: '+(channel==='email'?'e-mail':'WhatsApp')+'.'))return;
+   const button=document.querySelector('#ipaClientDoAction'),status=document.querySelector('#ipaClientPublicationStatus');
+   button.disabled=true;select.disabled=true;button.textContent='Publicando no Firebase...';status.textContent='Conferindo vínculo e publicação...';
+   let published=false;
+   try{
+    if(!window.IPAFirebase?.user)throw Error('Entre como ADM antes de publicar.');
+    await window.IPAFirebase.confirmClientTripPublication(client.id,trip.id,true);
+    published=true;
+    const now=new Date().toISOString();
+    IPAData.updateClientById(client.id,{approvalStatus:'Aprovado',accessApproved:true,approvedAt:client.approvedAt||now,activeTripId:trip.id,lastConfiguredTripId:trip.id});
+    IPAData.updateTrip(trip.id,{published:true,status:'Publicado',publishedAt:trip.publishedAt||now,publicationReview:{...(trip.publicationReview||{}),experience:true},publicationReviewedAt:now});
+    await window.IPAFirebase.syncNow();
+    if(channel==='email'){
+     button.textContent='Enviando e-mail...';status.textContent='Viagem publicada; enviando convite personalizado pelo Resend...';
+     await window.IPAFirebase.sendCustomClientInvite(client.email,client.id,trip.id,client.name||'Viajante');
+     IPAData.updateClientById(client.id,{inviteStatus:'sent',inviteSentAt:new Date().toISOString()});
+     IPAData.updateTrip(trip.id,{publicationInviteSentAt:new Date().toISOString(),publicationInviteError:'',notificationChannel:'email'});
+     await window.IPAFirebase.syncNow();
+     modal.close();adminSection='clients';render();toast('Viagem publicada e e-mail personalizado enviado ✓');
+    }else{
+     const number=phone.startsWith('55')?phone:'55'+phone;
+     const msg=`Olá, ${client.name}! Sua viagem ${trip.name} no Indo por Aí foi liberada! Acesse https://app.indoporaicomagente.com para acompanhar seu roteiro, documentos e informações. Se for seu primeiro acesso, solicite o link seguro de criação de senha por e-mail. Equipe Indo por Aí.`;
+     const url='https://wa.me/'+number+'?text='+encodeURIComponent(msg);
+     IPAData.updateTrip(trip.id,{notificationChannel:'whatsapp',notificationPreparedAt:new Date().toISOString()});
+     await window.IPAFirebase.syncNow();
+     status.textContent='✓ Viagem publicada. Abra o WhatsApp e pressione Enviar; a mensagem não é disparada automaticamente.';
+     controls.innerHTML='<p>Viagem publicada no Firebase. A mensagem está pronta; confirme o envio no WhatsApp.</p><button class="btn btn-primary btn-block" id="ipaClientOpenWhatsapp">📱 Abrir WhatsApp e enviar</button><button class="btn btn-light btn-block" id="ipaClientDone">Fechar</button>';
+     document.querySelector('#ipaClientOpenWhatsapp').onclick=()=>window.open(url,'_blank','noopener,noreferrer');
+     document.querySelector('#ipaClientDone').onclick=()=>{modal.close();adminSection='clients';render()};
+     toast('Viagem publicada. Confirme o envio no WhatsApp.');
+    }
+   }catch(e){console.error('Publicação em Clientes',e);const err=e?.message||String(e);status.textContent=(published?'A viagem foi publicada, mas o aviso falhou: ':'Falha na publicação: ')+err;button.disabled=false;select.disabled=false;button.textContent=published?'Tentar enviar aviso':'Tentar publicar';toast(status.textContent)}
+  };
+ }
+ select.onchange=refresh;refresh();
+}
 function adminClients(){
  const d=adminData();
- return `<div class="ipa-admin-head"><div><span class="eyebrow">CRM</span><h1>Clientes</h1><p>Cadastros manuais e solicitações do Quero viajar.</p></div><div class="lead-actions"><button class="btn btn-primary" data-admin-new-client>+ Novo cliente</button><button class="btn btn-light" data-admin-smart-client-trip>✨ Criar viagem inteligente</button></div></div><div class="catalog-summary ipa-access-summary"><div><strong>1</strong><small>Explore · acesso</small></div><div><strong>3</strong><small>Signature · acessos</small></div><div><strong>5</strong><small>Elite · acessos</small></div><div><strong>∞</strong><small>Groups · acessos</small></div></div><div class="ipa-admin-client-grid">${d.clients.map(c=>{const a=ipaAccessUsage(c,d),pending=(c.approvalStatus||'Aprovado')!=='Aprovado';return `<div class="ipa-admin-client"><div class="ipa-admin-avatar">${(c.name||'C').split(' ').map(x=>x[0]).slice(0,2).join('')}</div><div><b>${ipaEscape(c.name)}</b><small>${ipaEscape(c.email||'')} ${c.phone?' · '+ipaEscape(c.phone):''}</small><em>${ipaEscape(c.plan||'Explore')} · ${ipaEscape(c.clientType||'Titular')} · ${pending?'🟠 Aguardando aprovação':'🟢 Aprovado'}</em><small>Acessos: ${a.used} de ${a.total===Infinity?'ilimitados':a.total}</small><div class="lead-actions"><button class="btn btn-light" data-admin-edit-client="${c.id}">✏️ Editar</button><button class="btn btn-light" data-admin-smart-client-trip="${c.id}">✨ Criar viagem inteligente</button><button class="btn btn-light" data-client-open-trips="${ipaEscape(c.id)}">✈️ ${d.trips.some(t=>t.clientId===c.id)?'Abrir viagens':'Criar viagem'}</button></div></div></div>`}).join('')||'<div class="smart-empty"><b>Nenhum cliente cadastrado.</b></div>'}</div>`
+ return `<div class="ipa-admin-head"><div><span class="eyebrow">CRM</span><h1>Clientes</h1><p>Etapa 3: editar, excluir ou publicar a viagem pronta. A aprovação e o aviso ao cliente acontecem somente aqui.</p></div><div class="lead-actions"><button class="btn btn-primary" data-admin-new-client>+ Novo cliente</button><button class="btn btn-light" data-admin-smart-client-trip>✨ Criar viagem inteligente</button></div></div><div class="catalog-summary ipa-access-summary"><div><strong>1</strong><small>Explore · acesso</small></div><div><strong>3</strong><small>Signature · acessos</small></div><div><strong>5</strong><small>Elite · acessos</small></div><div><strong>∞</strong><small>Groups · acessos</small></div></div><div class="ipa-admin-client-grid">${d.clients.map(c=>{const a=ipaAccessUsage(c,d),pending=(c.approvalStatus||'Aprovado')!=='Aprovado';return `<div class="ipa-admin-client"><div class="ipa-admin-avatar">${(c.name||'C').split(' ').map(x=>x[0]).slice(0,2).join('')}</div><div><b>${ipaEscape(c.name)}</b><small>${ipaEscape(c.email||'')} ${c.phone?' · '+ipaEscape(c.phone):''}</small><em>${ipaEscape(c.plan||'Explore')} · ${ipaEscape(c.clientType||'Titular')} · ${pending?'🟠 Aguardando aprovação':'🟢 Aprovado'}</em><small>Acessos: ${a.used} de ${a.total===Infinity?'ilimitados':a.total}</small><div class="lead-actions"><button class="btn btn-light" data-admin-edit-client="${c.id}">✏️ Editar</button><button class="btn btn-light" data-admin-smart-client-trip="${c.id}">✨ Criar viagem inteligente</button><button class="btn btn-light" data-client-open-trips="${ipaEscape(c.id)}">✈️ ${d.trips.some(t=>t.clientId===c.id)?'Ver viagens':'Criar viagem'}</button><button class="btn btn-light" data-client-manage-trip="${ipaEscape(c.id)}">✏️ Editar viagem</button><button class="btn btn-light" data-client-delete-trip="${ipaEscape(c.id)}">🗑 Excluir viagem</button><button class="btn btn-primary" data-client-publish-trip="${ipaEscape(c.id)}">${d.trips.some(t=>t.clientId===c.id&&t.published)?'📨 Reenviar aviso / publicar':'🚀 Publicar viagem'}</button></div></div></div>`}).join('')||'<div class="smart-empty"><b>Nenhum cliente cadastrado.</b></div>'}</div>`
 }
 
-function adminTrips(){return `<div class="ipa-admin-head"><div><span class="eyebrow">EXPERIÊNCIAS</span><h1>Viagens</h1><p>Escolha uma viagem para personalizar o app.</p></div><div class="lead-actions"><button class="btn btn-primary" data-admin-new-trip>+ Nova viagem</button><button class="btn btn-light" data-admin-smart-client-trip>✨ Criação inteligente</button></div></div><section class="ipa-admin-panel">${adminTripList()}</section>`}
+function adminTrips(){if(adminTripId&&(adminData().trips||[]).some(t=>t.id===adminTripId))return adminTripEditor(adminTripId);return `<div class="ipa-admin-head"><div><span class="eyebrow">EXPERIÊNCIAS</span><h1>Viagens</h1><p>Escolha uma viagem para personalizar o app.</p></div><div class="lead-actions"><button class="btn btn-primary" data-admin-new-trip>+ Nova viagem</button><button class="btn btn-light" data-admin-smart-client-trip>✨ Criação inteligente</button></div></div><section class="ipa-admin-panel">${adminTripList()}</section>`}
 function adminFinance(){
  const d=adminData();
  const total=d.payments.reduce((s,p)=>s+Number(p.amount||0),0);
@@ -2611,7 +2703,7 @@ function adminTripEditor(id){
  const flags=countries.slice(0,5).map(x=>`<span class="trip-country-flag" title="${ipaEscape(x)}">${countryFlag(x)}</span>`).join('');
  const extra=countries.length>5?`<span class="trip-country-more">+${countries.length-5}</span>`:'';
  return `<div class="ipa-admin-editor-head trip-editor-hero"><button data-admin-section="trips">← Todas as viagens</button><div class="trip-editor-identity"><span class="eyebrow">${ipaEscape(c?.name||'VIAGEM')}</span><h1>${ipaEscape(t.name)}</h1><div class="trip-country-flags">${flags}${extra}</div><p>📍 ${ipaEscape(tripDestination(t))}${country?', '+ipaEscape(country):''}</p>${c?`<small>👤 ${ipaEscape(c.name)}</small>`:''}</div><button class="btn btn-light trip-editor-preview" data-client-preview="${t.id}" data-client-preview-client="${t.clientId}">👁 Ver como cliente</button></div>
- <div class="ipa-trip-setup-hint">1. Complete os dados da viagem nesta página. 2. Confira a prévia. 3. No final, libere o app e envie o e-mail. <button type="button" class="btn btn-light" data-publication-scroll="${ipaEscape(t.id)}">Ir para finalização ↓</button></div>
+ <div class="ipa-trip-setup-hint">Etapa 2: complete e salve todos os dados nesta página. Depois vá para Clientes para editar, excluir ou publicar e notificar o viajante. <button type="button" class="btn btn-light" data-publication-scroll="${ipaEscape(t.id)}">Salvar e seguir para Clientes ↓</button></div>
  <section class="ipa-admin-panel trip-client-panel"><div class="section-head"><div><span class="eyebrow">👤 CLIENTE DA VIAGEM</span><h2>${c?'Cliente da viagem':'Vincular cliente cadastrado'}</h2></div><span class="chip">${c?'✓ Vinculado':'Sem cliente'}</span></div>
  ${c?`<div class="trip-linked-client"><strong>${ipaEscape(c.name)}</strong><small>${ipaEscape(c.email||'')}</small></div>`:`<p>Selecione quem receberá esta viagem para publicar e enviar o acesso.</p>`}
  <div class="admin-trip-fields trip-client-fields"><label>${c?'Alterar cliente vinculado':'Cliente'}<select data-trip-client-select="${t.id}"><option value="">Selecione um cliente...</option>${(d.clients||[]).map(client=>`<option value="${client.id}" ${client.id===t.clientId?'selected':''}>${ipaEscape(client.name)}${client.email?' · '+ipaEscape(client.email):''}${client.approvalStatus?' · '+ipaEscape(client.approvalStatus):''}</option>`).join('')}</select></label><button class="btn btn-light" data-admin-link-client="${t.id}">${c?'✏️ Alterar cliente':'Vincular cliente'}</button></div>${!c?`<small>⚠️ Vincule um cliente antes de publicar/enviar o acesso.</small>`:''}</section>
@@ -2637,7 +2729,7 @@ function adminTripEditor(id){
  <div class="flight-admin-grid">${[['airline','Companhia'],['flightNumber','Número do voo'],['date','Data'],['origin','Origem'],['destination','Destino'],['time','Horário'],['terminal','Terminal'],['gate','Portão'],['seat','Assento']].map(([k,l])=>`<label>${l}<input data-flight-field="${k}" value="${t.flight?.[k]||''}" ${k==='date'?'type="date"':k==='time'?'type="time"':''}></label>`).join('')}</div>
  <label>Observações<textarea data-flight-field="notes" placeholder="Ex.: apresentação no portão 1h antes">${t.flight?.notes||''}</textarea></label>
  <button class="btn btn-primary" data-admin-save-flight="${t.id}">Salvar dados do voo</button></section>
- ${ipaTripPublicationPanel(t,c)}
+ <section class="ipa-admin-panel ipa-save-to-clients" id="ipaTripPublicationCenter"><span class="eyebrow">ETAPA 2 DE 3 · VIAGENS</span><h2>Concluir cadastro da viagem</h2><p>Revise o roteiro, os destinos, as hospedagens, o financeiro, os documentos e os voos. Cada seção possui seu botão de salvar. Depois, confirme a sincronização e siga para Clientes, onde ficará a publicação.</p><div class="ipa-publication-actions"><button type="button" class="btn btn-light" data-client-preview="${ipaEscape(t.id)}" data-client-preview-client="${ipaEscape(t.clientId||'')}">👁 Prévia do cliente</button><button type="button" class="btn btn-primary" data-trip-save-to-clients="${ipaEscape(t.id)}">💾 Salvar e seguir para Clientes</button></div><small>Essa ação não aprova o acesso nem envia mensagens.</small></section>
  <div class="admin-publish-actions ipa-publish-cta"><h3>Financeiro da viagem</h3><p>A cobrança permanece independente da liberação do aplicativo.</p>
  <button class="btn btn-light btn-block" data-admin-charge-trip="${t.id}" data-charge-client="${t.clientId}">💳 Enviar cobrança ao cliente responsável</button>
  </div>${ipaParticipantAdminSection(t)}`;
