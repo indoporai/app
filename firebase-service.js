@@ -409,7 +409,8 @@ async function loadClientExperience(){
   let memories=[],tripDocuments=[],recommendations=[];
   window.ipaMemoryCloudLoadError = false;
   try{
-    const s=await getDocs(query(collection(firestore,"memories"),where("clientId","==",client.id)));
+    // Consulta pelo UID impede que a lista solicite memórias de outros viajantes.
+    const s=await getDocs(query(collection(firestore,"memories"),where("ownerUid","==",currentUser.uid)));
     memories=s.docs.map(d=>({id:d.id,...d.data()})).filter(x=>trips.some(t=>t.id===x.tripId));
   }catch(e){
     window.ipaMemoryCloudLoadError=true;
@@ -594,7 +595,7 @@ window.IPAFirebase = {
     if(!currentUser)throw new Error("Entre na sua conta para sincronizar a memória.");
     if(!record?.id||!record?.tripId||!record?.clientId||!record?.url)throw new Error("Memória incompleta: viagem ou arquivo não identificado.");
     if(!String(record.url).startsWith("https://"))throw new Error("Arquivo ainda não está salvo na nuvem.");
-    const payload={...record,updatedAt:new Date().toISOString()};
+    const payload={...record,ownerUid:currentUser.uid,updatedAt:new Date().toISOString()};
     await setDoc(doc(firestore,"memories",record.id),payload);
     const checked=await getDocFromServer(doc(firestore,"memories",record.id));
     if(!checked.exists())throw new Error("Não foi possível confirmar a memória no Firebase.");

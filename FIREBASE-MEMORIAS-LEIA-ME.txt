@@ -1,0 +1,17 @@
+Beta 6.30.06 — AVISO PARA CONFIGURAÇÃO FIREBASE
+
+O erro permission-denied é emitido por regras publicadas no Firebase; atualizar apenas o ZIP não altera essas regras.
+
+NO FIREBASE CONSOLE:
+1) Firestore Database > Rules: revisar permissões da coleção memories para que a conta autenticada do cliente possa criar e consultar APENAS suas memórias de viagens vinculadas.
+2) Storage > Rules: revisar o caminho memories/{clientId}/{tripId}/{fileName} para permitir upload APENAS ao titular autenticado da viagem e ao ADM, com limites de arquivo.
+3) As regras devem conferir no documento clients/{clientId} que authUid == request.auth.uid, e em trips/{tripId} que clientId corresponde, sem usar allow read, write: if true.
+4) A leitura de lista no Firestore precisa ser compatível com as consultas do aplicativo e a regra aplicada (regras não filtram consultas).
+
+IMPORTANTE: não substitua regras existentes sem conferir o resto do projeto; isso pode bloquear pagamentos, documentos e Concierge. A correção das regras do servidor precisa ser validada no Firebase Rules Playground/Emulator antes de publicar.
+
+UX: fotos registradas aparecem imediatamente no álbum deste dispositivo e no Filme da Viagem; sincronização automática é tentada ao reconectar/retomar o app. Sem autorização no servidor, não ficam disponíveis em outros aparelhos. Não limpe os dados do navegador até confirmar o upload.
+
+IMPORTANTE: O print mostrou que a falha ocorreu em "Registro da memória", ou seja, após o upload ao Storage. Priorize conferir a regra de escrita da coleção memories no Firestore.
+
+O app 6.30.06 grava ownerUid com o UID autenticado e lista apenas memórias cujo ownerUid corresponda ao viajante. Ajuste as regras atuais para permitir essa consulta e a criação/alteração somente pelo dono da memória, vinculada a seu cliente e viagem. As memórias antigas que não possuam ownerUid podem exigir migração supervisionada pelo ADM; não as exclua.

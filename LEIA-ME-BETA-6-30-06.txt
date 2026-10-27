@@ -1,0 +1,1 @@
+Beta 6.30.06: registro de memórias integrado ao álbum e ao filme, sem botão de enviar manualmente. Atenção: regras de Firebase Storage e Firestore devem permitir acesso ao viajante autenticado para a sincronização funcionar entre dispositivos. Leia FIREBASE-MEMORIAS-LEIA-ME.txt.

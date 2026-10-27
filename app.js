@@ -950,7 +950,7 @@ function bind(){
  document.querySelectorAll('[data-profile]').forEach(b=>b.onclick=()=>setProfile(b.dataset.profile));
  document.querySelectorAll('#liveBtn').forEach(b=>b.onclick=toggleLive);
  document.querySelectorAll('#addPhoto').forEach(b=>b.onclick=()=>photoInput.click());
- if(state.route==='memories')ipaUpdatePendingMemories();
+ if(state.route==='memories'){ipaUpdatePendingMemories();ipaAutoSyncMemories();}
 
  document.querySelectorAll('[data-day]').forEach(b=>b.onclick=()=>{state.tripDay=Number(b.dataset.day);render()});
  document.querySelectorAll('[data-client-switch-trip]').forEach(b=>b.onclick=()=>ipaSelectClientTrip(b.dataset.clientSwitchTrip));
@@ -3688,7 +3688,7 @@ function memoriesView(){
  const t=activeTrip();if(!t)return `<section class="section"><h2>Viagem não encontrada</h2></section>`;
  const days=(t.itinerary||[]).sort((a,b)=>Number(a.day)-Number(b.day)),country=tripCountry(t),flag=countryFlag(country);
  const memories=(ipaDB().memories||[]).filter(m=>m.tripId===t.id);
- const memorySyncWarning=window.ipaMemoryCloudLoadError ? `<div class="ipa-memory-sync-alert" role="status">☁️ Não foi possível conferir todas as fotos na nuvem. Os registros deste aparelho foram mantidos. Verifique a conexão e tente entrar novamente; não limpe os dados do navegador.</div>` : "";
+ const memorySyncWarning=window.ipaMemoryCloudLoadError ? `<div class="ipa-memory-sync-alert" role="status">☁️ A sincronização das memórias ainda não foi confirmada. Suas fotos deste aparelho continuam visíveis abaixo, e o aplicativo tentará sincronizar automaticamente.</div>` : "";
  const jp=ipaDB().journeyPlaces||{};
  const dayCards=days.map(day=>{
    const official=normalizedPlaces(day);
@@ -3748,27 +3748,96 @@ async function ipaSendPendingMemory(item){
  try{await window.IPAFirebase.saveMemory(memory)}catch(e){throw new Error(ipaMemoryError(e,'Registro da memória'))}
  IPAData.addMemory(memory);
  await ipaPendingMemoryDB.del(item.id);
+ if(typeof ipaForgetPendingMedia==='function')ipaForgetPendingMedia(item.id);
  return memory;
+}
+// 6.30.06: prévias locais no álbum e no filme; reenvio transparente.
+const ipaPendingMediaUrls=new Map();
+let ipaAutoMemoryRunning=false;
+let ipaLastAutomaticMemoryAttempt=0;
+function ipaGetPendingMediaUrl(item){
+ const stored=ipaPendingMediaUrls.get(item.id);
+ if(stored)return stored;
+ if(!item.file)return '';
+ const url=URL.createObjectURL(item.file);
+ ipaPendingMediaUrls.set(item.id,url);
+ return url;
+}
+function ipaForgetPendingMedia(id){
+ const url=ipaPendingMediaUrls.get(id);
+ if(url)URL.revokeObjectURL(url);
+ ipaPendingMediaUrls.delete(id);
+}
+function ipaPendingMovieItems(t){
+ if(!t?.id)return [];
+ return (window.ipaActivePendingMemories||[]).filter(item=>item.tripId===t.id).map(item=>({
+   ...item.memory,src:ipaGetPendingMediaUrl(item),url:ipaGetPendingMediaUrl(item),
+   cloudSynced:false
+ }));
+}
+async function ipaAutoSyncMemories(force=false){
+ if(ipaAutoMemoryRunning||!window.IPAFirebase?.user?.uid)return;
+ if(!force&&Date.now()-ipaLastAutomaticMemoryAttempt<120000)return;
+ ipaLastAutomaticMemoryAttempt=Date.now();ipaAutoMemoryRunning=true;
+ try{
+  const uid=window.IPAFirebase.user.uid;
+  const items=(await ipaPendingMemoryDB.all()).filter(item=>item.ownerUid===uid);
+  for(const item of items){
+   try{await ipaSendPendingMemory(item);ipaForgetPendingMedia(item.id)}
+   catch(err){console.warn('Memória pendente de sincronização automática:',err?.code||err?.message);if(/permission-denied|storage\/unauthorized/i.test(String(err?.message||'')))break}
+  }
+ }catch(err){console.warn('Sincronização automática de memórias indisponível',err)}
+ finally{
+  ipaAutoMemoryRunning=false;
+  if(state.route==='memories'&&state.profile==='client')ipaUpdatePendingMemories();
+ }
 }
 async function ipaUpdatePendingMemories(){
  const container=document.querySelector('[data-memory-pending-list]');if(!container)return;
  const t=activeTrip(),uid=window.IPAFirebase?.user?.uid;
- if(!t||!uid){container.innerHTML='';return;}
+ if(!t||!uid){container.replaceChildren();window.ipaActivePendingMemories=[];return}
  try{
-  const items=(await ipaPendingMemoryDB.all()).filter(x=>x.tripId===t.id&&x.ownerUid===uid);
+  const items=(await ipaPendingMemoryDB.all()).filter(item=>item.tripId===t.id&&item.ownerUid===uid);
   if(!container.isConnected)return;
-  if(!items.length){container.innerHTML='';return;}
-  container.innerHTML=`<div class="ipa-memory-pending-box"><b>📱 ${items.length} memória(s) aguardando sincronização</b><p>Arquivos preservados neste aparelho, mas ainda não disponíveis em outros dispositivos. Não apague os dados do navegador até enviar.</p><button type="button" class="btn btn-primary" data-retry-memories>☁️ Tentar enviar para a nuvem</button><small data-retry-memories-status></small></div>`;
-  container.querySelector('[data-retry-memories]').onclick=async(event)=>{
-   const button=event.currentTarget,status=container.querySelector('[data-retry-memories-status]');button.disabled=true;button.textContent='Enviando...';
-   let ok=0,errors=[];
-   for(const record of items){try{await ipaSendPendingMemory(record);ok++}catch(err){errors.push(err.message||'Falha desconhecida')}}
-   if(status)status.textContent=errors.length?`${ok} enviada(s). ${errors[0]}`:`${ok} memória(s) salva(s) na nuvem ✓`;
-   button.disabled=false;button.textContent='☁️ Tentar novamente';
-   if(ok&&!errors.length){toast(`${ok} memória(s) sincronizada(s) ✓`);render();}
-  };
- }catch(err){console.warn('Memórias locais pendentes indisponíveis',err);container.textContent='Não foi possível conferir as fotos pendentes deste aparelho.'}
+  window.ipaActivePendingMemories=items;
+  // A foto fica visível imediatamente no álbum, sem criar registros remotos fictícios.
+  const gallery=document.querySelector('.live-memory-grid');
+  if(gallery){gallery.querySelectorAll('[data-ipa-local-pending]').forEach(node=>node.remove());
+   for(const item of items){
+    const url=ipaGetPendingMediaUrl(item);if(!url)continue;
+    const card=document.createElement('div');card.className='live-memory ipa-local-memory';card.dataset.ipaLocalPending=item.id;
+    const media=document.createElement(item.memory?.type==='video'?'video':'img');media.src=url;
+    if(media.tagName==='VIDEO'){media.controls=true;media.playsInline=true}
+    else media.alt=item.memory?.placeName||'Momento da viagem';
+    card.appendChild(media);
+    const caption=document.createElement('b');caption.textContent=item.memory?.placeName||item.memory?.prompt||'Momento registrado';card.appendChild(caption);
+    const status=document.createElement('small');status.textContent='☁️ Salvando automaticamente na nuvem';card.appendChild(status);
+    gallery.prepend(card);
+   }
+   const empty=gallery.querySelector('.empty-memory');if(empty&&items.length)empty.remove();
+  }
+  // Status discreto, não é uma ação manual nem interrompe o cliente.
+  container.replaceChildren();
+  if(items.length){
+   const small=document.createElement('p');small.className='ipa-memory-auto-status';
+   small.textContent=items.length+' momento(s) neste aparelho · sincronização automática pendente. Não limpe os dados do navegador.';
+   container.appendChild(small);
+  }
+  const stats=document.querySelector('.album-stats');
+  if(stats){
+   const cloud=(ipaDB().memories||[]).filter(m=>m.tripId===t.id);
+   const photos=cloud.filter(m=>m.type==='image').length+items.filter(x=>x.memory?.type==='image').length;
+   const videos=cloud.filter(m=>m.type==='video').length+items.filter(x=>x.memory?.type==='video').length;
+   const chips=stats.querySelectorAll('span');
+   if(chips[0])chips[0].textContent='📸 '+photos+' fotos';
+   if(chips[1])chips[1].textContent='🎥 '+videos+' vídeos';
+  }
+ }catch(err){console.warn('Não foi possível abrir as memórias locais',err)}
 }
+window.addEventListener('online',()=>ipaAutoSyncMemories(true));
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)ipaAutoSyncMemories()});
+window.addEventListener('ipa-client-experience-ready',()=>ipaAutoSyncMemories(true));
+
 async function handlePhotos(e){
  const t=activeTrip(),context=window.ipaPendingPlaceMemory;
  window.ipaPendingPlaceMemory=null;
@@ -3782,7 +3851,7 @@ async function handlePhotos(e){
   const clientId=t.clientId||ipaDB()?.activeClientId||'';
   const ownerUid=window.IPAFirebase?.user?.uid||'';
   const type=file.type.startsWith('video/')?'video':'image';
-  const memory={id:'mem-'+Date.now()+'-'+Math.random().toString(36).slice(2,10),tripId:t.id,clientId,prompt,type,name:file.name,day:context?.day||state.tripDay||1,placeId:context?.placeId||'',placeName:context?.placeName||'',createdAt:new Date().toISOString()};
+  const memory={id:'mem-'+Date.now()+'-'+Math.random().toString(36).slice(2,10),tripId:t.id,clientId,ownerUid,prompt,type,name:file.name,day:context?.day||state.tripDay||1,placeId:context?.placeId||'',placeName:context?.placeName||'',createdAt:new Date().toISOString()};
   const record={id:memory.id,tripId:t.id,clientId,ownerUid,file,memory,uploaded:null};
   if(!ownerUid||!clientId){failed++;firstError='Sessão ou cliente não identificado. Entre novamente com o login do viajante.';continue;}
   try{
@@ -3794,9 +3863,9 @@ async function handlePhotos(e){
  }
  localStorage.removeItem('ipa-memory-prompt');e.target.value='';if(btn)btn.disabled=false;
  if(saved)toast(`${saved} memória(s) salva(s) na nuvem ✓`);
- if(pending)toast(`${pending} memória(s) guardada(s) neste aparelho, aguardando a nuvem. ${firstError}`);
+ if(pending)toast(`${pending} momento(s) registrados. A sincronização com a nuvem será automática; não limpe os dados do navegador.`);
  if(failed)toast(`${failed} foto(s) não preservada(s): ${firstError}`);
- if(saved||pending){if(!context){state.mode='after';state.route='memories'}render()}
+ if(saved||pending){state.mode='after';state.route='memories';render(); if(pending)ipaAutoSyncMemories();}
 }
 
 function showModal(html){modalContent.innerHTML=html;modal.showModal();setTimeout(()=>{modalContent.querySelectorAll('[data-map]').forEach(b=>b.onclick=()=>window.open('https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(b.dataset.map),'_blank'));modalContent.querySelectorAll('[data-profile]').forEach(b=>b.onclick=()=>{modal.close();setProfile(b.dataset.profile)})},0)}
@@ -3956,7 +4025,7 @@ if(!(window.IPAFirebase?.isEmailSignInLink?.())){
 
 
 function ipaMovieMemories(t){
- const raw=(ipaDB().memories||[]).filter(m=>m.tripId===t?.id);
+ const raw=[...(ipaDB().memories||[]).filter(m=>m.tripId===t?.id),...ipaPendingMovieItems(t)];
  return raw.map((m,i)=>({
    ...m,
    media:m.url||m.src||m.remote||m.media||'',
