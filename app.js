@@ -2731,7 +2731,8 @@ function beforeView(){
  const country=tripCountry(t)||"sua próxima viagem",flag=countryFlag(country),dest=tripDestination(t);
  const client=d?.clients?.[0]||d?.client||{};
  const plan=t?.plan||d?.client?.plan||"Explore";
- const firstDay=t?.itinerary?.[0];
+ const previewDays=[...(t?.itinerary||[])].sort((a,b)=>Number(a.day)-Number(b.day));
+ const firstDay=previewDays.find(x=>Number(x.day)===Number(state.tripDay))||previewDays[0];
  return `<section class="v2-hero v2-before-hero">
  <div class="v2-hero-top"><div><span class="eyebrow">Antes da viagem</span><h1>${dest} já está esperando por você. ${flag}</h1><p>${t?.published?'Sua experiência personalizada está publicada.':'Sua viagem está em preparação.'}</p></div><span class="v2-weather">✈️ ${country}</span></div>
  <div class="v2-countdown"><div><strong>${t?.startDate?new Date(t.startDate+'T12:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'}):'--/--'}</strong><small>embarque</small></div><div><strong>${t?.itinerary?.length||0}</strong><small>dias de roteiro</small></div><div><strong>${plan}</strong><small>plano</small></div></div>
@@ -2741,7 +2742,7 @@ ${ipaTripSwitchSection()}
 ${tripWeatherSection(t)}
 ${modeCard()}
 <section class="section"><div class="v2-plan-card"><div><span class="eyebrow">Seu plano contratado</span><h3>${plan}</h3><p>${t?.name||'Minha viagem'} · ${dest}, ${country} ${flag}</p></div><button class="btn btn-light" data-plan-details="true">Ver benefícios</button></div></section>
-${tripModule('itinerary')?`<section class="section"><div class="section-head"><div><span class="eyebrow">Seu roteiro</span><h2>${firstDay?firstDay.title:'Roteiro em preparação'}</h2></div><span class="chip">${t?.itinerary?.length||0} dias</span></div>${firstDay?`<div class="client-itinerary-preview">${normalizedPlaces(firstDay).slice(0,4).map((p,i)=>`<div><span>${i+1}</span>${ipaPlacePhotoHtml(p,'ipa-preview-thumbnail')}<div><b>${p.name}</b><small>${p.time||p.address||'Programado no roteiro'}</small></div></div>`).join('')}</div>`:'<p>O Indo por Aí está preparando seus dias.</p>'}</section>`:''}
+${tripModule('itinerary')?`<section class="section ipa-before-itinerary"><div class="section-head"><div><span class="eyebrow">Seu roteiro</span><h2>${firstDay?ipaEscape(firstDay.title):'Roteiro em preparação'}</h2></div><span class="chip">${previewDays.length} dias</span></div>${previewDays.length>1?`<div class="day-strip ipa-preview-day-strip" aria-label="Escolha o dia do roteiro">${previewDays.map(x=>`<button type="button" class="day-pill ${Number(x.day)===Number(firstDay?.day)?'active':''}" data-day="${Number(x.day)}" aria-pressed="${Number(x.day)===Number(firstDay?.day)}"><small>Dia</small><strong>${Number(x.day)}</strong></button>`).join('')}</div>`:''}${firstDay?`<div class="client-itinerary-preview">${normalizedPlaces(firstDay).slice(0,4).map((p,i)=>`<div><span>${i+1}</span>${ipaPlacePhotoHtml(p,'ipa-preview-thumbnail')}<div><b>${p.name}</b><small>${p.time||p.address||'Programado no roteiro'}</small></div></div>`).join('')}</div>`:'<p>O Indo por Aí está preparando seus dias.</p>'}</section>`:''}
 ${tripModule('payments')?`<section class="section"><button class="payment-alert-card" data-go="payments"><div class="payment-alert-icon">💳</div><div><span class="eyebrow">Pagamentos</span><h3>Acompanhe sua viagem</h3><p>${(d?.payments||[]).filter(p=>p.status!=='Pago'&&(!t||p.tripId===t.id||(!p.tripId&&p.trip===t.name))).length} cobrança(s) em aberto</p></div><span>›</span></button></section>`:''}
 <section class="section"><div class="section-head"><div><span class="eyebrow">Sua jornada até o embarque</span><h2>Preparação da viagem</h2></div></div>
  <div class="v2-journey">

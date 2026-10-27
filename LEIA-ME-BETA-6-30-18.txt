@@ -1,0 +1,1 @@
+Beta 6.30.18 — Correção incremental sobre 6.30.17: abas de dias no resumo Seu roteiro (Antes) com seleção funcional; cards detalhados do roteiro responsivos em telas estreitas, preservando dicas, fotos, reordenação, Maps e feedback. Filme permanece sem música.

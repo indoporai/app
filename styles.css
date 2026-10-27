@@ -1379,3 +1379,29 @@ dialog:has(#routeCatalogPlace) .smart-place-actions button{
 .ipa-stamp-ring small{font-family:monospace;font-size:8px;letter-spacing:.1px;max-width:120px;line-height:1.1}
 .ipa-landmark-etch{width:83px;height:66px;flex-shrink:0;stroke:currentColor;opacity:.96}
 @media(max-width:370px){.ipa-passport-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.ipa-passport-stamp{width:140px;height:140px}.ipa-landmark-etch{width:74px;height:56px}}
+
+/* Beta 6.30.18 — navegação no resumo e cards do roteiro responsivos */
+.ipa-preview-day-strip{display:flex;overflow-x:auto;gap:9px;padding:4px 2px 12px;scrollbar-width:thin;max-width:100%;margin-bottom:12px}
+.ipa-preview-day-strip .day-pill{flex:0 0 auto;min-width:57px}
+.ipa-before-itinerary .client-itinerary-preview{min-width:0}
+.ipa-reorder-item{min-width:0;max-width:100%;box-sizing:border-box}
+.ipa-reorder-item>.itinerary-copy{min-width:0;max-width:100%;box-sizing:border-box}
+.ipa-reorder-item .ipa-place-client-tip,.ipa-reorder-item .ipa-place-client-note{max-width:100%;box-sizing:border-box;overflow-wrap:anywhere}
+.ipa-reorder-item .ipa-itinerary-copy-head{min-width:0;flex-wrap:wrap}
+@media(max-width:620px){
+ .ipa-reorder-item{display:grid!important;grid-template-areas:"number photo copy" "controls controls controls"!important;grid-template-columns:40px minmax(68px,94px) minmax(0,1fr)!important;gap:10px!important;padding:12px!important;align-items:start!important}
+ .ipa-reorder-item>.ipa-order-number{grid-area:number!important;width:38px!important;min-width:0!important;height:40px!important}
+ .ipa-reorder-item>.ipa-itinerary-thumbnail{grid-area:photo!important;width:100%!important;min-width:0!important;height:86px!important;object-fit:cover!important}
+ .ipa-reorder-item>.itinerary-copy{grid-area:copy!important;grid-column:3!important;grid-row:1!important;width:100%!important;min-width:0!important}
+ .ipa-reorder-item>.ipa-move-controls{grid-area:controls!important;grid-column:1/-1!important;grid-row:2!important;display:flex!important;flex-direction:row!important;justify-content:flex-end!important;gap:8px!important}
+ .ipa-reorder-item .ipa-itinerary-copy-head b{font-size:16px!important;overflow-wrap:break-word!important}
+ .ipa-reorder-item .ipa-itinerary-address{font-size:12px!important}
+ .ipa-reorder-item .ipa-place-feedback{display:flex!important;flex-wrap:wrap!important;gap:6px!important}
+ .ipa-reorder-item .ipa-place-feedback button{min-width:0!important;max-width:100%!important}
+ .ipa-reorder-item .ipa-place-reactions{display:flex!important;flex-wrap:wrap!important}
+}
+@media(max-width:390px){
+ .ipa-reorder-item{grid-template-columns:34px 68px minmax(0,1fr)!important;gap:7px!important;padding:9px!important}
+ .ipa-reorder-item>.ipa-order-number{width:34px!important;height:38px!important}
+ .ipa-reorder-item>.ipa-itinerary-thumbnail{height:72px!important}
+}
