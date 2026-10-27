@@ -1,0 +1,1 @@
+Beta 6.30.03 — Correção responsiva nos cards de roteiro: número e foto ao lado de título; endereço, dicas e botões abaixo sem espaços vazios. Preserva Registrar momento compacto e memórias.
