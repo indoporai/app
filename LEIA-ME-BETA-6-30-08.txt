@@ -1,0 +1,1 @@
+Beta 6.30.08 — Memorias lidas por clientId em conformidade com as regras do Firestore. Filme inline com teste de som e volume. Preserva registros locais e demais recursos.

@@ -1345,3 +1345,9 @@ dialog:has(#routeCatalogPlace) .smart-place-actions button{
 .movie615 .movie615sound select{border-radius:9px;padding:8px;background:#fff;color:#14363a;border:1px solid #dce7e5;max-width:170px}
 .movie615 [data-inline-movie-sound-status]{font-size:11px;opacity:.83}
 @media(prefers-reduced-motion:reduce){.movie615 .movie615scene,.movie615 .movie615-foreground{transition:none!important;transform:none!important}}
+
+/* Beta 6.30.08: controles de audio acessiveis no Filme inline. */
+.movie615-audio-tools{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:8px 0 4px;flex-wrap:wrap}
+.movie615-audio-tools button{border:1px solid #b5d9db;background:#e9f5f4;color:#07646c;border-radius:10px;min-height:38px;padding:8px 14px;font-weight:750;cursor:pointer}
+.movie615-audio-tools label{display:flex;align-items:center;gap:8px;font-weight:650;font-size:12px;color:#eaf5f5}
+.movie615-audio-tools input{width:125px;accent-color:#29adae}

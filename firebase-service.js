@@ -409,9 +409,11 @@ async function loadClientExperience(){
   let memories=[],tripDocuments=[],recommendations=[];
   window.ipaMemoryCloudLoadError = false;
   try{
-    // Consulta pelo UID impede que a lista solicite memórias de outros viajantes.
-    const s=await getDocs(query(collection(firestore,"memories"),where("ownerUid","==",currentUser.uid)));
-    memories=s.docs.map(d=>({id:d.id,...d.data()})).filter(x=>trips.some(t=>t.id===x.tripId));
+    // As regras publicadas concedem leitura pela propriedade clientId.
+    // O Firestore nao filtra documentos pelas regras: a consulta deve
+    // restringir clientId ANTES de receber os resultados.
+    const s=await getDocs(query(collection(firestore,"memories"),where("clientId","==",client.id)));
+    memories=s.docs.map(d=>({id:d.id,...d.data()})).filter(x=>trips.some(t=>String(t.id)===String(x.tripId)));
   }catch(e){
     window.ipaMemoryCloudLoadError=true;
     console.warn("Não foi possível carregar as memórias da nuvem",e);
