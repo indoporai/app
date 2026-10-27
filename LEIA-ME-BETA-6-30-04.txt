@@ -1,0 +1,2 @@
+Indo por Aí — Beta 6.30.04
+Ajuste pontual dos botões do roteiro real: Visitei compacto, Curti/Não curti na mesma linha e Mapa/Registrar momento na linha seguinte. Mantém funcionalidades e dados da Beta 6.30.03.

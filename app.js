@@ -3347,7 +3347,7 @@ function ipaBindProspectForm(){
   }catch(e){console.error(e);toast(e.message||'Pedido salvo, mas não foi possível abrir o WhatsApp');send.disabled=false;send.textContent='Enviar meu pedido'}
  };
 }
-function ipaJourneyFeedbackHtml(tripId,dayNo,placeId,placeName){
+function ipaJourneyFeedbackHtml(tripId,dayNo,placeId,placeName,mapTarget){
  const key=[tripId,dayNo,placeId].join(':');
  const state=ipaDB().journeyPlaces?.[key]||{};
  const id=[tripId,dayNo,placeId].join('|');
@@ -3357,7 +3357,9 @@ function ipaJourneyFeedbackHtml(tripId,dayNo,placeId,placeName){
    <button type="button" class="${state.reaction==='up'?'selected':''}" data-journey-reaction="${ipaEscape(id)}|up" aria-label="Curti" aria-pressed="${state.reaction==='up'?'true':'false'}">👍 Curti</button>
    <button type="button" class="${state.reaction==='down'?'selected':''}" data-journey-reaction="${ipaEscape(id)}|down" aria-label="Não curti" aria-pressed="${state.reaction==='down'?'true':'false'}">👎 Não curti</button>
   </div>
-  <button type="button" class="ipa-place-memory" data-place-memory="${ipaEscape(id)}" data-memory-place-name="${ipaEscape(placeName||'Lugar visitado')}">📷 Registrar momento</button>
+  <div class="ipa-place-utilities">${mapTarget?`<button type="button" class="ipa-place-map" data-map="${ipaEscape(mapTarget)}">📍 Mapa</button>`:''}
+   <button type="button" class="ipa-place-memory" data-place-memory="${ipaEscape(id)}" data-memory-place-name="${ipaEscape(placeName||'Lugar visitado')}">📷 Registrar momento</button>
+  </div>
  </div>`;
 }
 function journeyInlineStars(tripId,dayNo,placeId){
@@ -3509,7 +3511,7 @@ function duringView(){
  const country=tripCountry(t),flag=countryFlag(country),route=googleMapsRouteUrl(day,t);
  return `<section class="hero during-personalized-hero"><span class="eyebrow">Durante a viagem</span><h1>${tripDestination(t)} ${flag}</h1><p>${t.name} · Dia ${day.day}${day.title?` · ${day.title}`:''}</p><div class="hero-actions">${route?`<button class="btn btn-light" data-external-route="${route}">Abrir rota</button>`:''}${tripModule('concierge')?`<button class="btn btn-light" data-concierge>👑 Concierge</button>`:''}${tripModule('live')?`<button class="btn btn-primary" id="realLiveBtn">🔴 Live</button>`:''}</div></section>
  ${modeCard()}
- <section class="section"><div class="section-head"><div><span class="eyebrow">Roteiro real</span><h2>${day.title||`Dia ${day.day}`}</h2></div><span class="chip">${places.length} locais</span></div><div class="during-place-list">${places.map((p,i)=>`<article class="during-place-card ${p.personal?'during-place-personal':''}"><div class="during-place-number">${i+1}</div>${ipaPlacePhotoHtml(p,'ipa-during-thumbnail')}<div class="during-place-main"><small>${p.time||'Horário livre'}</small><div class="during-place-title" data-journey-title="${ipaEscape([t.id,day.day,p.id||i].join(':'))}"><b>${p.name}</b></div></div><div class="during-place-details"><p>${ipaEscape(p.address||'Programado no roteiro')}</p>${p.note?`<div class="ipa-place-client-note"><strong>📝 Observação</strong><span>${ipaEscape(p.note)}</span></div>`:''}${(p.smartTip||p.tip)?`<div class="ipa-place-client-tip"><strong>💡 Dica Indo por Aí</strong><span>${ipaEscape(p.smartTip||p.tip)}</span></div>`:''}<div class="during-place-actions"><button data-map="${(p.address||p.name)+', '+country}">📍 Mapa</button></div>${ipaJourneyFeedbackHtml(t.id,day.day,p.id||i,p.name)}</div></article>`).join('')||'<p>Nenhum local cadastrado para este dia.</p>'}</div></section>
+ <section class="section"><div class="section-head"><div><span class="eyebrow">Roteiro real</span><h2>${day.title||`Dia ${day.day}`}</h2></div><span class="chip">${places.length} locais</span></div><div class="during-place-list">${places.map((p,i)=>`<article class="during-place-card ${p.personal?'during-place-personal':''}"><div class="during-place-number">${i+1}</div>${ipaPlacePhotoHtml(p,'ipa-during-thumbnail')}<div class="during-place-main"><small>${p.time||'Horário livre'}</small><div class="during-place-title" data-journey-title="${ipaEscape([t.id,day.day,p.id||i].join(':'))}"><b>${p.name}</b></div></div><div class="during-place-details"><p>${ipaEscape(p.address||'Programado no roteiro')}</p>${p.note?`<div class="ipa-place-client-note"><strong>📝 Observação</strong><span>${ipaEscape(p.note)}</span></div>`:''}${(p.smartTip||p.tip)?`<div class="ipa-place-client-tip"><strong>💡 Dica Indo por Aí</strong><span>${ipaEscape(p.smartTip||p.tip)}</span></div>`:''}${ipaJourneyFeedbackHtml(t.id,day.day,p.id||i,p.name,(p.address||p.name)+', '+country)}</div></article>`).join('')||'<p>Nenhum local cadastrado para este dia.</p>'}</div></section>
  <section class="section"><div class="section-head"><h2>Dias da viagem</h2></div><div class="day-strip">${days.map(x=>`<button class="day-pill ${Number(x.day)===Number(day.day)?'active':''}" data-day="${x.day}"><small>Dia</small><strong>${x.day}</strong></button>`).join('')}</div></section>
  <section class="section ipa-real-map-section"><div class="section-head"><div><span class="eyebrow">MAPA DO DIA</span><h2>Seu roteiro no mapa</h2></div><span class="chip">A → B → C${places.length>3?' → D':''}</span></div><div id="ipaRealMap" class="ipa-real-map"><div class="ipa-map-loading">🗺️ Carregando mapa...</div></div><div class="ipa-map-legend"><span><i class="official"></i> Roteiro oficial</span><span><i class="personal"></i> Dica adicionada</span><span><i class="current"></i> Você</span></div></section>
 `;
