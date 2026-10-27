@@ -840,6 +840,19 @@ window.IPAFirebase = {
     ]);
     return true;
   },
+  // Atualização pontual: não depende de syncAll (que pode estar em andamento).
+  async saveTripClimateConfirmed(tripId,climateContent,editedAt){
+    if(!currentUser||currentUser.uid!==ADMIN_UID)throw new Error('Entre como administrador para salvar.');
+    if(!tripId||!Array.isArray(climateContent))throw new Error('Dados da recomendação incompletos.');
+    const target=doc(firestore,'trips',String(tripId));
+    await setDoc(target,{climateContent,climateEditedAt:editedAt,updatedAt:serverTimestamp()},{merge:true});
+    const snapshot=await getDoc(target);
+    if(!snapshot.exists())throw new Error('A viagem não foi encontrada após salvar.');
+    const saved=snapshot.data();
+    if(saved.climateEditedAt!==editedAt||JSON.stringify(saved.climateContent||[])!==JSON.stringify(climateContent))
+      throw new Error('O Firebase não confirmou a atualização do Entre no Clima.');
+    return true;
+  },
   // Salva a ordem escolhida pelo ADM sem depender de sincronização global.
   async saveLeadSuggestionConfirmed(leadId){
     if(!currentUser||currentUser.uid!==ADMIN_UID)throw new Error('Entre como ADM para salvar a ordem.');

@@ -1,0 +1,1 @@
+Beta 6.29.97 — salvamento direto e confirmado de links do Entre no Clima no Firebase. Preserva Beta 6.29.96.

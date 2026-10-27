@@ -886,7 +886,45 @@ function bind(){
  document.querySelectorAll('[data-admin-edit-climate]').forEach(b=>b.onclick=()=>{
    const [tripId,idxRaw]=b.dataset.adminEditClimate.split(':'),idx=Number(idxRaw),d=adminData(),t=(d.trips||[]).find(x=>x.id===tripId),item=t?.climateContent?.[idx];if(!item)return;
    showModal(`<span class="eyebrow">ENTRE NO CLIMA</span><h2>Editar ${ipaEscape(item.type||'conteúdo')}</h2><label>Título<input id="climateEditTitle" class="v2-concierge-input" value="${ipaEscape(item.title||'')}"></label><label>Descrição<textarea id="climateEditDescription" class="rating-text">${ipaEscape(item.description||'')}</textarea></label><label>Link principal opcional<input id="climateEditUrl" class="v2-concierge-input" value="${ipaEscape(item.url||'')}"></label><p class="ipa-climate-links-help">Links específicos por plataforma (opcionais). Os encontrados automaticamente dispensam cadastro.</p>${ipaClimateEditorFields(item)}<button id="saveClimateEdit" class="btn btn-primary btn-block">Salvar alteração</button>`);
-   setTimeout(()=>{const save=document.querySelector('#saveClimateEdit');if(save)save.onclick=async()=>{const list=[...(t.climateContent||[])];list[idx]={...item,title:document.querySelector('#climateEditTitle').value.trim(),description:document.querySelector('#climateEditDescription').value.trim(),url:document.querySelector('#climateEditUrl').value.trim(),links:ipaClimateEditorValues(item),manuallyEdited:true};IPAData.updateTrip(tripId,{climateContent:list,climateEditedAt:new Date().toISOString()});if(window.IPAFirebase?.user)await window.IPAFirebase.syncNow();modal.close();view.innerHTML=adminTripEditor(tripId);bind();toast('Entre no Clima atualizado ✓')}},0);
+   setTimeout(()=>{
+    const save=document.querySelector('#saveClimateEdit');
+    if(!save)return;
+    save.onclick=async()=>{
+      if(save.disabled)return;
+      const title=document.querySelector('#climateEditTitle')?.value.trim()||'';
+      if(!title){toast('Informe o título da recomendação.');return}
+      const mainUrl=document.querySelector('#climateEditUrl')?.value.trim()||'';
+      if(mainUrl){try{if(new URL(mainUrl).protocol!=='https:')throw Error()}catch(e){toast('O link principal deve começar com https://');return}}
+      const newLinks={...(item.links||{})};
+      for(const input of document.querySelectorAll('[data-ipa-climate-platform]')){
+       const name=input.dataset.ipaClimatePlatform,url=input.value.trim();
+       if(!url){delete newLinks[name];continue}
+       if(ipaClimateProviderFromUrl(url)!==name){
+        toast('Confira o link de '+name+': use o endereço oficial da plataforma.');
+        input.focus();return;
+       }
+       newLinks[name]=url;
+      }
+      // Releitura evita substituir alterações feitas em outra tela.
+      const current=(adminData().trips||[]).find(x=>String(x.id)===String(tripId));
+      if(!current){toast('Viagem não encontrada. Abra novamente a edição.');return}
+      const list=[...(current.climateContent||[])];
+      list[idx]={...list[idx],...item,title,description:document.querySelector('#climateEditDescription')?.value.trim()||'',url:mainUrl,links:newLinks,manuallyEdited:true};
+      const editedAt=new Date().toISOString();
+      save.disabled=true;save.textContent='Salvando link no Firebase...';
+      try{
+       if(!window.IPAFirebase?.saveTripClimateConfirmed)throw Error('Serviço de salvamento indisponível. Atualize o aplicativo.');
+       await window.IPAFirebase.saveTripClimateConfirmed(tripId,list,editedAt);
+       IPAData.updateTrip(tripId,{climateContent:list,climateEditedAt:editedAt});
+       modal.close();view.innerHTML=adminTripEditor(tripId);bind();
+       toast('Playlist e links salvos no Firebase ✓');
+      }catch(err){
+       console.error('Falha ao salvar link do Entre no Clima',err);
+       toast('Não foi possível salvar: '+(err?.code||err?.message||'erro desconhecido'));
+       save.disabled=false;save.textContent='Tentar salvar novamente';
+      }
+    };
+   },0);
  });
  document.querySelectorAll('[data-remove-smart-route]').forEach(b=>b.onclick=()=>{
   const t=activeTrip();if(!t)return;
