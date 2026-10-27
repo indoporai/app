@@ -1,0 +1,1 @@
+Indo por Aí Beta 6.30.13 — Filme inline preservado. Reprodução de trilhas MP3 com player nativo e fallback M4A; opção de reproduzir manualmente em navegadores que bloqueiam play programático. Testar em aparelho e domínio publicado.

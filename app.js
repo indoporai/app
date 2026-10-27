@@ -3701,7 +3701,7 @@ function capturedExperience(){
  <div class="movie615controls"><button type="button" data-inline-movie-play>▶ Assistir filme</button><span data-progress615>1 / ${ms.length}</span></div>
  <div class="movie615sound"><label>♫ Trilha <select data-inline-movie-track aria-label="Trilha sonora do filme"><option value="emotional">Emocionante</option><option value="light">Leve</option><option value="upbeat">Animada</option><option value="off">Sem música</option></select></label><span data-inline-movie-sound-status aria-live="polite">Toque em Assistir para ouvir a trilha</span></div>
  <div class="movie615-audio-tools"><button type="button" data-inline-movie-test-sound>♫ Testar som</button><label>Volume <input type="range" data-inline-movie-volume min="0" max="100" value="90" aria-label="Volume da trilha"></label></div>
- <audio data-inline-movie-audio preload="none" loop playsinline></audio>
+ <audio data-inline-movie-audio preload="metadata" controls loop playsinline src="assets/trilha-emocionante.mp3" aria-label="Reproduzir música do filme"></audio>
  </section>`;
 }
 // Filme dentro do próprio álbum: reprodução e som iniciados por gesto do usuário.
@@ -3721,16 +3721,16 @@ function bindCapturedExperience(){
  const stopVideo=()=>scenes.forEach(scene=>{const video=scene.querySelector('video');if(video)try{video.pause()}catch(_){}});
  const setStatus=(value)=>{status.textContent=value};
  const audioUrl=(name,fmt)=>new URL('assets/trilha-'+name+'.'+fmt, document.baseURI).href;
+ audio.volume=.9;
  const startAudio=(preferFallback=false)=>{
    if(select.value==='off'){audio.pause();setStatus('Sem música');return}
    const custom=select.value==='custom'&&/^https:\/\//i.test(configuredAudio);
    const track=custom?'custom':(tracks[select.value]||tracks.emotional);
-   const format=custom?'custom':(preferFallback?'mp3':'m4a');
+   const format=custom?'custom':(preferFallback?'m4a':'mp3');
    const attempt=++audioAttempt;
    if(activeTrack!==track||activeFormat!==format){
      audio.pause();activeTrack=track;activeFormat=format;
      audio.src=custom?configuredAudio:audioUrl(track,format);
-     audio.load();
    }
    audio.muted=false;
    audio.volume=Math.max(0,Math.min(1,Number(volume?.value||90)/100));
@@ -3738,7 +3738,7 @@ function bindCapturedExperience(){
    const onFailure=(err)=>{
      if(attempt!==audioAttempt)return;
      console.warn('Filme: falha ao tocar '+format,err);
-     if(!custom&&format==='m4a'&&!fallbackAttempted){fallbackAttempted=true;startAudio(true);return}
+     if(!custom&&format==='mp3'&&!fallbackAttempted){fallbackAttempted=true;startAudio(true);return}
      const code=audio.error?.code;
      setStatus('Áudio indisponível ('+(err?.name||'erro')+(code?', código '+code:'')+'). Confira se os arquivos de trilha foram publicados.');
    };
@@ -3770,12 +3770,15 @@ function bindCapturedExperience(){
    const video=scenes[index].querySelector('video');if(video)video.play().catch(()=>{});
    schedule();
  };
- select.onchange=()=>{fallbackAttempted=false;if(playing)startAudio();else {audio.pause();setStatus('Toque em Assistir ou Testar som')}};
+ select.onchange=()=>{fallbackAttempted=false;activeTrack='';activeFormat='';if(select.value==='off'){audio.pause();audio.removeAttribute('src');audio.load();setStatus('Sem música');return}audio.src=audioUrl(tracks[select.value]||'emocionante','mp3');activeTrack=tracks[select.value]||'emocionante';activeFormat='mp3';if(playing)startAudio();else {audio.pause();setStatus('Toque em Assistir ou ▶ no player de áudio')}};
  if(soundTest)soundTest.onclick=()=>{
-   if(select.value==='off')select.value='light';
+   if(select.value==='off'){select.value='light';activeTrack='';activeFormat=''}
    fallbackAttempted=false;startAudio();
  };
  if(volume)volume.oninput=()=>{audio.volume=Number(volume.value)/100;audio.muted=false};
+ // Controles nativos: reproduzir manualmente quando o navegador impede o play programático.
+ audio.addEventListener('play',()=>{if(select.value!=='off')setStatus('♫ Música tocando')});
+ audio.addEventListener('pause',()=>{if(playing&&select.value!=='off')setStatus('Música pausada — toque em ▶ no player abaixo')});
  audio.addEventListener('error',()=>{const c=audio.error?.code;console.warn('Falha mídia do filme',c, audio.currentSrc);});
  const cleanup=()=>{playing=false;clearTimeout(timer);audio.pause();stopVideo();play.onclick=null;select.onchange=null;if(soundTest)soundTest.onclick=null};
  ipaInlineMovieCleanup=cleanup;
