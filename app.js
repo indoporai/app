@@ -3352,12 +3352,12 @@ function ipaJourneyFeedbackHtml(tripId,dayNo,placeId,placeName){
  const state=ipaDB().journeyPlaces?.[key]||{};
  const id=[tripId,dayNo,placeId].join('|');
  return `<div class="ipa-place-feedback">
-  <button type="button" class="ipa-visit-toggle ${state.checked?'selected':''}" data-journey-check="${ipaEscape(id)}" aria-pressed="${state.checked?'true':'false'}">${state.checked?'✓ Visitado':'✓ Marcar visitado'}</button>
+  <button type="button" class="ipa-visit-toggle ${state.checked?'selected':''}" data-journey-check="${ipaEscape(id)}" aria-pressed="${state.checked?'true':'false'}">${state.checked?'✓ Visitado':'✓ Visitei'}</button>
   <div class="ipa-place-reactions" role="group" aria-label="Você curtiu o passeio?">
    <button type="button" class="${state.reaction==='up'?'selected':''}" data-journey-reaction="${ipaEscape(id)}|up" aria-label="Curti" aria-pressed="${state.reaction==='up'?'true':'false'}">👍 Curti</button>
    <button type="button" class="${state.reaction==='down'?'selected':''}" data-journey-reaction="${ipaEscape(id)}|down" aria-label="Não curti" aria-pressed="${state.reaction==='down'?'true':'false'}">👎 Não curti</button>
   </div>
-  <button type="button" class="ipa-place-memory" data-place-memory="${ipaEscape(id)}" data-memory-place-name="${ipaEscape(placeName||'Lugar visitado')}">📸 Foto / vídeo deste lugar</button>
+  <button type="button" class="ipa-place-memory" data-place-memory="${ipaEscape(id)}" data-memory-place-name="${ipaEscape(placeName||'Lugar visitado')}">📷 Registrar momento</button>
  </div>`;
 }
 function journeyInlineStars(tripId,dayNo,placeId){
@@ -3685,6 +3685,7 @@ function memoriesView(){
  const t=activeTrip();if(!t)return `<section class="section"><h2>Viagem não encontrada</h2></section>`;
  const days=(t.itinerary||[]).sort((a,b)=>Number(a.day)-Number(b.day)),country=tripCountry(t),flag=countryFlag(country);
  const memories=(ipaDB().memories||[]).filter(m=>m.tripId===t.id);
+ const memorySyncWarning=window.ipaMemoryCloudLoadError ? `<div class="ipa-memory-sync-alert" role="status">☁️ Não foi possível conferir todas as fotos na nuvem. Os registros deste aparelho foram mantidos. Verifique a conexão e tente entrar novamente; não limpe os dados do navegador.</div>` : "";
  const jp=ipaDB().journeyPlaces||{};
  const dayCards=days.map(day=>{
    const official=normalizedPlaces(day);
@@ -3695,7 +3696,7 @@ function memoriesView(){
    const discoveryCount=personal.length;
    return `<button class="album-day" data-memory-day="${encodeURIComponent(day.title)}"><div class="album-day-cover">📍</div><div><span>Dia ${day.day}</span><h3>${day.title}</h3><p>${done}/${places.length} lugares visitados · ${dayMem.length} memórias${discoveryCount?` · ✨ ${discoveryCount} descoberta${discoveryCount>1?'s':''}`:''}</p><small>${day.date||tripDestination(t)}</small></div><b>›</b></button>`
  }).join('');
- return `<section class="album-hero"><span class="eyebrow">DIÁRIO AUTOMÁTICO · ${flag} ${country}</span><h1>${t.name}</h1><p>Seu diário cresce com checks, avaliações, fotos e vídeos desta viagem.</p><div class="album-stats"><span>📸 ${memories.filter(m=>m.type==='image').length} fotos</span><span>🎥 ${memories.filter(m=>m.type==='video').length} vídeos</span><span>📍 ${days.reduce((sum,d)=>sum+normalizedPlaces(d).length+ipaGetPersonalRoute(t,d.day).length,0)} lugares</span></div></section>
+ return `${memorySyncWarning}<section class="album-hero"><span class="eyebrow">DIÁRIO AUTOMÁTICO · ${flag} ${country}</span><h1>${t.name}</h1><p>Seu diário cresce com checks, avaliações, fotos e vídeos desta viagem.</p><div class="album-stats"><span>📸 ${memories.filter(m=>m.type==='image').length} fotos</span><span>🎥 ${memories.filter(m=>m.type==='video').length} vídeos</span><span>📍 ${days.reduce((sum,d)=>sum+normalizedPlaces(d).length+ipaGetPersonalRoute(t,d.day).length,0)} lugares</span></div></section>
  <section class="section"><div class="section-head"><div><span class="eyebrow">LINHA DO TEMPO</span><h2>A viagem, dia por dia</h2></div></div><div class="album-days">${dayCards||'<p>O diário começará quando o roteiro for cadastrado.</p>'}</div></section>
  <section class="section"><div class="section-head"><div><span class="eyebrow">MOMENTOS SUGERIDOS</span><h2>Crie uma memória agora</h2></div></div><div class="memory-prompt-grid">${[['🥂','Hora do brinde'],['👨‍👩‍👧','Nossa turma'],['🍽️','Sabor inesquecível'],['🌅','A vista do dia'],['😂','Momento espontâneo'],['❤️','Meu favorito']].map(x=>`<button data-memory-prompt="${x[1]}"><span>${x[0]}</span><b>${x[1]}</b><small>${tripDestination(t)}</small></button>`).join('')}</div></section>
  <section class="section"><div class="section-head"><h2>Suas fotos e vídeos</h2></div><div class="live-memory-grid">${memories.map(m=>m.type==='video'?`<div class="live-memory"><video src="${m.src||m.url}" controls playsinline></video><b>${m.prompt||'Vídeo'}</b></div>`:`<div class="live-memory"><img src="${m.src||m.url}" alt=""><b>${m.prompt||'Memória'}</b></div>`).join('')||`<div class="empty-memory"><span>📷</span><h3>Seu álbum começa aqui</h3><button class="btn btn-primary" id="addPhoto">Adicionar foto ou vídeo</button></div>`}</div></section>

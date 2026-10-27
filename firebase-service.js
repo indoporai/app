@@ -407,7 +407,14 @@ async function loadClientExperience(){
   catch(e){console.warn("Benefícios indisponíveis",e);}
 
   let memories=[],tripDocuments=[],recommendations=[];
-  try{const s=await getDocs(query(collection(firestore,"memories"),where("clientId","==",client.id)));memories=s.docs.map(d=>({id:d.id,...d.data()})).filter(x=>trips.some(t=>t.id===x.tripId))}catch(e){}
+  window.ipaMemoryCloudLoadError = false;
+  try{
+    const s=await getDocs(query(collection(firestore,"memories"),where("clientId","==",client.id)));
+    memories=s.docs.map(d=>({id:d.id,...d.data()})).filter(x=>trips.some(t=>t.id===x.tripId));
+  }catch(e){
+    window.ipaMemoryCloudLoadError=true;
+    console.warn("Não foi possível carregar as memórias da nuvem",e);
+  }
   try{const s=await getDocs(query(collection(firestore,"tripDocuments"),where("clientId","==",client.id)));tripDocuments=s.docs.map(d=>({id:d.id,...d.data()})).filter(x=>trips.some(t=>t.id===x.tripId))}catch(e){}
   for(const trip of trips){
     try{const s=await getDocs(query(collection(firestore,"recommendations"),where("tripId","==",trip.id)));

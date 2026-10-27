@@ -1195,10 +1195,10 @@ dialog:has(#routeCatalogPlace) .smart-place-actions button{
 .v2-journey-step.done .ipa-prep-counter{color:#207a37;background:#e2f6e5}
 .v2-journey-step .ipa-journey-symbol{font-size:21px;line-height:1}
 
-/* 6.30.00: feedback localizado no editor Entre no Clima */
+/* 6.30.01: feedback localizado no editor Entre no Clima */
 .ipa-climate-save-status{margin:10px 0 12px;color:#365966;font-size:.9rem;line-height:1.45;overflow-wrap:anywhere}
 
-/* Beta 6.30.00 — Filme da Viagem 2.0: fotos inteiras, transições cinematográficas */
+/* Beta 6.30.01 — Filme da Viagem 2.0: fotos inteiras, transições cinematográficas */
 .movie3-shell .movie3-screen{isolation:isolate;transition:aspect-ratio .35s ease;max-height:76vh;margin-inline:auto}
 .movie3-shell.movie3-vertical .movie3-screen{aspect-ratio:9/16;width:min(100%,390px)}
 .movie3-shell .movie3-scene{transform:none;opacity:0;transition:opacity 850ms ease;will-change:opacity}
@@ -1219,8 +1219,51 @@ dialog:has(#routeCatalogPlace) .smart-place-actions button{
 @media(max-width:620px){.movie3-shell .movie3-options label{min-width:100%}.movie3-shell.movie3-vertical .movie3-screen{width:min(100%,310px)}}
 @media(prefers-reduced-motion:reduce){.movie3-shell .movie3-scene,.movie3-shell .movie3-scene .movie3-foreground{transition:none!important;transform:none!important}}
 
-/* 6.30.00 — Registros vinculados ao passeio */
+/* 6.30.01 — Registros vinculados ao passeio */
 .ipa-place-feedback .ipa-place-memory{grid-column:1/-1;background:#e0f3f2;color:#055f68;text-align:center;font-size:13px;font-weight:800;border:1px solid #c1e3e1}
 .ipa-place-feedback .ipa-place-memory:disabled{opacity:.6}
 .movie3-test-sound{border:1px solid #b2dfdb;border-radius:10px;padding:9px 12px;background:#e7f5f3;color:#056575;cursor:pointer;font-weight:800}
 .movie3-audio-status{font-size:12px;color:#52727b}
+
+/* Beta 6.30.01 — Ações compactas por passeio, mantendo os 4 recursos */
+.ipa-place-feedback,.ipa-reorder-item .ipa-place-feedback{display:flex;flex-wrap:wrap;align-items:center;gap:7px;margin-top:10px}
+.ipa-place-feedback .ipa-visit-toggle{flex:0 1 auto;min-width:106px}
+.ipa-place-feedback .ipa-place-reactions{display:flex;gap:7px;flex:0 0 auto}
+.ipa-place-feedback .ipa-place-reactions button{min-width:79px}
+.ipa-place-feedback .ipa-place-memory{grid-column:auto;flex:1 1 155px;min-width:145px}
+.ipa-place-feedback button{min-height:38px;padding:8px 10px;font-size:12px;line-height:1.25;white-space:normal}
+@media(max-width:550px){
+ .ipa-place-feedback,.ipa-reorder-item .ipa-place-feedback{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.25fr);gap:7px}
+ .ipa-place-feedback .ipa-visit-toggle{min-width:0}
+ .ipa-place-feedback .ipa-place-reactions{min-width:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+ .ipa-place-feedback .ipa-place-reactions button{min-width:0;padding:8px 5px}
+ .ipa-place-feedback .ipa-place-memory{grid-column:1/-1;min-width:0;min-height:38px}
+}
+.ipa-memory-sync-alert{background:#fff8e9;color:#74510d;border:1px solid #eedcab;border-radius:14px;padding:12px 15px;margin:12px 0;font-size:13px;line-height:1.45}
+
+
+/* Beta 6.30.02 — Registrar momento: tamanho discreto, sem ocupar a largura inteira */
+.ipa-place-feedback .ipa-place-memory,
+.ipa-reorder-item .ipa-place-feedback .ipa-place-memory{
+  flex:0 0 auto;
+  width:max-content;
+  max-width:100%;
+  min-width:0;
+  min-height:34px;
+  padding:7px 13px;
+  border-radius:11px;
+  font-size:12px;
+  line-height:1.2;
+  white-space:nowrap;
+  justify-self:start;
+}
+@media(max-width:550px){
+ .ipa-place-feedback .ipa-place-memory,
+ .ipa-reorder-item .ipa-place-feedback .ipa-place-memory{
+   grid-column:1/-1;
+   width:max-content;
+   min-width:0;
+   min-height:34px;
+   justify-self:start;
+ }
+}

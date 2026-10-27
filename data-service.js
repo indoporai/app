@@ -145,7 +145,18 @@ window.IPAData={
     paymentPlans:Array.isArray(incoming.paymentPlans)?incoming.paymentPlans:[],
     travelLeads:Array.isArray(incoming.travelLeads)?incoming.travelLeads:[],
     tripDocuments:Array.isArray(incoming.tripDocuments)?incoming.tripDocuments:[],
-    memories:Array.isArray(incoming.memories)?incoming.memories:[],
+    // Preserve locally cached memories for this same client and these trips.
+    // A failed cloud read must never erase the only copy on this device.
+    memories:(()=>{
+      const cloud=Array.isArray(incoming.memories)?incoming.memories:[];
+      const ids=new Set((incoming.trips||[]).map(t=>String(t.id)));
+      const clientId=String(incoming.activeClientId||incoming.client?.id||"");
+      const local=readData().memories||[];
+      const scoped=local.filter(m=>ids.has(String(m.tripId)) && (!m.clientId||String(m.clientId)===clientId));
+      const merged=new Map(scoped.filter(m=>m.id).map(m=>[String(m.id),m]));
+      cloud.forEach(m=>{if(m.id)merged.set(String(m.id),m)});
+      return [...merged.values()].sort((a,b)=>String(b.createdAt||"").localeCompare(String(a.createdAt||"")));
+    })(),
     recommendations:Array.isArray(incoming.recommendations)?incoming.recommendations:[],
     conciergeRequests:Array.isArray(incoming.conciergeRequests)?incoming.conciergeRequests:[],
     benefits:Array.isArray(incoming.benefits)?incoming.benefits:[],

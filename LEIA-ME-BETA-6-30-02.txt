@@ -1,0 +1,1 @@
+Beta 6.30.02 — ajuste visual pontual: botão Registrar momento compacto, alinhado à esquerda, sem ocupar linha inteira. Demais recursos preservados.
