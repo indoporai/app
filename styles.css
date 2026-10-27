@@ -1356,3 +1356,6 @@ dialog:has(#routeCatalogPlace) .smart-place-actions button{
 .ipa-movie-music-admin .admin-trip-fields{margin-top:12px}
 .ipa-movie-music-hint{font-size:.9rem;color:#607781;line-height:1.55}
 .ipa-lead-favorite-song{font-size:.92rem;color:#185e66;margin:8px 0}
+
+/* 6.30.12 – álbum com lembranças reais, layout responsivo */
+.ipa-day-real-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:16px 0}.ipa-day-real-memory{margin:0;min-width:0;overflow:hidden;border-radius:14px;background:#f3f7f7}.ipa-day-real-memory img,.ipa-day-real-memory video{display:block;width:100%;height:180px;object-fit:cover}.ipa-day-real-memory small{display:block;padding:9px;overflow-wrap:anywhere}.ipa-day-place-list{display:grid;gap:8px;overflow-wrap:anywhere}.ipa-day-place-list>div{padding:10px;border-radius:10px;background:#f3f7f7}.memory-day-modal h2{overflow-wrap:anywhere;font-size:clamp(20px,5vw,30px)}@media(max-width:450px){.ipa-day-real-grid{grid-template-columns:1fr}}

@@ -3554,7 +3554,7 @@ function afterView(){
  <section class="section"><div class="section-head"><div><span class="eyebrow">Inspirações</span><h2>Que memória vamos guardar?</h2></div></div><div class="memory-prompt-grid">${prompts.map(p=>`<button data-memory-prompt="${p[1]}"><span>${p[0]}</span><b>${p[1]}</b><small>${p[2]}</small></button>`).join('')}</div></section>
  <section class="section"><div class="section-head"><div><span class="eyebrow">Sua história</span><h2>${memories.length?`${memories.length} memórias adicionadas`:'Comece seu álbum agora'}</h2></div></div><div class="live-memory-grid">${memories.map(m=>m.type==='video'?`<div class="live-memory"><video src="${m.src}" controls playsinline></video><b>${m.prompt||'Vídeo da viagem'}</b></div>`:`<div class="live-memory"><img src="${m.src}" alt="${m.prompt||'Memória'}"><b>${m.prompt||'Foto da viagem'}</b></div>`).join('')||`<div class="empty-memory"><span>✨</span><h3>Sua primeira memória está esperando</h3><p>Escolha uma sugestão acima ou envie uma foto/vídeo.</p></div>`}</div></section>
  <section class="section"><div class="after-stats-grid"><div><strong>${days.length}</strong><small>dias</small></div><div><strong>${days.flatMap(d=>normalizedPlaces(d)).length}</strong><small>lugares</small></div><div><strong>${memories.filter(m=>m.type==='image').length}</strong><small>fotos</small></div><div><strong>${memories.filter(m=>m.type==='video').length}</strong><small>vídeos</small></div></div></section>
- ${tripModule('movie')?`<section class="section"><div class="memory-building-card"><span>🎬</span><div><b>Seu filme está sendo montado</b><p>As memórias adicionadas durante a viagem serão a matéria-prima da retrospectiva.</p></div></div></section>`:''}
+ ${tripModule('movie')?capturedExperience():''}
  ${tripModule('passport')?`<section class="section"><div class="passport-card"><span>🛂</span><div><span class="eyebrow">Passaporte Indo por Aí</span><h3>${country}</h3><p>Experiência em andamento.</p></div></div></section>`:''}`;
 }
 function modeCard(){return `<section class="section"><div class="card mode-card"><span class="eyebrow">Simular momento da jornada</span><h2>${state.mode==='before'?'Preparando sua viagem':state.mode==='during'?'Vivendo sua viagem':'Reviva suas melhores memórias'}</h2><div class="mode-switch"><button type="button" data-mode="before" class="${state.mode==='before'?'active':''}">Antes</button><button type="button" data-mode="during" class="${state.mode==='during'?'active':''}">Durante</button><button type="button" data-mode="after" class="${state.mode==='after'?'active':''}">Depois</button></div>${state.profile==='client'&&tripModule('concierge')?`<button type="button" class="btn btn-primary btn-block ipa-concierge-access" data-concierge>👑 Solicitar concierge</button>`:''}</div></section>`}
@@ -3694,14 +3694,12 @@ function capturedExperience(){
    type:m.type==='video'?'video/mp4':'image/jpeg'
  }));
  const ms=core.length?core:localCapturedMoments(); if(!ms.length)return '';
- return `<section class="section captured615"><div class="section-head"><div><span class="eyebrow">📷 MOMENTOS REGISTRADOS</span><h2>Suas memórias da viagem</h2></div><span class="chip green">${ms.length} momentos</span></div>
- <div class="captured615grid">${ms.map(m=>`<article>${m.media?(String(m.type).startsWith('video')?`<video src="${m.media}" controls playsinline></video>`:`<img src="${m.media}">`):`<div class="captured615ph">📷<small>${m.name}</small></div>`}<div class="captured615copy">${m.featured?'<span>❤️ Destaque</span>':''}<b>${m.caption||'Momento da viagem'}</b><small>${new Date(m.date).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}</small></div></article>`).join('')}</div></section>
- <section class="section movie615" data-ipa-inline-movie><div class="section-head"><div><span class="eyebrow">🎬 FILME DA VIAGEM</span><h2>Seu filme já começou</h2></div><span class="chip orange">${ms.length} cenas</span></div>
+ return ` <section class="section movie615" data-ipa-inline-movie><div class="section-head"><div><span class="eyebrow">🎬 FILME DA VIAGEM</span><h2>Seu filme já começou</h2></div><span class="chip orange">${ms.length} cenas</span></div>
  <div class="movie615stage" aria-label="Prévia do filme da viagem">${ms.map((m,i)=>`<div class="movie615scene ${i===0?'active':''}" aria-hidden="${i!==0}">
  ${m.media?(String(m.type).startsWith('video')?`<video class="movie615-foreground" src="${ipaEscape(m.media)}" muted playsinline preload="metadata"></video>`:`<div class="movie615-backdrop" style="background-image:url('${encodeURI(String(m.media)).replace(/'/g,'%27')}')"></div><img class="movie615-foreground" src="${ipaEscape(m.media)}" alt="${ipaEscape(m.caption||'Memória da viagem')}" loading="lazy">`):'<div class="movie615ph">📷</div>'}
  <div class="movie615caption"><b>${ipaEscape(m.placeName||m.name||m.caption||'Momento da viagem')}</b>${m.day?`<small>Dia ${Number(m.day)}</small>`:''}</div></div>`).join('')}</div>
  <div class="movie615controls"><button type="button" data-inline-movie-play>▶ Assistir filme</button><span data-progress615>1 / ${ms.length}</span></div>
- <div class="movie615sound"><label>♫ Trilha <select data-inline-movie-track aria-label="Trilha sonora do filme"><option value="emotional">Emocionante</option><option value="light">Leve</option><option value="upbeat">Animada</option>${t?.movieAudioUrl?`<option value="custom" selected>Minha música · ${ipaEscape(t.favoriteSong||"Selecionada pelo ADM")}</option>`:""}<option value="off">Sem música</option></select></label><span data-inline-movie-sound-status aria-live="polite">Toque em Assistir para ouvir a trilha</span></div>
+ <div class="movie615sound"><label>♫ Trilha <select data-inline-movie-track aria-label="Trilha sonora do filme"><option value="emotional">Emocionante</option><option value="light">Leve</option><option value="upbeat">Animada</option><option value="off">Sem música</option></select></label><span data-inline-movie-sound-status aria-live="polite">Toque em Assistir para ouvir a trilha</span></div>
  <div class="movie615-audio-tools"><button type="button" data-inline-movie-test-sound>♫ Testar som</button><label>Volume <input type="range" data-inline-movie-volume min="0" max="100" value="90" aria-label="Volume da trilha"></label></div>
  <audio data-inline-movie-audio preload="none" loop playsinline></audio>
  </section>`;
@@ -3796,7 +3794,7 @@ function memoriesView(){
    const done=places.filter((p,i)=>jp[[t.id,day.day,p.id||i].join(':')]?.checked).length;
    const dayMem=memories.filter(m=>Number(m.day||0)===Number(day.day));
    const discoveryCount=personal.length;
-   return `<button class="album-day" data-memory-day="${encodeURIComponent(day.title)}"><div class="album-day-cover">📍</div><div><span>Dia ${day.day}</span><h3>${day.title}</h3><p>${done}/${places.length} lugares visitados · ${dayMem.length} memórias${discoveryCount?` · ✨ ${discoveryCount} descoberta${discoveryCount>1?'s':''}`:''}</p><small>${day.date||tripDestination(t)}</small></div><b>›</b></button>`
+   return `<button class="album-day" data-memory-day="${Number(day.day)}"><div class="album-day-cover">📍</div><div><span>Dia ${day.day}</span><h3>${day.title}</h3><p>${done}/${places.length} lugares visitados · ${dayMem.length} memórias${discoveryCount?` · ✨ ${discoveryCount} descoberta${discoveryCount>1?'s':''}`:''}</p><small>${day.date||tripDestination(t)}</small></div><b>›</b></button>`
  }).join('');
  return `${memorySyncWarning}<div data-memory-pending-list></div><section class="album-hero"><span class="eyebrow">DIÁRIO AUTOMÁTICO · ${flag} ${country}</span><h1>${t.name}</h1><p>Seu diário cresce com checks, avaliações, fotos e vídeos desta viagem.</p><div class="album-stats"><span>📸 ${memories.filter(m=>m.type==='image').length} fotos</span><span>🎥 ${memories.filter(m=>m.type==='video').length} vídeos</span><span>📍 ${days.reduce((sum,d)=>sum+normalizedPlaces(d).length+ipaGetPersonalRoute(t,d.day).length,0)} lugares</span></div></section>
  <section class="section"><div class="section-head"><div><span class="eyebrow">LINHA DO TEMPO</span><h2>A viagem, dia por dia</h2></div></div><div class="album-days">${dayCards||'<p>O diário começará quando o roteiro for cadastrado.</p>'}</div></section>
@@ -4236,8 +4234,16 @@ function ipaBindMovie2(){
  modal.addEventListener('close',dispose);
  paint();
 }
-function showMemoryDay(title){
- showModal(`<div class="memory-day-modal"><span class="eyebrow">Álbum de lembranças</span><h2>${title}</h2><div class="memory-modal-grid"><div>📸<small>Foto favorita</small></div><div>🎥<small>Vídeo do dia</small></div><div>📍<small>Mapa visitado</small></div><div>❤️<small>Momento salvo</small></div></div><p>Esta é uma demonstração visual. Na versão real, as fotos, vídeos, locais, avaliações e mensagens daquele dia aparecerão aqui automaticamente.</p></div>`);
+function showMemoryDay(dayNumber){
+ const t=activeTrip();if(!t)return;
+ const day=(t.itinerary||[]).find(d=>Number(d.day)===Number(dayNumber));if(!day)return;
+ const mem=(ipaDB().memories||[]).filter(m=>m.tripId===t.id&&Number(m.day||0)===Number(day.day));
+ const places=normalizedPlaces(day);
+ const title=`Dia ${Number(day.day)}${day.title?' · '+String(day.title):''}`;
+ const media=mem.map(m=>m.type==='video'
+  ?`<article class="ipa-day-real-memory"><video controls playsinline preload="metadata" src="${ipaEscape(m.src||m.url||'')}"></video><small>${ipaEscape(m.prompt||m.caption||'Vídeo da viagem')}</small></article>`
+  :`<article class="ipa-day-real-memory"><img loading="lazy" src="${ipaEscape(m.src||m.url||'')}" alt="${ipaEscape(m.prompt||'Foto da viagem')}"><small>${ipaEscape(m.prompt||m.caption||'Foto da viagem')}</small></article>`).join('');
+ showModal(`<div class="memory-day-modal"><span class="eyebrow">ÁLBUM DE LEMBRANÇAS</span><h2>${ipaEscape(title)}</h2><p>${mem.length} memória${mem.length===1?'':'s'} registrada${mem.length===1?'':'s'} · ${places.length} lugar${places.length===1?'':'es'} no roteiro</p>${media?`<div class="ipa-day-real-grid">${media}</div>`:'<p>As fotos e os vídeos registrados neste dia aparecerão aqui automaticamente.</p>'}${places.length?`<h3>Lugares do dia</h3><div class="ipa-day-place-list">${places.map(p=>`<div>📍 ${ipaEscape(p.name||'Lugar visitado')}</div>`).join('')}</div>`:''}</div>`);
 }
 
 

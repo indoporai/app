@@ -1,0 +1,10 @@
+Indo por Aí — Beta 6.30.12
+
+- Restaurado filme embutido na tela Depois, sem janela adicional.
+- Removido banner redundante «Seu filme está sendo montado».
+- Retirado grid duplicado «Suas memórias da viagem» de dentro do player.
+- Álbum por dia agora decodifica corretamente o título e exibe fotos/vídeos reais cadastrados no dia.
+- Removido aviso de demonstração do álbum.
+- Mantidas três opções de trilha sonora e arquivos locais em MP3/M4A.
+
+Testar reprodução de áudio e arquivos sincronizados em dispositivos reais após a publicação.
