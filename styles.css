@@ -1194,3 +1194,6 @@ dialog:has(#routeCatalogPlace) .smart-place-actions button{
 .v2-journey-step .ipa-prep-counter{display:inline-flex;margin-top:5px;font-size:12px;font-weight:800;color:#087b83;background:#e8f7f5;padding:4px 9px;border-radius:999px;letter-spacing:.01em;width:max-content}
 .v2-journey-step.done .ipa-prep-counter{color:#207a37;background:#e2f6e5}
 .v2-journey-step .ipa-journey-symbol{font-size:21px;line-height:1}
+
+/* 6.29.98: feedback localizado no editor Entre no Clima */
+.ipa-climate-save-status{margin:10px 0 12px;color:#365966;font-size:.9rem;line-height:1.45;overflow-wrap:anywhere}

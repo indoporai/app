@@ -17,6 +17,7 @@ import {
   getDocs,
   doc,
   getDoc,
+  getDocFromServer,
   setDoc,
   deleteDoc,
   serverTimestamp,
@@ -845,12 +846,24 @@ window.IPAFirebase = {
     if(!currentUser||currentUser.uid!==ADMIN_UID)throw new Error('Entre como administrador para salvar.');
     if(!tripId||!Array.isArray(climateContent))throw new Error('Dados da recomendação incompletos.');
     const target=doc(firestore,'trips',String(tripId));
-    await setDoc(target,{climateContent,climateEditedAt:editedAt,updatedAt:serverTimestamp()},{merge:true});
-    const snapshot=await getDoc(target);
+    // Elimina valores undefined internos rejeitados pelo Firestore e diferenças de serialização.
+    const cleaned=JSON.parse(JSON.stringify(climateContent));
+    const write=setDoc(target,{climateContent:cleaned,climateEditedAt:editedAt,updatedAt:serverTimestamp()},{merge:true});
+    // Não considere a ausência de resposta como falha confirmada: a gravação ainda pode concluir.
+    let writeTimeout;
+    try{
+      await Promise.race([write,new Promise((_,reject)=>{writeTimeout=setTimeout(()=>reject(new Error('O Firebase não respondeu em 25 segundos. O resultado é incerto: reabra a viagem e confira o link antes de tentar novamente.')),25000)})]);
+    }finally{clearTimeout(writeTimeout)}
+    const snapshot=await getDocFromServer(target);
     if(!snapshot.exists())throw new Error('A viagem não foi encontrada após salvar.');
     const saved=snapshot.data();
-    if(saved.climateEditedAt!==editedAt||JSON.stringify(saved.climateContent||[])!==JSON.stringify(climateContent))
-      throw new Error('O Firebase não confirmou a atualização do Entre no Clima.');
+    if(saved.climateEditedAt!==editedAt)throw new Error('A confirmação ainda não apareceu no servidor. Reabra a viagem para conferir.');
+    // Confere especificamente os links por plataforma (não os demais campos antigos do roteiro).
+    for(let i=0;i<cleaned.length;i++){
+      const expected=cleaned[i]?.links||{},actual=saved.climateContent?.[i]?.links||{};
+      for(const [platform,url] of Object.entries(expected))if(actual[platform]!==url)
+        throw new Error('Link de '+platform+' não foi confirmado no servidor.');
+    }
     return true;
   },
   // Salva a ordem escolhida pelo ADM sem depender de sincronização global.

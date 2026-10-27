@@ -885,7 +885,7 @@ function bind(){
  });
  document.querySelectorAll('[data-admin-edit-climate]').forEach(b=>b.onclick=()=>{
    const [tripId,idxRaw]=b.dataset.adminEditClimate.split(':'),idx=Number(idxRaw),d=adminData(),t=(d.trips||[]).find(x=>x.id===tripId),item=t?.climateContent?.[idx];if(!item)return;
-   showModal(`<span class="eyebrow">ENTRE NO CLIMA</span><h2>Editar ${ipaEscape(item.type||'conteúdo')}</h2><label>Título<input id="climateEditTitle" class="v2-concierge-input" value="${ipaEscape(item.title||'')}"></label><label>Descrição<textarea id="climateEditDescription" class="rating-text">${ipaEscape(item.description||'')}</textarea></label><label>Link principal opcional<input id="climateEditUrl" class="v2-concierge-input" value="${ipaEscape(item.url||'')}"></label><p class="ipa-climate-links-help">Links específicos por plataforma (opcionais). Os encontrados automaticamente dispensam cadastro.</p>${ipaClimateEditorFields(item)}<button id="saveClimateEdit" class="btn btn-primary btn-block">Salvar alteração</button>`);
+   showModal(`<span class="eyebrow">ENTRE NO CLIMA</span><h2>Editar ${ipaEscape(item.type||'conteúdo')}</h2><label>Título<input id="climateEditTitle" class="v2-concierge-input" value="${ipaEscape(item.title||'')}"></label><label>Descrição<textarea id="climateEditDescription" class="rating-text">${ipaEscape(item.description||'')}</textarea></label><label>Link principal opcional<input id="climateEditUrl" class="v2-concierge-input" value="${ipaEscape(item.url||'')}"></label><p class="ipa-climate-links-help">Links específicos por plataforma (opcionais). Os encontrados automaticamente dispensam cadastro.</p>${ipaClimateEditorFields(item)}<button id="saveClimateEdit" data-no-save-feedback class="btn btn-primary btn-block">Salvar alteração</button>`);
    setTimeout(()=>{
     const save=document.querySelector('#saveClimateEdit');
     if(!save)return;
@@ -911,14 +911,19 @@ function bind(){
       const list=[...(current.climateContent||[])];
       list[idx]={...list[idx],...item,title,description:document.querySelector('#climateEditDescription')?.value.trim()||'',url:mainUrl,links:newLinks,manuallyEdited:true};
       const editedAt=new Date().toISOString();
-      save.disabled=true;save.textContent='Salvando link no Firebase...';
+      save.disabled=true;save.textContent='Salvando playlist no Firebase...';
+      const statusNode=document.createElement('p');statusNode.id='ipaClimateSaveStatus';statusNode.className='ipa-climate-save-status';statusNode.setAttribute('role','status');statusNode.textContent='Enviando os links da playlist para o Firebase...';save.insertAdjacentElement('beforebegin',statusNode);
+      const slowNotice=setTimeout(()=>{if(save.isConnected&&save.disabled)statusNode.textContent='O Firebase está demorando a responder. Aguarde a confirmação; não feche nem envie novamente.'},10000);
       try{
        if(!window.IPAFirebase?.saveTripClimateConfirmed)throw Error('Serviço de salvamento indisponível. Atualize o aplicativo.');
        await window.IPAFirebase.saveTripClimateConfirmed(tripId,list,editedAt);
+       clearTimeout(slowNotice);
        IPAData.updateTrip(tripId,{climateContent:list,climateEditedAt:editedAt});
        modal.close();view.innerHTML=adminTripEditor(tripId);bind();
        toast('Playlist e links salvos no Firebase ✓');
       }catch(err){
+       clearTimeout(slowNotice);
+       if(statusNode.isConnected)statusNode.textContent='Falha no Firebase: '+(err?.code||err?.message||'não foi possível confirmar o salvamento');
        console.error('Falha ao salvar link do Entre no Clima',err);
        toast('Não foi possível salvar: '+(err?.code||err?.message||'erro desconhecido'));
        save.disabled=false;save.textContent='Tentar salvar novamente';
