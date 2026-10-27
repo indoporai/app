@@ -1,16 +1,16 @@
-const CACHE = "indo-por-ai-v2-beta-6-30-13-email-icon";
+const CACHE = "indo-por-ai-v2-beta-6-30-14-email-icon";
 const CORE = [
   "./",
   "index.html",
-  "styles.css?v=v2-beta-6-30-13",
-  "app.js?v=v2-beta-6-30-13",
-  "data-service.js?v=v2-beta-6-30-13",
-  "firebase-service.js?v=v2-beta-6-30-13",
+  "styles.css?v=v2-beta-6-30-14",
+  "app.js?v=v2-beta-6-30-14",
+  "data-service.js?v=v2-beta-6-30-14",
+  "firebase-service.js?v=v2-beta-6-30-14",
   "admin.html",
-  "admin.js?v=v2-beta-6-30-13",
+  "admin.js?v=v2-beta-6-30-14",
   "admin.css",
   "manifest.webmanifest?v=63011",
-  "pwa-install.js?v=v2-beta-6-30-13",
+  "pwa-install.js?v=v2-beta-6-30-14",
   "assets/apple-touch-icon.png",
   "assets/icon-192.png",
   "assets/icon-512.png",
@@ -30,6 +30,14 @@ self.addEventListener("activate", event => {
 self.addEventListener("fetch", event => {
   if(event.request.method !== "GET") return;
   const url = new URL(event.request.url);
+  // Evita usar página HTML como se fosse áudio quando o host aplica fallback SPA.
+  if(url.pathname.startsWith('/assets/trilha-')) {
+    event.respondWith(fetch(event.request).then(res => {
+      const type=(res.headers.get('content-type')||'').toLowerCase();
+      return res.ok && (type.startsWith('audio/') || type.includes('octet-stream')) ? res : new Response('Áudio não publicado', {status:404});
+    }).catch(()=>new Response('Áudio indisponível', {status:503})));
+    return;
+  }
   const critical = url.origin === self.location.origin && (url.pathname === "/" || url.pathname.endsWith("/") || /\.(?:html|js|css)$/.test(url.pathname));
   if(critical){
     event.respondWith(fetch(event.request,{cache:"no-store"}).then(response=>{

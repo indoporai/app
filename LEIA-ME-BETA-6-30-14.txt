@@ -1,0 +1,13 @@
+INDO POR AÍ — 6.30.14
+
+Correção localizada: músicas do filme integradas ao app.js, reproduzidas a partir de Blob URLs.
+Motivo: servidor devolvendo HTML em links /assets/trilha-*.mp3, conforme print do teste.
+Não altera layout, dados, pagamentos ou formulários.
+
+Publicação: enviar todos os arquivos do ZIP na raiz da hospedagem, substituindo os anteriores. Não publicar o ZIP como arquivo único.
+Depois limpar dados de cache/reabrir o aplicativo se uma versão antiga continuar visível.
+
+Teste: entrar no filme, escolher trilha e clicar em Testar som. Teste também Assistir.
+Se persistir falha, registrar código da mensagem, navegador e dispositivo.
+
+ATENÇÃO: revisão estática do código; funcionamento no site publicado requer teste após deploy.
