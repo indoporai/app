@@ -688,7 +688,7 @@ async function ipaCreateLeadTripFromButton(btn){
        const itinerary=(lead.adminSuggestion.days||[]).map(day=>({day:Number(day.day),title:`Dia ${day.day}${day.city?' · '+day.city:''}`,city:day.city||'',places:(day.places||[]).map((place,i)=>({...place,id:`trip-place-${Date.now()}-${day.day}-${i}`,catalogPlaceId:place.catalogPlaceId||place.id}))}));
        if(!itinerary.length)throw new Error('Nenhum dia encontrado na sugestão de roteiro.');
        const requestedStages=(Array.isArray(lead.stages)&&lead.stages.length?lead.stages:[{destination:lead.destination,days:lead.days}]).map((x,i)=>({id:'stage-'+Date.now()+'-'+i,order:i+1,destination:x.destination,country:x.country||'',days:Number(x.days)||1}));
-       trip=IPAData.createTrip({clientId:client.id,name:`${requestedStages.map(x=>x.destination).join(' → ')} · ${lead.name||client.name}`,destination:requestedStages[0].destination,country:'',stages:requestedStages,plan:client.plan||lead.plan||'Explore',itinerary,sourceLeadId:lead.id,sourceRequestCode:lead.requestCode,smartRouteApprovedAt:new Date().toISOString(),status:'Em preparação'});
+       trip=IPAData.createTrip({clientId:client.id,name:`${requestedStages.map(x=>x.destination).join(' → ')} · ${lead.name||client.name}`,destination:requestedStages[0].destination,country:'',stages:requestedStages,plan:client.plan||lead.plan||'Explore',itinerary,favoriteSong:lead.favoriteSong||'',sourceLeadId:lead.id,sourceRequestCode:lead.requestCode,smartRouteApprovedAt:new Date().toISOString(),status:'Em preparação'});
      }
      IPAData.updateClientById(client.id,{activeTripId:trip.id,lastConfiguredTripId:trip.id});
      IPAData.updateTravelLead(lead.id,{tripId:trip.id,status:'Roteiro em preparação'});
@@ -1463,6 +1463,24 @@ function bind(){
    IPAData.updateTrip(b.dataset.adminSaveDestination,{destination,country});
    if(window.IPAFirebase?.user)await window.IPAFirebase.syncNow();
    toast('Destino atualizado ✓');view.innerHTML=adminTripEditor(b.dataset.adminSaveDestination);bind();
+ });
+ document.querySelectorAll('[data-admin-save-movie-music]').forEach(btn=>btn.onclick=async()=>{
+  const id=btn.dataset.adminSaveMovieMusic;
+  const favoriteSong=(document.querySelector('#editTripFavoriteSong')?.value||'').trim().slice(0,160);
+  const raw=(document.querySelector('#editTripMovieAudioUrl')?.value||'').trim();
+  let movieAudioUrl='';
+  if(raw){
+   try{const u=new URL(raw);if(u.protocol!=='https:'||!(/\.(mp3|m4a|aac|wav)$/i).test(u.pathname))throw new Error('Formato inválido');movieAudioUrl=u.href}
+   catch(_){toast('Informe um link HTTPS direto para um arquivo MP3, M4A, AAC ou WAV (não um link do Spotify).');return}
+  }
+  btn.disabled=true;btn.textContent='Salvando trilha...';
+  try{
+   IPAData.updateTrip(id,{favoriteSong,movieAudioUrl});
+   if(!window.IPAFirebase?.user)throw new Error('Faça login como ADM para gravar a viagem.');
+   if(!window.IPAFirebase.saveTripMovieMusicConfirmed)throw new Error('Atualize os arquivos do Firebase junto com o app.');
+   await window.IPAFirebase.saveTripMovieMusicConfirmed(id,{favoriteSong,movieAudioUrl});
+   toast('Preferência e trilha salvas ✓');view.innerHTML=adminTripEditor(id);bind();
+  }catch(e){console.error('Salvar trilha da viagem',e);toast('Não foi possível confirmar a gravação da trilha: '+(e?.message||'erro'));btn.disabled=false;btn.textContent='♫ Salvar música da viagem'}
  });
  document.querySelectorAll('[data-admin-add-day]').forEach(b=>b.onclick=()=>{
    showModal(`<span class="eyebrow">ROTEIRO</span><h2>Adicionar dia</h2><p class="route-helper">Crie aqui o <b>dia da viagem</b>. Depois use <b>+ Adicionar local</b> para incluir atrações, restaurantes e passeios.</p><label>Tema / nome do dia</label><input id="routeDayTitle" class="v2-concierge-input" placeholder="Ex.: Centro histórico de Paris"><label>Data</label><input id="routeDayDate" type="date" class="v2-concierge-input"><button id="saveRouteDay" class="btn btn-primary btn-block">Salvar dia</button>`);
@@ -3287,7 +3305,7 @@ function ipaLeadWhatsappText(lead){
 function adminLeads(){
  const leads=adminData().travelLeads||[];
  return `<div class="ipa-admin-head"><div><span class="eyebrow">NOVOS NEGÓCIOS</span><h1>Pedidos de viagem</h1><p>Gerencie pedidos externos ou crie uma viagem inteligente diretamente para um cliente cadastrado.</p></div><div class="lead-actions"><button class="btn btn-primary" data-admin-smart-client-trip>✨ Criar viagem inteligente para cliente</button><span class="chip">${leads.filter(x=>(x.status||'Novo')==='Novo').length} novos</span></div></div>
- <div class="lead-admin-grid">${leads.map(l=>`<article class="lead-admin-card"><div class="lead-admin-top"><span class="chip orange">${ipaEscape(l.status||'Novo')}</span><small>${ipaEscape(l.requestCode||l.id)}</small></div><h3>${ipaEscape(l.name||'Novo viajante')} · ${ipaEscape(l.destination||'Destino')}</h3><p><b>${ipaEscape(l.plan||'Plano a definir')}</b> · ${l.days} dias · ${l.adults} adulto(s)${Number(l.children)?` + ${l.children} criança(s)`:''}</p><small>${(l.interests||[]).map(ipaEscape).join(' · ')||'Sem interesses marcados'}</small><div class="lead-budget"><span>Orçamento informado</span><b>${ipaCatalogMoney(l.budget,l.currency)} / pessoa</b></div><div class="lead-actions"><button class="btn btn-primary" data-lead-generate="${l.id}">✨ Gerar sugestão</button></div><div data-lead-result="${l.id}">${l.adminSuggestion?ipaAdminSuggestionHtml(l,l.adminSuggestion):''}</div></article>`).join('')||'<div class="smart-empty"><b>Nenhum pedido externo ainda.</b><small>Você não precisa de um pedido externo para criar uma viagem: use o botão ✨ Criar viagem inteligente para cliente acima.</small><button class="btn btn-primary" data-admin-smart-client-trip>✨ Criar para cliente cadastrado</button></div>'}</div>`;
+ <div class="lead-admin-grid">${leads.map(l=>`<article class="lead-admin-card"><div class="lead-admin-top"><span class="chip orange">${ipaEscape(l.status||'Novo')}</span><small>${ipaEscape(l.requestCode||l.id)}</small></div><h3>${ipaEscape(l.name||'Novo viajante')} · ${ipaEscape(l.destination||'Destino')}</h3><p><b>${ipaEscape(l.plan||'Plano a definir')}</b> · ${l.days} dias · ${l.adults} adulto(s)${Number(l.children)?` + ${l.children} criança(s)`:''}</p><small>${(l.interests||[]).map(ipaEscape).join(' · ')||'Sem interesses marcados'}</small>${l.favoriteSong?`<p class="ipa-lead-favorite-song">♫ Música favorita: <b>${ipaEscape(l.favoriteSong)}</b></p>`:''}<div class="lead-budget"><span>Orçamento informado</span><b>${ipaCatalogMoney(l.budget,l.currency)} / pessoa</b></div><div class="lead-actions"><button class="btn btn-primary" data-lead-generate="${l.id}">✨ Gerar sugestão</button></div><div data-lead-result="${l.id}">${l.adminSuggestion?ipaAdminSuggestionHtml(l,l.adminSuggestion):''}</div></article>`).join('')||'<div class="smart-empty"><b>Nenhum pedido externo ainda.</b><small>Você não precisa de um pedido externo para criar uma viagem: use o botão ✨ Criar viagem inteligente para cliente acima.</small><button class="btn btn-primary" data-admin-smart-client-trip>✨ Criar para cliente cadastrado</button></div>'}</div>`;
 }
 function ipaAdminSuggestionHtml(lead,result){
  if(!result?.count)return `<div class="planner-empty"><b>Banco de Lugares sem combinação suficiente.</b><small>Cadastre mais experiências para ${ipaEscape(lead.destination||'este destino')} e gere novamente.</small></div>`;
@@ -3683,7 +3701,7 @@ function capturedExperience(){
  ${m.media?(String(m.type).startsWith('video')?`<video class="movie615-foreground" src="${ipaEscape(m.media)}" muted playsinline preload="metadata"></video>`:`<div class="movie615-backdrop" style="background-image:url('${encodeURI(String(m.media)).replace(/'/g,'%27')}')"></div><img class="movie615-foreground" src="${ipaEscape(m.media)}" alt="${ipaEscape(m.caption||'Memória da viagem')}" loading="lazy">`):'<div class="movie615ph">📷</div>'}
  <div class="movie615caption"><b>${ipaEscape(m.placeName||m.name||m.caption||'Momento da viagem')}</b>${m.day?`<small>Dia ${Number(m.day)}</small>`:''}</div></div>`).join('')}</div>
  <div class="movie615controls"><button type="button" data-inline-movie-play>▶ Assistir filme</button><span data-progress615>1 / ${ms.length}</span></div>
- <div class="movie615sound"><label>♫ Trilha <select data-inline-movie-track aria-label="Trilha sonora do filme"><option value="emotional">Emocionante</option><option value="light">Leve</option><option value="upbeat">Animada</option><option value="off">Sem música</option></select></label><span data-inline-movie-sound-status aria-live="polite">Toque em Assistir para ouvir a trilha</span></div>
+ <div class="movie615sound"><label>♫ Trilha <select data-inline-movie-track aria-label="Trilha sonora do filme"><option value="emotional">Emocionante</option><option value="light">Leve</option><option value="upbeat">Animada</option>${t?.movieAudioUrl?`<option value="custom" selected>Minha música · ${ipaEscape(t.favoriteSong||"Selecionada pelo ADM")}</option>`:""}<option value="off">Sem música</option></select></label><span data-inline-movie-sound-status aria-live="polite">Toque em Assistir para ouvir a trilha</span></div>
  <div class="movie615-audio-tools"><button type="button" data-inline-movie-test-sound>♫ Testar som</button><label>Volume <input type="range" data-inline-movie-volume min="0" max="100" value="90" aria-label="Volume da trilha"></label></div>
  <audio data-inline-movie-audio preload="none" loop playsinline></audio>
  </section>`;
@@ -3699,6 +3717,7 @@ function bindCapturedExperience(){
  const soundTest=root.querySelector('[data-inline-movie-test-sound]'),volume=root.querySelector('[data-inline-movie-volume]');
  if(!scenes.length||!play||!audio)return;
  const tracks={emotional:'emocionante',light:'leve',upbeat:'animada'};
+ const configuredAudio=String(activeTrip()?.movieAudioUrl||'');
  let index=0,playing=false,timer=null,ended=false;
  let activeTrack='',activeFormat='',fallbackAttempted=false,audioAttempt=0;
  const stopVideo=()=>scenes.forEach(scene=>{const video=scene.querySelector('video');if(video)try{video.pause()}catch(_){}});
@@ -3706,12 +3725,13 @@ function bindCapturedExperience(){
  const audioUrl=(name,fmt)=>new URL('assets/trilha-'+name+'.'+fmt, document.baseURI).href;
  const startAudio=(preferFallback=false)=>{
    if(select.value==='off'){audio.pause();setStatus('Sem música');return}
-   const track=tracks[select.value]||tracks.emotional;
-   const format=preferFallback?'mp3':'m4a';
+   const custom=select.value==='custom'&&/^https:\/\//i.test(configuredAudio);
+   const track=custom?'custom':(tracks[select.value]||tracks.emotional);
+   const format=custom?'custom':(preferFallback?'mp3':'m4a');
    const attempt=++audioAttempt;
    if(activeTrack!==track||activeFormat!==format){
      audio.pause();activeTrack=track;activeFormat=format;
-     audio.src=audioUrl(track,format);
+     audio.src=custom?configuredAudio:audioUrl(track,format);
      audio.load();
    }
    audio.muted=false;
@@ -3720,7 +3740,7 @@ function bindCapturedExperience(){
    const onFailure=(err)=>{
      if(attempt!==audioAttempt)return;
      console.warn('Filme: falha ao tocar '+format,err);
-     if(format==='m4a'&&!fallbackAttempted){fallbackAttempted=true;startAudio(true);return}
+     if(!custom&&format==='m4a'&&!fallbackAttempted){fallbackAttempted=true;startAudio(true);return}
      const code=audio.error?.code;
      setStatus('Áudio indisponível ('+(err?.name||'erro')+(code?', código '+code:'')+'). Confira se os arquivos de trilha foram publicados.');
    };
@@ -3781,8 +3801,7 @@ function memoriesView(){
  return `${memorySyncWarning}<div data-memory-pending-list></div><section class="album-hero"><span class="eyebrow">DIÁRIO AUTOMÁTICO · ${flag} ${country}</span><h1>${t.name}</h1><p>Seu diário cresce com checks, avaliações, fotos e vídeos desta viagem.</p><div class="album-stats"><span>📸 ${memories.filter(m=>m.type==='image').length} fotos</span><span>🎥 ${memories.filter(m=>m.type==='video').length} vídeos</span><span>📍 ${days.reduce((sum,d)=>sum+normalizedPlaces(d).length+ipaGetPersonalRoute(t,d.day).length,0)} lugares</span></div></section>
  <section class="section"><div class="section-head"><div><span class="eyebrow">LINHA DO TEMPO</span><h2>A viagem, dia por dia</h2></div></div><div class="album-days">${dayCards||'<p>O diário começará quando o roteiro for cadastrado.</p>'}</div></section>
  <section class="section"><div class="section-head"><div><span class="eyebrow">MOMENTOS SUGERIDOS</span><h2>Crie uma memória agora</h2></div></div><div class="memory-prompt-grid">${[['🥂','Hora do brinde'],['👨‍👩‍👧','Nossa turma'],['🍽️','Sabor inesquecível'],['🌅','A vista do dia'],['😂','Momento espontâneo'],['❤️','Meu favorito']].map(x=>`<button data-memory-prompt="${x[1]}"><span>${x[0]}</span><b>${x[1]}</b><small>${tripDestination(t)}</small></button>`).join('')}</div></section>
- <section class="section"><div class="section-head"><h2>Suas fotos e vídeos</h2></div><div class="live-memory-grid">${memories.map(m=>m.type==='video'?`<div class="live-memory"><video src="${m.src||m.url}" controls playsinline></video><b>${m.prompt||'Vídeo'}</b></div>`:`<div class="live-memory"><img src="${m.src||m.url}" alt=""><b>${m.prompt||'Memória'}</b></div>`).join('')||`<div class="empty-memory"><span>📷</span><h3>Seu álbum começa aqui</h3><button class="btn btn-primary" id="addPhoto">Adicionar foto ou vídeo</button></div>`}</div></section>
- ${tripModule('movie')?`<section class="section"><div class="memory-building-card"><span>🎬</span><div><b>Filme da viagem</b><p>${memories.length?'Já temos material para a retrospectiva.':'Registre seu primeiro momento para começar a retrospectiva.'}</p></div><button class="btn btn-light" data-memory-movie>Assistir prévia</button></div></section>`:''}${capturedExperience()}`;
+ `;
 }
 // Beta 6.30.05 — arquivos que não conseguiram sincronizar permanecem no dispositivo.
 // IndexedDB guarda o Blob original (sem transformar fotos em localStorage/base64).
@@ -4160,13 +4179,25 @@ function openTravelMovie(){
  setTimeout(()=>ipaBindMovie2(),30);
 }
 function ipaMovieMusicEngine(){
- let el=null;
- const tracks={emotional:'assets/trilha-emocionante.mp3',light:'assets/trilha-leve.mp3',upbeat:'assets/trilha-animada.mp3'};
- const stop=()=>{if(el){el.pause();el.currentTime=0;el=null}};
+ const tracks={emotional:'emocionante',light:'leve',upbeat:'animada'};
+ let el=null,attempt=0;
+ const stop=()=>{++attempt;if(el){el.pause();el.removeAttribute('src');el.load();el=null}};
  const start=async(style)=>{
    stop();if(style==='off')return true;
-   el=new Audio(tracks[style]||tracks.emotional);el.loop=true;el.volume=.55;el.preload='auto';
-   try{await el.play();return true}catch(e){console.warn('Áudio bloqueado',e);return false}
+   const ticket=attempt;
+   const name=tracks[style]||tracks.emotional;
+   const audio=document.createElement('audio');el=audio;
+   audio.loop=true;audio.volume=.65;audio.preload='auto';audio.playsInline=true;
+   const formats=audio.canPlayType('audio/mp4')?['m4a','mp3']:['mp3','m4a'];
+   for(const ext of formats){
+     if(ticket!==attempt)return false;
+     audio.src=new URL('assets/trilha-'+name+'.'+ext,document.baseURI).href;
+     try{await audio.play();return !audio.paused}catch(e){
+       console.warn('Falha ao reproduzir trilha '+name+'.'+ext,e);
+       if(e?.name==='NotAllowedError')return false;
+     }
+   }
+   return false;
  };
  const volume=v=>{if(el)el.volume=Math.max(0,Math.min(1,Number(v)||0))};
  return {start,stop,volume};
@@ -4193,12 +4224,12 @@ function ipaBindMovie2(){
    timer=setTimeout(()=>{if(i>=els.length-1){playing=false;audio.stop();i=0;paint();return}i++;paint();schedule()},duration);
  };
  const pause=()=>{if(!playing)return;remaining=Math.max(150,duration-(performance.now()-startTime));playing=false;clearTimeout(timer);cancelAnimationFrame(raf);audio.stop();const v=els[i]?.querySelector('video');if(v)try{v.pause()}catch(e){};plays.forEach(b=>b.textContent='▶ Continuar')};
- const resume=()=>{playing=true;audio.start(music.value).then(ok=>{if(audioStatus)audioStatus.textContent=ok?(music.value==='off'?'Sem música':'♫ Trilha tocando'):'Áudio bloqueado: toque em Testar música';});paint(false);schedule(remaining>0);remaining=0};
+ const resume=()=>{playing=true;audio.start(music.value).then(ok=>{if(audioStatus)audioStatus.textContent=ok?(music.value==='off'?'Sem música':'♫ Trilha tocando'):'Não foi possível iniciar a trilha. Toque em Testar música.';});paint(false);schedule(remaining>0);remaining=0};
  plays.forEach(b=>b.onclick=()=>playing?pause():resume());
  root.querySelector('[data-movie2-next]').onclick=()=>{i=(i+1)%els.length;remaining=0;paint();schedule()};
  root.querySelector('[data-movie2-prev]').onclick=()=>{i=(i-1+els.length)%els.length;remaining=0;paint();schedule()};
  root.querySelectorAll('[data-movie3-goto]').forEach(b=>b.onclick=()=>{i=Math.max(0,Math.min(els.length-1,Number(b.dataset.movie3Goto)));remaining=0;paint();schedule()});
- music.onchange=()=>{if(playing)audio.start(music.value).then(ok=>{if(audioStatus)audioStatus.textContent=ok?'♫ Trilha tocando':'Toque em Testar música'})};
+ music.onchange=()=>{if(playing)audio.start(music.value).then(ok=>{if(audioStatus)audioStatus.textContent=ok?'♫ Trilha tocando':'Trilha indisponível. Toque em Testar música.'})};
  const soundTest=root.querySelector('[data-movie3-test-sound]');if(soundTest)soundTest.onclick=()=>{if(music.value==='off')music.value='light';audio.start(music.value).then(ok=>{if(audioStatus)audioStatus.textContent=ok?'♫ Áudio ligado':'O navegador bloqueou o som. Verifique o volume e toque novamente.'})};
  format.onchange=()=>root.classList.toggle('movie3-vertical',format.value==='vertical');
  const dispose=()=>{disposed=true;clearTimeout(timer);cancelAnimationFrame(raf);audio.stop();stopVideo();modal.removeEventListener('close',dispose)};

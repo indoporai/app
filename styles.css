@@ -1351,3 +1351,8 @@ dialog:has(#routeCatalogPlace) .smart-place-actions button{
 .movie615-audio-tools button{border:1px solid #b5d9db;background:#e9f5f4;color:#07646c;border-radius:10px;min-height:38px;padding:8px 14px;font-weight:750;cursor:pointer}
 .movie615-audio-tools label{display:flex;align-items:center;gap:8px;font-weight:650;font-size:12px;color:#eaf5f5}
 .movie615-audio-tools input{width:125px;accent-color:#29adae}
+
+/* Beta 6.30.10: preferências musicais individuais */
+.ipa-movie-music-admin .admin-trip-fields{margin-top:12px}
+.ipa-movie-music-hint{font-size:.9rem;color:#607781;line-height:1.55}
+.ipa-lead-favorite-song{font-size:.92rem;color:#185e66;margin:8px 0}

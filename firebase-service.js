@@ -861,6 +861,18 @@ window.IPAFirebase = {
     ]);
     return true;
   },
+  // Trilha individual do filme: gravação confirmada no servidor, sem sync geral.
+  async saveTripMovieMusicConfirmed(tripId,{favoriteSong='',movieAudioUrl=''}){
+    if(!currentUser||currentUser.uid!==ADMIN_UID)throw new Error('Entre como ADM.');
+    if(!tripId)throw new Error('Viagem não identificada.');
+    const target=doc(firestore,'trips',String(tripId));
+    const savedFields={favoriteSong:String(favoriteSong).slice(0,160),movieAudioUrl:String(movieAudioUrl),updatedAt:serverTimestamp()};
+    await setDoc(target,savedFields,{merge:true});
+    const snapshot=await getDocFromServer(target);
+    if(!snapshot.exists()||snapshot.data().favoriteSong!==savedFields.favoriteSong||snapshot.data().movieAudioUrl!==savedFields.movieAudioUrl)
+      throw new Error('A alteração ainda não foi confirmada no Firebase.');
+    return true;
+  },
   // Atualização pontual: não depende de syncAll (que pode estar em andamento).
   async saveTripClimateConfirmed(tripId,climateContent,editedAt){
     if(!currentUser||currentUser.uid!==ADMIN_UID)throw new Error('Entre como administrador para salvar.');

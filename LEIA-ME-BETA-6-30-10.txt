@@ -1,0 +1,1 @@
+Beta 6.30.10 — Remove galeria e atalho de filme duplicados na página Memórias. Adiciona música favorita no formulário do pedido, campo de trilha autorizada no ADM e opção de música personalizada no player. Para música comercial, é necessária autorização de sincronização com imagens.
