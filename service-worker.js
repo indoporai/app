@@ -1,21 +1,24 @@
-const CACHE = "indo-por-ai-v2-beta-6-30-08-email-icon";
+const CACHE = "indo-por-ai-v2-beta-6-30-09-email-icon";
 const CORE = [
   "./",
   "index.html",
-  "styles.css?v=v2-beta-6-30-08",
-  "app.js?v=v2-beta-6-30-08",
-  "data-service.js?v=v2-beta-6-30-08",
-  "firebase-service.js?v=v2-beta-6-30-08",
+  "styles.css?v=v2-beta-6-30-09",
+  "app.js?v=v2-beta-6-30-09",
+  "data-service.js?v=v2-beta-6-30-09",
+  "firebase-service.js?v=v2-beta-6-30-09",
   "admin.html",
-  "admin.js?v=v2-beta-6-30-08",
+  "admin.js?v=v2-beta-6-30-09",
   "admin.css",
-  "manifest.webmanifest?v=63008",
-  "pwa-install.js?v=v2-beta-6-30-08",
+  "manifest.webmanifest?v=63009",
+  "pwa-install.js?v=v2-beta-6-30-09",
   "assets/apple-touch-icon.png",
   "assets/icon-192.png",
   "assets/icon-512.png",
+  "assets/trilha-emocionante.m4a",
   "assets/trilha-emocionante.mp3",
+  "assets/trilha-leve.m4a",
   "assets/trilha-leve.mp3",
+  "assets/trilha-animada.m4a",
   "assets/trilha-animada.mp3"
 ];
 self.addEventListener("install", event => {

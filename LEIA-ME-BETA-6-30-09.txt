@@ -1,0 +1,1 @@
+Beta 6.30.09: trilhas AAC/M4A 44,1 kHz com fallback MP3 para Filme da Viagem. Manter a pasta assets inteira no deploy Cloudflare Pages. Nenhuma alteração no Firebase ou nas memórias.

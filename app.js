@@ -3685,7 +3685,7 @@ function capturedExperience(){
  <div class="movie615controls"><button type="button" data-inline-movie-play>▶ Assistir filme</button><span data-progress615>1 / ${ms.length}</span></div>
  <div class="movie615sound"><label>♫ Trilha <select data-inline-movie-track aria-label="Trilha sonora do filme"><option value="emotional">Emocionante</option><option value="light">Leve</option><option value="upbeat">Animada</option><option value="off">Sem música</option></select></label><span data-inline-movie-sound-status aria-live="polite">Toque em Assistir para ouvir a trilha</span></div>
  <div class="movie615-audio-tools"><button type="button" data-inline-movie-test-sound>♫ Testar som</button><label>Volume <input type="range" data-inline-movie-volume min="0" max="100" value="90" aria-label="Volume da trilha"></label></div>
- <audio data-inline-movie-audio src="assets/trilha-emocionante.mp3" preload="auto" loop></audio>
+ <audio data-inline-movie-audio preload="none" loop playsinline></audio>
  </section>`;
 }
 // Filme dentro do próprio álbum: reprodução e som iniciados por gesto do usuário.
@@ -3698,27 +3698,38 @@ function bindCapturedExperience(){
  const status=root.querySelector('[data-inline-movie-sound-status]'),audio=root.querySelector('[data-inline-movie-audio]');
  const soundTest=root.querySelector('[data-inline-movie-test-sound]'),volume=root.querySelector('[data-inline-movie-volume]');
  if(!scenes.length||!play||!audio)return;
- const tracks={emotional:'assets/trilha-emocionante.mp3',light:'assets/trilha-leve.mp3',upbeat:'assets/trilha-animada.mp3'};
+ const tracks={emotional:'emocionante',light:'leve',upbeat:'animada'};
  let index=0,playing=false,timer=null,ended=false;
+ let activeTrack='',activeFormat='',fallbackAttempted=false,audioAttempt=0;
  const stopVideo=()=>scenes.forEach(scene=>{const video=scene.querySelector('video');if(video)try{video.pause()}catch(_){}});
  const setStatus=(value)=>{status.textContent=value};
- const startAudio=()=>{
+ const audioUrl=(name,fmt)=>new URL('assets/trilha-'+name+'.'+fmt, document.baseURI).href;
+ const startAudio=(preferFallback=false)=>{
    if(select.value==='off'){audio.pause();setStatus('Sem música');return}
    const track=tracks[select.value]||tracks.emotional;
-   if(!audio.getAttribute('src')||!audio.getAttribute('src').endsWith(track)){
-     audio.pause();audio.src=track;audio.load();
+   const format=preferFallback?'mp3':'m4a';
+   const attempt=++audioAttempt;
+   if(activeTrack!==track||activeFormat!==format){
+     audio.pause();activeTrack=track;activeFormat=format;
+     audio.src=audioUrl(track,format);
+     audio.load();
    }
    audio.muted=false;
    audio.volume=Math.max(0,Math.min(1,Number(volume?.value||90)/100));
-   // Chamada direta do gesto do usuario (requisito do iPhone).
-   let promise;
-   try{promise=audio.play()}catch(err){setStatus('Falha no áudio: '+(err?.name||'erro'));return}
-   if(promise&&typeof promise.then==='function')promise.then(()=>{
-     setStatus(audio.paused?'O áudio não iniciou':'♫ Tocando · confira o volume do aparelho');
-   }).catch(err=>{
-     console.warn('Filme: áudio não iniciou',err);
-     setStatus('Não foi possível tocar: '+(err?.name||'erro')+' · toque em Testar som');
-   });
+   setStatus('♫ Iniciando trilha...');
+   const onFailure=(err)=>{
+     if(attempt!==audioAttempt)return;
+     console.warn('Filme: falha ao tocar '+format,err);
+     if(format==='m4a'&&!fallbackAttempted){fallbackAttempted=true;startAudio(true);return}
+     const code=audio.error?.code;
+     setStatus('Áudio indisponível ('+(err?.name||'erro')+(code?', código '+code:'')+'). Confira se os arquivos de trilha foram publicados.');
+   };
+   try{
+     const promise=audio.play();
+     if(promise&&typeof promise.then==='function')promise.then(()=>{
+       if(attempt===audioAttempt)setStatus(audio.paused?'O áudio não iniciou':'♫ Música tocando');
+     }).catch(onFailure);
+   }catch(err){onFailure(err)}
  };
  const show=(next)=>{
    stopVideo();index=next;
@@ -3741,13 +3752,13 @@ function bindCapturedExperience(){
    const video=scenes[index].querySelector('video');if(video)video.play().catch(()=>{});
    schedule();
  };
- select.onchange=()=>{if(playing)startAudio();else {audio.pause();setStatus('Toque em Assistir ou Testar som')}};
+ select.onchange=()=>{fallbackAttempted=false;if(playing)startAudio();else {audio.pause();setStatus('Toque em Assistir ou Testar som')}};
  if(soundTest)soundTest.onclick=()=>{
    if(select.value==='off')select.value='light';
-   startAudio();
+   fallbackAttempted=false;startAudio();
  };
  if(volume)volume.oninput=()=>{audio.volume=Number(volume.value)/100;audio.muted=false};
- audio.addEventListener('error',()=>{const c=audio.error?.code;setStatus('Falha ao carregar trilha'+(c?' (código '+c+')':''));});
+ audio.addEventListener('error',()=>{const c=audio.error?.code;console.warn('Falha mídia do filme',c, audio.currentSrc);});
  const cleanup=()=>{playing=false;clearTimeout(timer);audio.pause();stopVideo();play.onclick=null;select.onchange=null;if(soundTest)soundTest.onclick=null};
  ipaInlineMovieCleanup=cleanup;
 }
