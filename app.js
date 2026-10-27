@@ -950,6 +950,7 @@ function bind(){
  document.querySelectorAll('[data-profile]').forEach(b=>b.onclick=()=>setProfile(b.dataset.profile));
  document.querySelectorAll('#liveBtn').forEach(b=>b.onclick=toggleLive);
  document.querySelectorAll('#addPhoto').forEach(b=>b.onclick=()=>photoInput.click());
+ if(state.route==='memories')ipaUpdatePendingMemories();
 
  document.querySelectorAll('[data-day]').forEach(b=>b.onclick=()=>{state.tripDay=Number(b.dataset.day);render()});
  document.querySelectorAll('[data-client-switch-trip]').forEach(b=>b.onclick=()=>ipaSelectClientTrip(b.dataset.clientSwitchTrip));
@@ -3698,11 +3699,75 @@ function memoriesView(){
    const discoveryCount=personal.length;
    return `<button class="album-day" data-memory-day="${encodeURIComponent(day.title)}"><div class="album-day-cover">📍</div><div><span>Dia ${day.day}</span><h3>${day.title}</h3><p>${done}/${places.length} lugares visitados · ${dayMem.length} memórias${discoveryCount?` · ✨ ${discoveryCount} descoberta${discoveryCount>1?'s':''}`:''}</p><small>${day.date||tripDestination(t)}</small></div><b>›</b></button>`
  }).join('');
- return `${memorySyncWarning}<section class="album-hero"><span class="eyebrow">DIÁRIO AUTOMÁTICO · ${flag} ${country}</span><h1>${t.name}</h1><p>Seu diário cresce com checks, avaliações, fotos e vídeos desta viagem.</p><div class="album-stats"><span>📸 ${memories.filter(m=>m.type==='image').length} fotos</span><span>🎥 ${memories.filter(m=>m.type==='video').length} vídeos</span><span>📍 ${days.reduce((sum,d)=>sum+normalizedPlaces(d).length+ipaGetPersonalRoute(t,d.day).length,0)} lugares</span></div></section>
+ return `${memorySyncWarning}<div data-memory-pending-list></div><section class="album-hero"><span class="eyebrow">DIÁRIO AUTOMÁTICO · ${flag} ${country}</span><h1>${t.name}</h1><p>Seu diário cresce com checks, avaliações, fotos e vídeos desta viagem.</p><div class="album-stats"><span>📸 ${memories.filter(m=>m.type==='image').length} fotos</span><span>🎥 ${memories.filter(m=>m.type==='video').length} vídeos</span><span>📍 ${days.reduce((sum,d)=>sum+normalizedPlaces(d).length+ipaGetPersonalRoute(t,d.day).length,0)} lugares</span></div></section>
  <section class="section"><div class="section-head"><div><span class="eyebrow">LINHA DO TEMPO</span><h2>A viagem, dia por dia</h2></div></div><div class="album-days">${dayCards||'<p>O diário começará quando o roteiro for cadastrado.</p>'}</div></section>
  <section class="section"><div class="section-head"><div><span class="eyebrow">MOMENTOS SUGERIDOS</span><h2>Crie uma memória agora</h2></div></div><div class="memory-prompt-grid">${[['🥂','Hora do brinde'],['👨‍👩‍👧','Nossa turma'],['🍽️','Sabor inesquecível'],['🌅','A vista do dia'],['😂','Momento espontâneo'],['❤️','Meu favorito']].map(x=>`<button data-memory-prompt="${x[1]}"><span>${x[0]}</span><b>${x[1]}</b><small>${tripDestination(t)}</small></button>`).join('')}</div></section>
  <section class="section"><div class="section-head"><h2>Suas fotos e vídeos</h2></div><div class="live-memory-grid">${memories.map(m=>m.type==='video'?`<div class="live-memory"><video src="${m.src||m.url}" controls playsinline></video><b>${m.prompt||'Vídeo'}</b></div>`:`<div class="live-memory"><img src="${m.src||m.url}" alt=""><b>${m.prompt||'Memória'}</b></div>`).join('')||`<div class="empty-memory"><span>📷</span><h3>Seu álbum começa aqui</h3><button class="btn btn-primary" id="addPhoto">Adicionar foto ou vídeo</button></div>`}</div></section>
  ${tripModule('movie')?`<section class="section"><div class="memory-building-card"><span>🎬</span><div><b>Filme da viagem</b><p>${memories.length?'Já temos material para a retrospectiva.':'Registre seu primeiro momento para começar a retrospectiva.'}</p></div><button class="btn btn-light" data-memory-movie>Assistir prévia</button></div></section>`:''}${capturedExperience()}`;
+}
+// Beta 6.30.05 — arquivos que não conseguiram sincronizar permanecem no dispositivo.
+// IndexedDB guarda o Blob original (sem transformar fotos em localStorage/base64).
+const ipaPendingMemoryDB = (()=>{
+ let opening;
+ function open(){
+  if(!('indexedDB' in window))return Promise.reject(new Error('Armazenamento local de fotos indisponível neste navegador.'));
+  if(!opening)opening=new Promise((resolve,reject)=>{
+   const req=indexedDB.open('ipa-memory-outbox-v1',1);
+   req.onupgradeneeded=()=>{const db=req.result;if(!db.objectStoreNames.contains('pending'))db.createObjectStore('pending',{keyPath:'id'});};
+   req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error||new Error('Erro ao abrir o armazenamento local.'));
+  }).catch(err=>{opening=null;throw err});
+  return opening;
+ }
+ async function action(mode,operation,item){const db=await open();return new Promise((resolve,reject)=>{
+  const tx=db.transaction('pending',mode),st=tx.objectStore('pending');
+  const req=operation==='put'?st.put(item):operation==='delete'?st.delete(item):st.getAll();
+  req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);
+ })}
+ return {put:item=>action('readwrite','put',item),del:id=>action('readwrite','delete',id),all:()=>action('readonly','all')};
+})();
+function ipaMemoryError(error,stage){
+ const code=String(error?.code||'');
+ let message=String(error?.message||'O servidor recusou a gravação.');
+ if(/storage\/unauthorized|permission-denied/i.test(code+' '+message))message='O Firebase negou permissão de gravação. Verifique as regras do Storage/Firestore para este viajante.';
+ else if(/storage\/quota-exceeded/i.test(code))message='Limite de armazenamento do Firebase atingido.';
+ else if(/storage\/canceled/i.test(code))message='Envio cancelado.';
+ else if(/storage\/retry-limit-exceeded|unavailable|network-request-failed/i.test(code+' '+message))message='Falha de conexão com o Firebase.';
+ return `${stage}: ${message}${code?' ['+code+']':''}`;
+}
+async function ipaSendPendingMemory(item){
+ const userId=window.IPAFirebase?.user?.uid;
+ if(!userId||userId!==item.ownerUid)throw new Error('Entre na mesma conta usada para registrar esta foto.');
+ let uploaded=item.uploaded||null;
+ if(!uploaded){
+  if(!item.file)throw new Error('Arquivo local indisponível.');
+  try{uploaded=await window.IPAFirebase.uploadMemory(item.file,item.clientId,item.tripId);}
+  catch(e){throw new Error(ipaMemoryError(e,'Envio da foto'))}
+  await ipaPendingMemoryDB.put({...item,uploaded});
+ }
+ const memory={...item.memory,src:uploaded.url,url:uploaded.url,path:uploaded.path,cloudSynced:true};
+ try{await window.IPAFirebase.saveMemory(memory)}catch(e){throw new Error(ipaMemoryError(e,'Registro da memória'))}
+ IPAData.addMemory(memory);
+ await ipaPendingMemoryDB.del(item.id);
+ return memory;
+}
+async function ipaUpdatePendingMemories(){
+ const container=document.querySelector('[data-memory-pending-list]');if(!container)return;
+ const t=activeTrip(),uid=window.IPAFirebase?.user?.uid;
+ if(!t||!uid){container.innerHTML='';return;}
+ try{
+  const items=(await ipaPendingMemoryDB.all()).filter(x=>x.tripId===t.id&&x.ownerUid===uid);
+  if(!container.isConnected)return;
+  if(!items.length){container.innerHTML='';return;}
+  container.innerHTML=`<div class="ipa-memory-pending-box"><b>📱 ${items.length} memória(s) aguardando sincronização</b><p>Arquivos preservados neste aparelho, mas ainda não disponíveis em outros dispositivos. Não apague os dados do navegador até enviar.</p><button type="button" class="btn btn-primary" data-retry-memories>☁️ Tentar enviar para a nuvem</button><small data-retry-memories-status></small></div>`;
+  container.querySelector('[data-retry-memories]').onclick=async(event)=>{
+   const button=event.currentTarget,status=container.querySelector('[data-retry-memories-status]');button.disabled=true;button.textContent='Enviando...';
+   let ok=0,errors=[];
+   for(const record of items){try{await ipaSendPendingMemory(record);ok++}catch(err){errors.push(err.message||'Falha desconhecida')}}
+   if(status)status.textContent=errors.length?`${ok} enviada(s). ${errors[0]}`:`${ok} memória(s) salva(s) na nuvem ✓`;
+   button.disabled=false;button.textContent='☁️ Tentar novamente';
+   if(ok&&!errors.length){toast(`${ok} memória(s) sincronizada(s) ✓`);render();}
+  };
+ }catch(err){console.warn('Memórias locais pendentes indisponíveis',err);container.textContent='Não foi possível conferir as fotos pendentes deste aparelho.'}
 }
 async function handlePhotos(e){
  const t=activeTrip(),context=window.ipaPendingPlaceMemory;
@@ -3712,20 +3777,26 @@ async function handlePhotos(e){
  if(!files.length)return;
  if(!t?.id){toast('Selecione uma viagem antes de registrar a memória.');e.target.value='';return}
  const btn=document.querySelector('[data-place-memory]');if(btn)btn.disabled=true;
- let saved=0,failed=0;
+ let saved=0,pending=0,failed=0,firstError='';
  for(const file of files){
-   try{
-     const type=file.type.startsWith('video/')?'video':'image';
-     if(!window.IPAFirebase?.uploadMemory||!window.IPAFirebase?.saveMemory||!t?.clientId)throw new Error('Entre na conta do viajante para salvar na nuvem.');
-     const up=await window.IPAFirebase.uploadMemory(file,t.clientId,t.id);
-     const memory={id:'mem-'+Date.now()+'-'+Math.random().toString(36).slice(2,10),tripId:t.id,clientId:t.clientId,prompt,type,src:up.url,url:up.url,path:up.path,name:file.name,day:context?.day||state.tripDay||1,placeId:context?.placeId||'',placeName:context?.placeName||'',createdAt:new Date().toISOString(),cloudSynced:true};
-     await window.IPAFirebase.saveMemory(memory);
-     IPAData.addMemory(memory);saved++;
-   }catch(err){failed++;console.warn('Erro no registro de memória',err);toast('Foto/vídeo não sincronizado: '+(err?.message||'tente novamente'));}
+  const clientId=t.clientId||ipaDB()?.activeClientId||'';
+  const ownerUid=window.IPAFirebase?.user?.uid||'';
+  const type=file.type.startsWith('video/')?'video':'image';
+  const memory={id:'mem-'+Date.now()+'-'+Math.random().toString(36).slice(2,10),tripId:t.id,clientId,prompt,type,name:file.name,day:context?.day||state.tripDay||1,placeId:context?.placeId||'',placeName:context?.placeName||'',createdAt:new Date().toISOString()};
+  const record={id:memory.id,tripId:t.id,clientId,ownerUid,file,memory,uploaded:null};
+  if(!ownerUid||!clientId){failed++;firstError='Sessão ou cliente não identificado. Entre novamente com o login do viajante.';continue;}
+  try{
+   // Primeiro preserva o arquivo original localmente, mesmo que o Firebase esteja indisponível.
+   await ipaPendingMemoryDB.put(record);
+  }catch(err){failed++;firstError='Não foi possível guardar uma cópia local: '+(err?.message||'armazenamento indisponível');continue}
+  try{await ipaSendPendingMemory(record);saved++}
+  catch(err){pending++;firstError=firstError||err.message;console.warn('Memória aguardando sincronização',err)}
  }
  localStorage.removeItem('ipa-memory-prompt');e.target.value='';if(btn)btn.disabled=false;
- if(saved){toast(saved+' memória(s) salva(s) na nuvem ✓');if(!context){state.mode='after';state.route='memories'}render()}
- else if(failed)toast('Nenhuma memória foi salva. Confira a conexão e as permissões do Firebase.');
+ if(saved)toast(`${saved} memória(s) salva(s) na nuvem ✓`);
+ if(pending)toast(`${pending} memória(s) guardada(s) neste aparelho, aguardando a nuvem. ${firstError}`);
+ if(failed)toast(`${failed} foto(s) não preservada(s): ${firstError}`);
+ if(saved||pending){if(!context){state.mode='after';state.route='memories'}render()}
 }
 
 function showModal(html){modalContent.innerHTML=html;modal.showModal();setTimeout(()=>{modalContent.querySelectorAll('[data-map]').forEach(b=>b.onclick=()=>window.open('https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(b.dataset.map),'_blank'));modalContent.querySelectorAll('[data-profile]').forEach(b=>b.onclick=()=>{modal.close();setProfile(b.dataset.profile)})},0)}

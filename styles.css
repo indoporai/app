@@ -1242,7 +1242,7 @@ dialog:has(#routeCatalogPlace) .smart-place-actions button{
 .ipa-memory-sync-alert{background:#fff8e9;color:#74510d;border:1px solid #eedcab;border-radius:14px;padding:12px 15px;margin:12px 0;font-size:13px;line-height:1.45}
 
 
-/* Beta 6.30.04 — Registrar momento: tamanho discreto, sem ocupar a largura inteira */
+/* Beta 6.30.05 — Registrar momento: tamanho discreto, sem ocupar a largura inteira */
 .ipa-place-feedback .ipa-place-memory,
 .ipa-reorder-item .ipa-place-feedback .ipa-place-memory{
   flex:0 0 auto;
@@ -1269,7 +1269,7 @@ dialog:has(#routeCatalogPlace) .smart-place-actions button{
 }
 
 
-/* Beta 6.30.04 — Roteiro responsivo: título ao lado da foto, conteúdo sem lacunas */
+/* Beta 6.30.05 — Roteiro responsivo: título ao lado da foto, conteúdo sem lacunas */
 .during-place-card{grid-template-columns:42px 96px minmax(0,1fr);grid-template-rows:auto auto;align-items:start;column-gap:12px;row-gap:10px}
 .during-place-card>.during-place-number{grid-column:1;grid-row:1}
 .during-place-card>.ipa-during-thumbnail{grid-column:2;grid-row:1;max-width:100%;object-fit:cover}
@@ -1292,7 +1292,7 @@ dialog:has(#routeCatalogPlace) .smart-place-actions button{
 }
 @media(max-width:360px){.during-place-card{grid-template-columns:36px 66px minmax(0,1fr)!important;gap:8px!important}.during-place-card>.ipa-during-thumbnail{width:66px!important;height:66px!important}}
 
-/* Beta 6.30.04 — Passeios: ações padronizadas em duas linhas, sem tocar nas ações do roteiro reordenável */
+/* Beta 6.30.05 — Passeios: ações padronizadas em duas linhas, sem tocar nas ações do roteiro reordenável */
 .during-place-card .ipa-place-feedback{
  display:flex!important;flex-direction:column!important;align-items:stretch!important;gap:8px!important;width:100%;margin-top:12px;
 }
@@ -1319,3 +1319,9 @@ dialog:has(#routeCatalogPlace) .smart-place-actions button{
 .during-place-card .ipa-place-feedback .ipa-place-utilities .ipa-place-map{
  background:#eef4f6;color:#0b6173;
 }
+
+/* 6.30.05: visualização de upload pendente, nunca confundir com armazenamento em nuvem. */
+.ipa-memory-pending-box{margin:14px 16px;padding:16px;border:1px solid #e5b968;border-radius:17px;background:#fff9e9;color:#19404b;display:grid;gap:10px}
+.ipa-memory-pending-box p{margin:0;line-height:1.5;font-size:14px}
+.ipa-memory-pending-box small{font-size:13px;line-height:1.45}
+.ipa-memory-pending-box .btn{width:fit-content;max-width:100%;font-size:14px}

@@ -1,0 +1,1 @@
+Beta 6.30.05 — preservação local de fotos/vídeos não enviados, diagnóstico da etapa Firebase e botão de reenviar em Memórias. Não altere nem exclua dados do navegador antes de sincronizar. O envio à nuvem depende das regras de segurança do Firebase Storage/Firestore.
