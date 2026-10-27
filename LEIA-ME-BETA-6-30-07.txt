@@ -1,0 +1,1 @@
+Beta 6.30.07 — Filme da Viagem na própria tela de Memórias, com seletor de trilha instrumental e reprodução no toque. Fotos e sincronização mantidas. A reprodução de áudio no iPhone depende de interação do usuário e volume do dispositivo.

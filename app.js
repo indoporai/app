@@ -994,6 +994,7 @@ function bind(){
    };
  });
  document.querySelectorAll('[data-memory-movie]').forEach(btn=>btn.onclick=()=>openTravelMovie());
+ bindCapturedExperience();
  document.querySelectorAll('[data-place-memory]').forEach(btn=>btn.onclick=()=>{
    const values=(btn.dataset.placeMemory||'').split('|');
    const placeName=btn.dataset.memoryPlaceName||'Lugar visitado';
@@ -3677,13 +3678,63 @@ function capturedExperience(){
  const ms=core.length?core:localCapturedMoments(); if(!ms.length)return '';
  return `<section class="section captured615"><div class="section-head"><div><span class="eyebrow">📷 MOMENTOS REGISTRADOS</span><h2>Suas memórias da viagem</h2></div><span class="chip green">${ms.length} momentos</span></div>
  <div class="captured615grid">${ms.map(m=>`<article>${m.media?(String(m.type).startsWith('video')?`<video src="${m.media}" controls playsinline></video>`:`<img src="${m.media}">`):`<div class="captured615ph">📷<small>${m.name}</small></div>`}<div class="captured615copy">${m.featured?'<span>❤️ Destaque</span>':''}<b>${m.caption||'Momento da viagem'}</b><small>${new Date(m.date).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}</small></div></article>`).join('')}</div></section>
- <section class="section movie615"><div class="section-head"><div><span class="eyebrow">🎬 FILME DA VIAGEM</span><h2>Seu filme já começou</h2></div><span class="chip orange">${ms.length} cenas</span></div>
- <div class="movie615stage">${ms.map((m,i)=>`<div class="movie615scene ${i===0?'active':''}">${m.media?(String(m.type).startsWith('video')?`<video src="${m.media}" muted playsinline></video>`:`<img src="${m.media}">`):'<div class="movie615ph">📷</div>'}<div><b>${m.caption||'Momento da viagem'}</b></div></div>`).join('')}</div>
- <div class="movie615controls"><button data-memory-movie>▶ Assistir Filme 2.0</button><span data-progress615>1 / ${ms.length}</span></div></section>`;
+ <section class="section movie615" data-ipa-inline-movie><div class="section-head"><div><span class="eyebrow">🎬 FILME DA VIAGEM</span><h2>Seu filme já começou</h2></div><span class="chip orange">${ms.length} cenas</span></div>
+ <div class="movie615stage" aria-label="Prévia do filme da viagem">${ms.map((m,i)=>`<div class="movie615scene ${i===0?'active':''}" aria-hidden="${i!==0}">
+ ${m.media?(String(m.type).startsWith('video')?`<video class="movie615-foreground" src="${ipaEscape(m.media)}" muted playsinline preload="metadata"></video>`:`<div class="movie615-backdrop" style="background-image:url('${encodeURI(String(m.media)).replace(/'/g,'%27')}')"></div><img class="movie615-foreground" src="${ipaEscape(m.media)}" alt="${ipaEscape(m.caption||'Memória da viagem')}" loading="lazy">`):'<div class="movie615ph">📷</div>'}
+ <div class="movie615caption"><b>${ipaEscape(m.placeName||m.name||m.caption||'Momento da viagem')}</b>${m.day?`<small>Dia ${Number(m.day)}</small>`:''}</div></div>`).join('')}</div>
+ <div class="movie615controls"><button type="button" data-inline-movie-play>▶ Assistir filme</button><span data-progress615>1 / ${ms.length}</span></div>
+ <div class="movie615sound"><label>♫ Trilha <select data-inline-movie-track aria-label="Trilha sonora do filme"><option value="emotional">Emocionante</option><option value="light">Leve</option><option value="upbeat">Animada</option><option value="off">Sem música</option></select></label><span data-inline-movie-sound-status aria-live="polite">Toque em Assistir para ouvir a trilha</span></div>
+ <audio data-inline-movie-audio src="assets/trilha-emocionante.mp3" preload="auto" loop playsinline></audio>
+ </section>`;
 }
+// Filme dentro do próprio álbum: reprodução e som iniciados por gesto do usuário.
+let ipaInlineMovieCleanup=null;
 function bindCapturedExperience(){
- document.querySelectorAll('[data-play615]').forEach(btn=>{let box=btn.closest('.movie615'),sc=[...box.querySelectorAll('.movie615scene')],p=box.querySelector('[data-progress615]'),i=0,t=null;btn.onclick=()=>{if(t){clearInterval(t);t=null;btn.textContent='▶ Continuar';return}btn.textContent='⏸ Pausar';t=setInterval(()=>{sc[i].classList.remove('active');i=(i+1)%sc.length;sc[i].classList.add('active');let v=sc[i].querySelector('video');if(v)try{v.currentTime=0;v.play()}catch(e){}p.textContent=`${i+1} / ${sc.length}`},3000)}})
+ if(ipaInlineMovieCleanup){ipaInlineMovieCleanup();ipaInlineMovieCleanup=null}
+ const root=document.querySelector('[data-ipa-inline-movie]');if(!root)return;
+ const scenes=[...root.querySelectorAll('.movie615scene')],play=root.querySelector('[data-inline-movie-play]');
+ const counter=root.querySelector('[data-progress615]'),select=root.querySelector('[data-inline-movie-track]');
+ const status=root.querySelector('[data-inline-movie-sound-status]'),audio=root.querySelector('[data-inline-movie-audio]');
+ if(!scenes.length||!play||!audio)return;
+ const tracks={emotional:'assets/trilha-emocionante.mp3',light:'assets/trilha-leve.mp3',upbeat:'assets/trilha-animada.mp3'};
+ let index=0,playing=false,timer=null,ended=false;
+ const stopVideo=()=>scenes.forEach(scene=>{const video=scene.querySelector('video');if(video)try{video.pause()}catch(_){}});
+ const setStatus=(value)=>{status.textContent=value};
+ const startAudio=()=>{
+   if(select.value==='off'){audio.pause();setStatus('Sem música');return}
+   const track=tracks[select.value]||tracks.emotional;
+   if(!audio.getAttribute('src')||!audio.getAttribute('src').endsWith(track)){audio.pause();audio.src=track;audio.load()}
+   audio.volume=.75;
+   // play() é invocado dentro do clique, não em um timer (Safari/iOS).
+   const promise=audio.play();
+   if(promise&&typeof promise.then==='function')promise.then(()=>setStatus('♫ Trilha tocando')).catch(err=>{console.warn('Filme: áudio não iniciou',err);setStatus('Som bloqueado. Toque em Pausar e Assistir novamente.')});
+ };
+ const show=(next)=>{
+   stopVideo();index=next;
+   scenes.forEach((scene,i)=>{scene.classList.toggle('active',i===index);scene.setAttribute('aria-hidden',i===index?'false':'true')});
+   const v=scenes[index].querySelector('video');if(v&&playing){try{v.currentTime=0;v.play().catch(()=>{})}catch(_){}}
+   counter.textContent=`${index+1} / ${scenes.length}`;
+ };
+ const sceneTime=()=>{const v=scenes[index].querySelector('video');return v&&Number.isFinite(v.duration)&&v.duration>0?Math.min(8000,Math.max(4000,v.duration*1000)):3900};
+ const schedule=()=>{clearTimeout(timer);if(!playing)return;timer=setTimeout(()=>{
+   if(!root.isConnected){cleanup();return}
+   if(index>=scenes.length-1){playing=false;ended=true;audio.pause();stopVideo();play.textContent='↻ Assistir novamente';setStatus(select.value==='off'?'Sem música':'Filme concluído');return}
+   show(index+1);schedule();
+ },sceneTime())};
+ const pause=()=>{playing=false;clearTimeout(timer);audio.pause();stopVideo();play.textContent='▶ Continuar';setStatus('Pausado')};
+ play.onclick=()=>{
+   if(playing){pause();return}
+   if(ended){ended=false;show(0)}
+   playing=true;play.textContent='⏸ Pausar';
+   startAudio(); // gesto direto do usuário
+   const video=scenes[index].querySelector('video');if(video)video.play().catch(()=>{});
+   schedule();
+ };
+ select.onchange=()=>{if(playing)startAudio();else {audio.pause();setStatus('Toque em Assistir para ouvir a trilha')}};
+ const cleanup=()=>{playing=false;clearTimeout(timer);audio.pause();stopVideo();play.onclick=null;select.onchange=null};
+ ipaInlineMovieCleanup=cleanup;
 }
+
 function memoriesView(){
  const t=activeTrip();if(!t)return `<section class="section"><h2>Viagem não encontrada</h2></section>`;
  const days=(t.itinerary||[]).sort((a,b)=>Number(a.day)-Number(b.day)),country=tripCountry(t),flag=countryFlag(country);
