@@ -1,0 +1,1 @@
+Beta 6.30.19 — Base 6.30.18. Remove limite de 4 lugares na prévia de cada dia no Antes. Ajusta botões do roteiro detalhado em layout compacto e responsivo. Mantém filme sem música, abas de dias e carimbos. Publicar todos os arquivos da raiz do ZIP.
