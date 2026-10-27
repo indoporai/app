@@ -1,0 +1,1 @@
+Beta 6.30.15 — abas de dias acima do roteiro em Durante; correção de seleção de dia; Passaporte Indo por Aí com carimbos únicos por cidade. Áudio funcional da 6.30.14 mantido; músicas comerciais NÃO incluídas por exigirem licença de sincronização e distribuição.

@@ -1362,3 +1362,20 @@ dialog:has(#routeCatalogPlace) .smart-place-actions button{
 
 /* 6.30.13: player nativo visível para trilha do filme inline */
 .movie615 audio[data-inline-movie-audio]{display:block!important;width:100%;height:44px;margin:10px 0 3px;opacity:1;position:relative;z-index:2;accent-color:#00a3a7}
+
+/* Beta 6.30.15 – navegação visível e passaporte de destinos */
+.ipa-top-day-tabs{margin-top:12px}.ipa-top-day-tabs .day-strip{display:flex;gap:8px;overflow-x:auto;padding:4px 2px 12px;scroll-snap-type:x proximity}.ipa-top-day-tabs .day-pill{flex:0 0 66px;scroll-snap-align:start}.ipa-passport-book{border-radius:22px;overflow:hidden;border:1px solid #cfdfdf;box-shadow:0 8px 22px #002b3612;background:#fff}.ipa-passport-cover{display:flex;align-items:center;gap:17px;background:#073b46;color:#fff;padding:22px 20px}.ipa-passport-cover>span{font-size:38px}.ipa-passport-cover .eyebrow{color:#c4e6df}.ipa-passport-cover h3{margin:5px 0;font-size:22px;color:#fff}.ipa-passport-cover p{margin:0;color:#d4eaed}.ipa-passport-page{background:#fffdf5;padding:20px 15px 24px;min-height:190px;background-image:repeating-linear-gradient(0deg,transparent,transparent 25px,#eedfc533 26px)}.ipa-passport-caption{text-transform:uppercase;font-size:12px;font-weight:800;letter-spacing:2px;color:#708a88;margin:0 0 18px 7px}.ipa-passport-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(135px,1fr));gap:15px;justify-items:center}.ipa-passport-stamp{width:142px;max-width:100%;aspect-ratio:1;border:2px dashed #1b6572;border-radius:50%;transform:rotate(-7deg);color:#175964;display:flex;justify-content:center;align-items:center;text-align:center;background:#e5f1ed66}.ipa-passport-stamp:nth-child(even){transform:rotate(8deg);border-color:#c45e43;color:#ac503a;background:#f8ebe466}.ipa-stamp-circle{display:flex;align-items:center;justify-content:center;flex-direction:column;padding:10px;gap:3px}.ipa-stamp-symbol{font-size:36px;line-height:1.15}.ipa-stamp-circle strong{font-size:14px;text-transform:uppercase;line-height:1.2}.ipa-stamp-circle small{font-size:10px;line-height:1.15}
+
+/* Beta 6.30.16 — carimbos em tinta de passaporte, sem emojis */
+.ipa-passport-page{background-color:#fffaf0;background-image:repeating-linear-gradient(0deg,transparent 0 22px,rgba(121,92,51,.035) 23px 24px),radial-gradient(circle at 12% 24%,rgba(149,122,67,.045),transparent 55%)}
+.ipa-passport-grid{grid-template-columns:repeat(auto-fit,minmax(158px,1fr));gap:19px 10px;padding:6px 1px}
+.ipa-passport-stamp{width:154px;height:154px;max-width:100%;border:0!important;border-radius:50%;color:#225d78!important;background:transparent!important;box-shadow:none!important;transform:rotate(-9deg);filter:contrast(.88);opacity:.87;position:relative;}
+.ipa-passport-stamp:nth-child(even){color:#9e554a!important;transform:rotate(11deg)}
+.ipa-passport-stamp:nth-child(3n){color:#315f58!important;transform:rotate(-4deg)}
+.ipa-passport-stamp:after{content:'';position:absolute;inset:3px;border-radius:50%;pointer-events:none;background:repeating-linear-gradient(115deg,transparent 0px,transparent 4px,currentColor 5px,transparent 6px);opacity:.055;mix-blend-mode:multiply}
+.ipa-stamp-ring{display:flex;align-items:center;justify-content:center;flex-direction:column;position:relative;width:100%;height:100%;border:3px double currentColor;border-radius:50%;outline:1.5px solid currentColor;outline-offset:-9px;padding:15px 10px 12px;gap:1px;line-height:1.05}
+.ipa-stamp-country,.ipa-stamp-bottom{font-family:monospace;font-size:7px;font-weight:900;letter-spacing:1px;text-transform:uppercase;white-space:nowrap}
+.ipa-stamp-ring strong{font-family:Georgia,serif;font-size:15px;letter-spacing:.4px;text-transform:uppercase;line-height:1.13;max-width:125px;overflow-wrap:anywhere}
+.ipa-stamp-ring small{font-family:monospace;font-size:8px;letter-spacing:.1px;max-width:120px;line-height:1.1}
+.ipa-landmark-etch{width:83px;height:66px;flex-shrink:0;stroke:currentColor;opacity:.96}
+@media(max-width:370px){.ipa-passport-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.ipa-passport-stamp{width:140px;height:140px}.ipa-landmark-etch{width:74px;height:56px}}
