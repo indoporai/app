@@ -1195,5 +1195,26 @@ dialog:has(#routeCatalogPlace) .smart-place-actions button{
 .v2-journey-step.done .ipa-prep-counter{color:#207a37;background:#e2f6e5}
 .v2-journey-step .ipa-journey-symbol{font-size:21px;line-height:1}
 
-/* 6.29.98: feedback localizado no editor Entre no Clima */
+/* 6.29.99: feedback localizado no editor Entre no Clima */
 .ipa-climate-save-status{margin:10px 0 12px;color:#365966;font-size:.9rem;line-height:1.45;overflow-wrap:anywhere}
+
+/* Beta 6.29.99 — Filme da Viagem 2.0: fotos inteiras, transições cinematográficas */
+.movie3-shell .movie3-screen{isolation:isolate;transition:aspect-ratio .35s ease;max-height:76vh;margin-inline:auto}
+.movie3-shell.movie3-vertical .movie3-screen{aspect-ratio:9/16;width:min(100%,390px)}
+.movie3-shell .movie3-scene{transform:none;opacity:0;transition:opacity 850ms ease;will-change:opacity}
+.movie3-shell .movie3-scene.active{opacity:1;transform:none;z-index:1}
+.movie3-shell .movie3-scene .movie3-backdrop{position:absolute;inset:-26px;background-position:center;background-size:cover;filter:blur(23px) brightness(.56);transform:scale(1.12)}
+.movie3-shell .movie3-scene .movie3-foreground{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;z-index:1;transform:scale(1);transition:transform 5s ease;box-shadow:0 0 45px rgba(0,0,0,.16)}
+.movie3-shell .movie3-scene.active img.movie3-foreground{transform:scale(1.035)}
+.movie3-shell .movie3-scene:after{z-index:1;pointer-events:none;background:linear-gradient(180deg,transparent 38%,rgba(0,0,0,.75) 100%)}
+.movie3-shell .movie2-overlay{z-index:3}
+.movie3-shell .movie2-overlay h3{font-size:clamp(16px,3.2vw,27px)}
+.movie3-shell .movie2-overlay h2{font-size:clamp(22px,5vw,46px)}
+.movie3-shell .movie2-intro,.movie3-shell .movie2-outro{background:radial-gradient(circle at 60% 22%,#159ca5,#062a42 65%,#071315)}
+.movie3-shell .movie3-options{display:flex;flex-wrap:wrap;gap:12px;padding:12px 0}
+.movie3-shell .movie3-options label{display:flex;flex:1;min-width:180px;gap:6px;align-items:center;font-size:12px;font-weight:700;color:#35505a}
+.movie3-shell .movie3-options select{flex:1;min-width:0;border:1px solid #d4e7e6;border-radius:9px;background:#fff;padding:8px;color:#123f49;font:inherit}
+.movie3-shell .movie2-chapters button{white-space:nowrap;background:#f2f7f6;color:#123f49;border:0;border-radius:999px;padding:8px 12px;font-size:11px;font-weight:800;cursor:pointer}
+.movie3-shell .movie3-note{font-size:11px;color:#63777d;line-height:1.5;margin:8px 0 0}
+@media(max-width:620px){.movie3-shell .movie3-options label{min-width:100%}.movie3-shell.movie3-vertical .movie3-screen{width:min(100%,310px)}}
+@media(prefers-reduced-motion:reduce){.movie3-shell .movie3-scene,.movie3-shell .movie3-scene .movie3-foreground{transition:none!important;transform:none!important}}

@@ -1,0 +1,1 @@
+Beta 6.29.99 — salvamento de playlist com confirmação do servidor, indicador próprio e diagnóstico. Pacote enxuto: documentação histórica excluída; arquivos funcionais preservados. Não substitui validação no Firebase de produção.

@@ -3879,7 +3879,6 @@ function ipaMovieMemories(t){
    date:m.createdAt||m.date||'',
    isVideo:m.type==='video'||String(m.type||'').startsWith('video')
  })).filter(m=>m.media).sort((a,b)=>{
-   if(a.featured!==b.featured)return a.featured?-1:1;
    if(a.day!==b.day)return a.day-b.day;
    return String(a.date).localeCompare(String(b.date));
  });
@@ -3892,54 +3891,92 @@ function ipaMovieTravelers(t){
  const names=(t?.participants||[]).map(p=>p.name).filter(Boolean);
  return names.length?names.join(' · '):'Uma história para guardar';
 }
+function ipaMovieStageName(t,m){
+ const stages=t?.stages||t?.destinations||t?.cities||[];
+ const stage=Array.isArray(stages)?stages.find(x=>Number(m.day)>=Number(x.startDay||x.dayStart||1)&&Number(m.day)<=Number(x.endDay||x.dayEnd||999)):null;
+ return String(stage?.city||stage?.destination||m.city||m.destination||'').trim();
+}
 function openTravelMovie(){
  const t=activeTrip();if(!t)return;
  const memories=ipaMovieMemories(t);
  if(!memories.length){showModal(`<div class="movie2-empty"><span>🎬</span><h2>Seu filme começa com a primeira memória</h2><p>Registre uma foto ou vídeo durante a viagem e ela entrará automaticamente aqui.</p><button class="btn btn-primary" onclick="modal.close();state.route='today';state.mode='during';render()">Ir para o Durante</button></div>`);return}
  const dest=tripDestination(t),dates=ipaMovieDates(t),travelers=ipaMovieTravelers(t);
- const scenes=[
-   {kind:'intro',caption:dest,sub:dates||t.name||'Sua viagem'},
-   ...memories,
-   {kind:'outro',caption:`${dest} · ${new Date().getFullYear()}`,sub:'Uma história Indo por Aí'}
- ];
- showModal(`<div class="movie2-shell">
-   <div class="movie2-screen" data-movie2-screen>
-     <div class="movie2-scene active movie2-intro" data-movie2-scene="0"><div class="movie2-overlay"><span>INDO POR AÍ APRESENTA</span><h2>${ipaEscape(dest)}</h2><p>${ipaEscape(dates||travelers)}</p></div></div>
-     ${memories.map((m,i)=>`<div class="movie2-scene ${m.featured?'featured':''}" data-movie2-scene="${i+1}">
-       ${m.isVideo?`<video src="${m.media}" muted playsinline preload="metadata"></video>`:`<img src="${m.media}" alt="">`}
-       <div class="movie2-overlay movie2-caption">${m.featured?'<span>❤️ DESTAQUE DA VIAGEM</span>':`<span>DIA ${m.day}</span>`}<h3>${ipaEscape(m.placeName||m.caption)}</h3><p>${ipaEscape(m.placeName&&m.caption!==m.placeName?m.caption:'')}${m.participantName?`<small>Registrado por ${ipaEscape(m.participantName)}</small>`:''}</p></div>
+ const sceneCount=memories.length+2;
+ showModal(`<div class="movie2-shell movie3-shell" data-movie3>
+   <div class="movie2-screen movie3-screen" data-movie2-screen>
+     <div class="movie2-scene movie3-scene active movie2-intro" data-movie2-scene="0"><div class="movie2-overlay"><span>✈️ INDO POR AÍ COM A GENTE</span><h2>${ipaEscape(t.name||dest)}</h2><p>${ipaEscape(dest)} · ${ipaEscape(dates||travelers)}</p><small>Uma viagem para lembrar</small></div></div>
+     ${memories.map((m,i)=>`<div class="movie2-scene movie3-scene ${m.featured?'featured':''}" data-movie2-scene="${i+1}" data-movie3-day="${m.day}">
+       <div class="movie3-backdrop" style="background-image:url('${m.isVideo?'':encodeURI(String(m.media)).replace(/'/g,'%27')}')"></div>
+       ${m.isVideo?`<video class="movie3-foreground" src="${ipaEscape(m.media)}" muted playsinline preload="metadata"></video>`:`<img class="movie3-foreground" src="${ipaEscape(m.media)}" alt="${ipaEscape(m.caption)}" loading="lazy">`}
+       <div class="movie2-overlay movie2-caption"><span>${m.featured?'❤️ MOMENTO ESPECIAL':`DIA ${m.day}${ipaMovieStageName(t,m)?' · '+ipaEscape(ipaMovieStageName(t,m)):''}`}</span><h3>${ipaEscape(m.placeName||m.caption)}</h3><p>${ipaEscape(m.placeName&&m.caption!==m.placeName?m.caption:'')}${m.participantName?`<small>Registrado por ${ipaEscape(m.participantName)}</small>`:''}</p></div>
      </div>`).join('')}
-     <div class="movie2-scene movie2-outro" data-movie2-scene="${scenes.length-1}"><div class="movie2-overlay"><span>MEMÓRIAS DE ${ipaEscape(travelers)}</span><h2>${ipaEscape(dest)}</h2><p>Uma história Indo por Aí</p></div></div>
-     <button class="movie2-mainplay" data-movie2-play>▶</button>
+     <div class="movie2-scene movie3-scene movie2-outro" data-movie2-scene="${sceneCount-1}"><div class="movie2-overlay"><span>MEMÓRIAS DE ${ipaEscape(travelers)}</span><h2>${ipaEscape(dest)}</h2><p>Momentos que ficam para sempre.</p><small>✈️ Indo por Aí com a Gente</small></div></div>
+     <button class="movie2-mainplay" aria-label="Reproduzir ou pausar" data-movie2-play>▶</button>
      <div class="movie2-progress"><i data-movie2-progress></i></div>
    </div>
-   <div class="movie2-meta"><div><span class="eyebrow">🎬 FILME 2.0</span><h2>${ipaEscape(t.name||dest)}</h2><p>${memories.length} memória${memories.length>1?'s':''} · ${memories.filter(x=>x.featured).length} destaque${memories.filter(x=>x.featured).length!==1?'s':''}</p></div>
-   <div class="movie2-controls"><button data-movie2-prev>‹</button><button class="primary" data-movie2-play>▶ Assistir</button><button data-movie2-next>›</button></div></div>
-   <div class="movie2-chapters">${[...new Set(memories.map(m=>m.day))].map(d=>`<span>Dia ${d}</span>`).join('')}<span>Créditos</span></div>
+   <div class="movie2-meta"><div><span class="eyebrow">🎬 FILME DA VIAGEM 2.0</span><h2>${ipaEscape(t.name||dest)}</h2><p>${memories.length} memória${memories.length!==1?'s':''} · ${memories.filter(x=>x.featured).length} destaque${memories.filter(x=>x.featured).length!==1?'s':''}</p></div>
+   <div class="movie2-controls"><button data-movie2-prev aria-label="Cena anterior">‹</button><button class="primary" data-movie2-play>▶ Assistir</button><button data-movie2-next aria-label="Próxima cena">›</button></div></div>
+   <div class="movie3-options"><label>Formato <select data-movie3-format><option value="wide">Horizontal · 16:9</option><option value="vertical">Vertical · 9:16</option></select></label><label>Trilha instrumental <select data-movie3-music><option value="emotional">Emocionante</option><option value="light">Leve</option><option value="upbeat">Animada</option><option value="off">Sem música</option></select></label></div>
+   <div class="movie2-chapters">${[...new Set(memories.map(m=>m.day))].map(d=>`<button type="button" data-movie3-goto="${memories.findIndex(m=>m.day===d)+1}">Dia ${d}</button>`).join('')}<button type="button" data-movie3-goto="${sceneCount-1}">Créditos</button></div>
+   <p class="movie3-note">Prévia automática · Fotos completas com fundo desfocado · Trilha instrumental original gerada no dispositivo. Para compartilhar um vídeo final, será necessária uma etapa de exportação compatível com seus arquivos.</p>
  </div>`);
- setTimeout(()=>ipaBindMovie2(scenes),30);
+ setTimeout(()=>ipaBindMovie2(),30);
 }
-function ipaBindMovie2(scenes){
- const root=document.querySelector('.movie2-shell');if(!root)return;
+function ipaMovieMusicEngine(){
+ let context=null,master=null,interval=null,step=0;
+ const tunes={emotional:{notes:[0,4,7,11,7,4,2,7],base:220,tempo:460},light:{notes:[0,4,7,9,7,4,2,4],base:261.63,tempo:375},upbeat:{notes:[0,7,4,7,9,7,4,2],base:293.66,tempo:250}};
+ const stop=()=>{if(interval)clearInterval(interval);interval=null;if(context){context.close().catch(()=>{});context=null;master=null}};
+ const start=(style)=>{
+   stop();if(style==='off')return;
+   const Constructor=window.AudioContext||window.webkitAudioContext;if(!Constructor)return;
+   try{
+     context=new Constructor();master=context.createGain();master.gain.value=.11;master.connect(context.destination);
+     const tune=tunes[style]||tunes.emotional;step=0;
+     const beat=()=>{
+       if(!context||context.state==='closed')return;
+       const note=tune.notes[step%tune.notes.length],freq=tune.base*Math.pow(2,note/12);
+       const osc=context.createOscillator(),gain=context.createGain(),now=context.currentTime;
+       osc.type=style==='upbeat'?'triangle':'sine';osc.frequency.value=freq;
+       gain.gain.setValueAtTime(0.0001,now);gain.gain.exponentialRampToValueAtTime(.65,now+.045);
+       gain.gain.exponentialRampToValueAtTime(.0001,now+Math.max(.23,tune.tempo/1000*.91));
+       osc.connect(gain);gain.connect(master);osc.start(now);osc.stop(now+Math.max(.24,tune.tempo/1000));step++;
+     };
+     beat();interval=setInterval(beat,tune.tempo);
+     context.resume().catch(()=>{});
+   }catch(e){stop();}
+ };
+ return {start,stop};
+}
+function ipaBindMovie2(){
+ const root=document.querySelector('.movie3-shell');if(!root)return;
  const els=[...root.querySelectorAll('[data-movie2-scene]')],bar=root.querySelector('[data-movie2-progress]');
- const plays=[...root.querySelectorAll('[data-movie2-play]')];
- let i=0,timer=null,playing=false;
+ const plays=[...root.querySelectorAll('[data-movie2-play]')],audio=ipaMovieMusicEngine();
+ const music=root.querySelector('[data-movie3-music]'),format=root.querySelector('[data-movie3-format]');
+ let i=0,timer=null,playing=false,startTime=0,duration=0,remaining=0,raf=0,disposed=false;
+ const sceneDuration=()=>{const v=els[i]?.querySelector('video');return v&&Number.isFinite(v.duration)&&v.duration>0?Math.min(Math.max(v.duration*1000,4000),8000):(i===0||i===els.length-1?3000:3600)};
  const stopVideo=()=>els.forEach(x=>{const v=x.querySelector('video');if(v){try{v.pause()}catch(e){}}});
- const paint=()=>{
+ const updateBar=()=>{if(disposed)return;const pct=Math.max(0,Math.min(1,(performance.now()-startTime)/duration));if(bar)bar.style.width=`${100*(i+pct)/els.length}%`;if(playing)raf=requestAnimationFrame(updateBar)};
+ const paint=(reset=true)=>{
    stopVideo();els.forEach((x,n)=>x.classList.toggle('active',n===i));
-   if(bar)bar.style.width=`${((i+1)/els.length)*100}%`;
-   const v=els[i]?.querySelector('video');if(v&&playing){try{v.currentTime=0;v.play()}catch(e){}}
+   const v=els[i]?.querySelector('video');if(v&&playing){try{if(reset)v.currentTime=0;v.play().catch(()=>{})}catch(e){}}
    plays.forEach(b=>b.textContent=playing?'⏸ Pausar':'▶ Assistir');
+   if(bar)bar.style.width=`${100*i/els.length}%`;
  };
- const schedule=()=>{
-   clearTimeout(timer);if(!playing)return;
-   const v=els[i]?.querySelector('video');
-   const ms=v&&Number.isFinite(v.duration)?Math.min(Math.max(v.duration*1000,1800),4500):(i===0||i===els.length-1?1800:2200);
-   timer=setTimeout(()=>{if(i>=els.length-1){playing=false;i=0;paint();return}i++;paint();schedule()},ms);
+ const schedule=(keep=false)=>{
+   clearTimeout(timer);cancelAnimationFrame(raf);if(!playing)return;
+   duration=keep?remaining:sceneDuration();startTime=performance.now();updateBar();
+   timer=setTimeout(()=>{if(i>=els.length-1){playing=false;audio.stop();i=0;paint();return}i++;paint();schedule()},duration);
  };
- plays.forEach(b=>b.onclick=()=>{playing=!playing;paint();schedule()});
- root.querySelector('[data-movie2-next]').onclick=()=>{i=(i+1)%els.length;paint();schedule()};
- root.querySelector('[data-movie2-prev]').onclick=()=>{i=(i-1+els.length)%els.length;paint();schedule()};
+ const pause=()=>{if(!playing)return;remaining=Math.max(150,duration-(performance.now()-startTime));playing=false;clearTimeout(timer);cancelAnimationFrame(raf);audio.stop();const v=els[i]?.querySelector('video');if(v)try{v.pause()}catch(e){};plays.forEach(b=>b.textContent='▶ Continuar')};
+ const resume=()=>{playing=true;audio.start(music.value);paint(false);schedule(remaining>0);remaining=0};
+ plays.forEach(b=>b.onclick=()=>playing?pause():resume());
+ root.querySelector('[data-movie2-next]').onclick=()=>{i=(i+1)%els.length;remaining=0;paint();schedule()};
+ root.querySelector('[data-movie2-prev]').onclick=()=>{i=(i-1+els.length)%els.length;remaining=0;paint();schedule()};
+ root.querySelectorAll('[data-movie3-goto]').forEach(b=>b.onclick=()=>{i=Math.max(0,Math.min(els.length-1,Number(b.dataset.movie3Goto)));remaining=0;paint();schedule()});
+ music.onchange=()=>{if(playing)audio.start(music.value)};
+ format.onchange=()=>root.classList.toggle('movie3-vertical',format.value==='vertical');
+ const dispose=()=>{disposed=true;clearTimeout(timer);cancelAnimationFrame(raf);audio.stop();stopVideo();modal.removeEventListener('close',dispose)};
+ modal.addEventListener('close',dispose);
  paint();
 }
 function showMemoryDay(title){
