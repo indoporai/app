@@ -1,0 +1,1 @@
+Beta 6.30.00: registro de fotos/vídeos por lugar, persistência explícita no Firebase e trilhas musicais originais em MP3. Testar Storage/Firestore com regras reais antes de produção.

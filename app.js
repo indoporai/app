@@ -993,6 +993,14 @@ function bind(){
    };
  });
  document.querySelectorAll('[data-memory-movie]').forEach(btn=>btn.onclick=()=>openTravelMovie());
+ document.querySelectorAll('[data-place-memory]').forEach(btn=>btn.onclick=()=>{
+   const values=(btn.dataset.placeMemory||'').split('|');
+   const placeName=btn.dataset.memoryPlaceName||'Lugar visitado';
+   if(!activeTrip()||values.length!==3)return toast('Lugar não identificado');
+   window.ipaPendingPlaceMemory={tripId:values[0],day:Number(values[1])||1,placeId:values[2],placeName};
+   photoInput.removeAttribute('capture');
+   photoInput.click();
+ });
  document.querySelectorAll('[data-memory-prompt]').forEach(btn=>btn.onclick=()=>{
    localStorage.setItem('ipa-memory-prompt',btn.dataset.memoryPrompt||'Memória da viagem');
    photoInput.click();
@@ -3339,7 +3347,7 @@ function ipaBindProspectForm(){
   }catch(e){console.error(e);toast(e.message||'Pedido salvo, mas não foi possível abrir o WhatsApp');send.disabled=false;send.textContent='Enviar meu pedido'}
  };
 }
-function ipaJourneyFeedbackHtml(tripId,dayNo,placeId){
+function ipaJourneyFeedbackHtml(tripId,dayNo,placeId,placeName){
  const key=[tripId,dayNo,placeId].join(':');
  const state=ipaDB().journeyPlaces?.[key]||{};
  const id=[tripId,dayNo,placeId].join('|');
@@ -3349,6 +3357,7 @@ function ipaJourneyFeedbackHtml(tripId,dayNo,placeId){
    <button type="button" class="${state.reaction==='up'?'selected':''}" data-journey-reaction="${ipaEscape(id)}|up" aria-label="Curti" aria-pressed="${state.reaction==='up'?'true':'false'}">👍 Curti</button>
    <button type="button" class="${state.reaction==='down'?'selected':''}" data-journey-reaction="${ipaEscape(id)}|down" aria-label="Não curti" aria-pressed="${state.reaction==='down'?'true':'false'}">👎 Não curti</button>
   </div>
+  <button type="button" class="ipa-place-memory" data-place-memory="${ipaEscape(id)}" data-memory-place-name="${ipaEscape(placeName||'Lugar visitado')}">📸 Foto / vídeo deste lugar</button>
  </div>`;
 }
 function journeyInlineStars(tripId,dayNo,placeId){
@@ -3500,7 +3509,7 @@ function duringView(){
  const country=tripCountry(t),flag=countryFlag(country),route=googleMapsRouteUrl(day,t);
  return `<section class="hero during-personalized-hero"><span class="eyebrow">Durante a viagem</span><h1>${tripDestination(t)} ${flag}</h1><p>${t.name} · Dia ${day.day}${day.title?` · ${day.title}`:''}</p><div class="hero-actions">${route?`<button class="btn btn-light" data-external-route="${route}">Abrir rota</button>`:''}${tripModule('concierge')?`<button class="btn btn-light" data-concierge>👑 Concierge</button>`:''}${tripModule('live')?`<button class="btn btn-primary" id="realLiveBtn">🔴 Live</button>`:''}</div></section>
  ${modeCard()}
- <section class="section"><div class="section-head"><div><span class="eyebrow">Roteiro real</span><h2>${day.title||`Dia ${day.day}`}</h2></div><span class="chip">${places.length} locais</span></div><div class="during-place-list">${places.map((p,i)=>`<article class="during-place-card ${p.personal?'during-place-personal':''}"><div class="during-place-number">${i+1}</div>${ipaPlacePhotoHtml(p,'ipa-during-thumbnail')}<div class="during-place-main"><small>${p.time||'Horário livre'}</small><div class="during-place-title" data-journey-title="${ipaEscape([t.id,day.day,p.id||i].join(':'))}"><b>${p.name}</b></div><p>${ipaEscape(p.address||'Programado no roteiro')}</p>${p.note?`<div class="ipa-place-client-note"><strong>📝 Observação</strong><span>${ipaEscape(p.note)}</span></div>`:''}${(p.smartTip||p.tip)?`<div class="ipa-place-client-tip"><strong>💡 Dica Indo por Aí</strong><span>${ipaEscape(p.smartTip||p.tip)}</span></div>`:''}<div class="during-place-actions"><button data-map="${(p.address||p.name)+', '+country}">📍 Mapa</button></div>${ipaJourneyFeedbackHtml(t.id,day.day,p.id||i)}</div></article>`).join('')||'<p>Nenhum local cadastrado para este dia.</p>'}</div></section>
+ <section class="section"><div class="section-head"><div><span class="eyebrow">Roteiro real</span><h2>${day.title||`Dia ${day.day}`}</h2></div><span class="chip">${places.length} locais</span></div><div class="during-place-list">${places.map((p,i)=>`<article class="during-place-card ${p.personal?'during-place-personal':''}"><div class="during-place-number">${i+1}</div>${ipaPlacePhotoHtml(p,'ipa-during-thumbnail')}<div class="during-place-main"><small>${p.time||'Horário livre'}</small><div class="during-place-title" data-journey-title="${ipaEscape([t.id,day.day,p.id||i].join(':'))}"><b>${p.name}</b></div><p>${ipaEscape(p.address||'Programado no roteiro')}</p>${p.note?`<div class="ipa-place-client-note"><strong>📝 Observação</strong><span>${ipaEscape(p.note)}</span></div>`:''}${(p.smartTip||p.tip)?`<div class="ipa-place-client-tip"><strong>💡 Dica Indo por Aí</strong><span>${ipaEscape(p.smartTip||p.tip)}</span></div>`:''}<div class="during-place-actions"><button data-map="${(p.address||p.name)+', '+country}">📍 Mapa</button></div>${ipaJourneyFeedbackHtml(t.id,day.day,p.id||i,p.name)}</div></article>`).join('')||'<p>Nenhum local cadastrado para este dia.</p>'}</div></section>
  <section class="section"><div class="section-head"><h2>Dias da viagem</h2></div><div class="day-strip">${days.map(x=>`<button class="day-pill ${Number(x.day)===Number(day.day)?'active':''}" data-day="${x.day}"><small>Dia</small><strong>${x.day}</strong></button>`).join('')}</div></section>
  <section class="section ipa-real-map-section"><div class="section-head"><div><span class="eyebrow">MAPA DO DIA</span><h2>Seu roteiro no mapa</h2></div><span class="chip">A → B → C${places.length>3?' → D':''}</span></div><div id="ipaRealMap" class="ipa-real-map"><div class="ipa-map-loading">🗺️ Carregando mapa...</div></div><div class="ipa-map-legend"><span><i class="official"></i> Roteiro oficial</span><span><i class="personal"></i> Dica adicionada</span><span><i class="current"></i> Você</span></div></section>
 `;
@@ -3535,7 +3544,7 @@ function tripView(){
  const day=days.find(x=>Number(x.day)===dayNumber)||{day:1,title:"Roteiro em preparação",places:[]};
  const places=ipaClientDayPlaces(t,day);
  const country=tripCountry(t),flag=countryFlag(country);
- const rows=places.map((p,index)=>`<article class="itinerary-item dynamic-itinerary-item ipa-reorder-item ${p.personal?'ipa-personal-place-card':''}"><span class="ipa-order-number">${index+1}</span>${ipaPlacePhotoHtml(p,'ipa-itinerary-thumbnail')}<span class="itinerary-copy"><div class="ipa-itinerary-copy-head"><b>${ipaEscape(p.name)}${p.personal?' <em class="personal-route-inline">Sua descoberta</em>':''}</b>${p.category?`<span class="chip">${ipaEscape(p.category)}</span>`:''}</div><small class="ipa-itinerary-address">📍 ${ipaEscape(p.address||'Local do passeio')}</small>${p.note?`<div class="ipa-place-client-note"><strong>📝 Observação</strong><span>${ipaEscape(p.note)}</span></div>`:''}${(p.smartTip||p.tip)?`<div class="ipa-place-client-tip"><strong>💡 Dica Indo por Aí</strong><span>${ipaEscape(p.smartTip||p.tip)}</span></div>`:''}<div class="ipa-itinerary-actions"><button class="mini-map-open" data-map="${ipaEscape((p.address||p.name)+', '+country)}">📍 Abrir no Google Maps</button></div>${ipaJourneyFeedbackHtml(t.id,day.day,p.id||index)}</span><span class="ipa-move-controls"><button type="button" data-move-place="${index}:up" ${index===0?'disabled':''} aria-label="Subir passeio">↑</button><button type="button" data-move-place="${index}:down" ${index===places.length-1?'disabled':''} aria-label="Descer passeio">↓</button></span></article>`).join('');
+ const rows=places.map((p,index)=>`<article class="itinerary-item dynamic-itinerary-item ipa-reorder-item ${p.personal?'ipa-personal-place-card':''}"><span class="ipa-order-number">${index+1}</span>${ipaPlacePhotoHtml(p,'ipa-itinerary-thumbnail')}<span class="itinerary-copy"><div class="ipa-itinerary-copy-head"><b>${ipaEscape(p.name)}${p.personal?' <em class="personal-route-inline">Sua descoberta</em>':''}</b>${p.category?`<span class="chip">${ipaEscape(p.category)}</span>`:''}</div><small class="ipa-itinerary-address">📍 ${ipaEscape(p.address||'Local do passeio')}</small>${p.note?`<div class="ipa-place-client-note"><strong>📝 Observação</strong><span>${ipaEscape(p.note)}</span></div>`:''}${(p.smartTip||p.tip)?`<div class="ipa-place-client-tip"><strong>💡 Dica Indo por Aí</strong><span>${ipaEscape(p.smartTip||p.tip)}</span></div>`:''}<div class="ipa-itinerary-actions"><button class="mini-map-open" data-map="${ipaEscape((p.address||p.name)+', '+country)}">📍 Abrir no Google Maps</button></div>${ipaJourneyFeedbackHtml(t.id,day.day,p.id||index,p.name)}</span><span class="ipa-move-controls"><button type="button" data-move-place="${index}:up" ${index===0?'disabled':''} aria-label="Subir passeio">↑</button><button type="button" data-move-place="${index}:down" ${index===places.length-1?'disabled':''} aria-label="Descer passeio">↓</button></span></article>`).join('');
  const route=ipaFullClientMapsUrl(places,t);
  return `${ipaTripSwitchSection()}<section class="hero personalized-trip-hero"><span class="eyebrow">Minha viagem</span><h1>${t.name} ${flag}</h1><p>${tripDestination(t)}, ${country} · ${days.length} dias de roteiro</p><div class="hero-actions">${route?`<button class="btn btn-light" data-external-route="${route}">Abrir rota no Google Maps</button>`:''}<button class="btn btn-primary" data-go="explore">Ver mapa do dia</button></div></section>
  <section class="section itinerary-days"><div class="day-strip">${days.map(x=>`<button class="day-pill ${Number(x.day)===dayNumber?'active':''}" data-day="${x.day}"><small>Dia</small><strong>${x.day}</strong></button>`).join('')}</div></section>
@@ -3693,23 +3702,29 @@ function memoriesView(){
  ${tripModule('movie')?`<section class="section"><div class="memory-building-card"><span>🎬</span><div><b>Filme da viagem</b><p>${memories.length?'Já temos material para a retrospectiva.':'Registre seu primeiro momento para começar a retrospectiva.'}</p></div><button class="btn btn-light" data-memory-movie>Assistir prévia</button></div></section>`:''}${capturedExperience()}`;
 }
 async function handlePhotos(e){
- const t=activeTrip(),prompt=localStorage.getItem('ipa-memory-prompt')||'Memória da viagem';
+ const t=activeTrip(),context=window.ipaPendingPlaceMemory;
+ window.ipaPendingPlaceMemory=null;
+ const prompt=context?.placeName||localStorage.getItem('ipa-memory-prompt')||'Memória da viagem';
  const files=[...e.target.files].slice(0,8);
+ if(!files.length)return;
+ if(!t?.id){toast('Selecione uma viagem antes de registrar a memória.');e.target.value='';return}
+ const btn=document.querySelector('[data-place-memory]');if(btn)btn.disabled=true;
+ let saved=0,failed=0;
  for(const file of files){
    try{
      const type=file.type.startsWith('video/')?'video':'image';
-     let src="",path="";
-     if(window.IPAFirebase?.uploadMemory && t?.clientId){
-       const up=await window.IPAFirebase.uploadMemory(file,t.clientId,t.id);src=up.url;path=up.path;
-     }else{
-       src=await new Promise(res=>{const r=new FileReader();r.onload=()=>res(r.result);r.readAsDataURL(file)});
-     }
-     IPAData.addMemory({tripId:t?.id||'',clientId:t?.clientId||'',prompt,type,src,url:src,path,name:file.name,day:state.tripDay||1});
-   }catch(err){console.error(err);toast('Não foi possível enviar '+file.name)}
+     if(!window.IPAFirebase?.uploadMemory||!window.IPAFirebase?.saveMemory||!t?.clientId)throw new Error('Entre na conta do viajante para salvar na nuvem.');
+     const up=await window.IPAFirebase.uploadMemory(file,t.clientId,t.id);
+     const memory={id:'mem-'+Date.now()+'-'+Math.random().toString(36).slice(2,10),tripId:t.id,clientId:t.clientId,prompt,type,src:up.url,url:up.url,path:up.path,name:file.name,day:context?.day||state.tripDay||1,placeId:context?.placeId||'',placeName:context?.placeName||'',createdAt:new Date().toISOString(),cloudSynced:true};
+     await window.IPAFirebase.saveMemory(memory);
+     IPAData.addMemory(memory);saved++;
+   }catch(err){failed++;console.warn('Erro no registro de memória',err);toast('Foto/vídeo não sincronizado: '+(err?.message||'tente novamente'));}
  }
- if(window.IPAFirebase?.user && window.IPAFirebase?.syncNow)try{await window.IPAFirebase.syncNow()}catch{}
- state.mode='after';state.route='memories';localStorage.removeItem('ipa-memory-prompt');e.target.value='';render();
+ localStorage.removeItem('ipa-memory-prompt');e.target.value='';if(btn)btn.disabled=false;
+ if(saved){toast(saved+' memória(s) salva(s) na nuvem ✓');if(!context){state.mode='after';state.route='memories'}render()}
+ else if(failed)toast('Nenhuma memória foi salva. Confira a conexão e as permissões do Firebase.');
 }
+
 function showModal(html){modalContent.innerHTML=html;modal.showModal();setTimeout(()=>{modalContent.querySelectorAll('[data-map]').forEach(b=>b.onclick=()=>window.open('https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(b.dataset.map),'_blank'));modalContent.querySelectorAll('[data-profile]').forEach(b=>b.onclick=()=>{modal.close();setProfile(b.dataset.profile)})},0)}
 function showClientLogin(){
  document.body.classList.add('hidden-nav');
@@ -3916,42 +3931,30 @@ function openTravelMovie(){
    </div>
    <div class="movie2-meta"><div><span class="eyebrow">🎬 FILME DA VIAGEM 2.0</span><h2>${ipaEscape(t.name||dest)}</h2><p>${memories.length} memória${memories.length!==1?'s':''} · ${memories.filter(x=>x.featured).length} destaque${memories.filter(x=>x.featured).length!==1?'s':''}</p></div>
    <div class="movie2-controls"><button data-movie2-prev aria-label="Cena anterior">‹</button><button class="primary" data-movie2-play>▶ Assistir</button><button data-movie2-next aria-label="Próxima cena">›</button></div></div>
-   <div class="movie3-options"><label>Formato <select data-movie3-format><option value="wide">Horizontal · 16:9</option><option value="vertical">Vertical · 9:16</option></select></label><label>Trilha instrumental <select data-movie3-music><option value="emotional">Emocionante</option><option value="light">Leve</option><option value="upbeat">Animada</option><option value="off">Sem música</option></select></label></div>
+   <div class="movie3-options"><label>Formato <select data-movie3-format><option value="wide">Horizontal · 16:9</option><option value="vertical">Vertical · 9:16</option></select></label><label>Trilha instrumental <select data-movie3-music><option value="emotional">Emocionante</option><option value="light">Leve</option><option value="upbeat">Animada</option><option value="off">Sem música</option></select></label><button type="button" class="movie3-test-sound" data-movie3-test-sound>♫ Testar música</button><span class="movie3-audio-status" data-movie3-audio-status aria-live="polite"></span></div>
    <div class="movie2-chapters">${[...new Set(memories.map(m=>m.day))].map(d=>`<button type="button" data-movie3-goto="${memories.findIndex(m=>m.day===d)+1}">Dia ${d}</button>`).join('')}<button type="button" data-movie3-goto="${sceneCount-1}">Créditos</button></div>
    <p class="movie3-note">Prévia automática · Fotos completas com fundo desfocado · Trilha instrumental original gerada no dispositivo. Para compartilhar um vídeo final, será necessária uma etapa de exportação compatível com seus arquivos.</p>
  </div>`);
  setTimeout(()=>ipaBindMovie2(),30);
 }
 function ipaMovieMusicEngine(){
- let context=null,master=null,interval=null,step=0;
- const tunes={emotional:{notes:[0,4,7,11,7,4,2,7],base:220,tempo:460},light:{notes:[0,4,7,9,7,4,2,4],base:261.63,tempo:375},upbeat:{notes:[0,7,4,7,9,7,4,2],base:293.66,tempo:250}};
- const stop=()=>{if(interval)clearInterval(interval);interval=null;if(context){context.close().catch(()=>{});context=null;master=null}};
- const start=(style)=>{
-   stop();if(style==='off')return;
-   const Constructor=window.AudioContext||window.webkitAudioContext;if(!Constructor)return;
-   try{
-     context=new Constructor();master=context.createGain();master.gain.value=.11;master.connect(context.destination);
-     const tune=tunes[style]||tunes.emotional;step=0;
-     const beat=()=>{
-       if(!context||context.state==='closed')return;
-       const note=tune.notes[step%tune.notes.length],freq=tune.base*Math.pow(2,note/12);
-       const osc=context.createOscillator(),gain=context.createGain(),now=context.currentTime;
-       osc.type=style==='upbeat'?'triangle':'sine';osc.frequency.value=freq;
-       gain.gain.setValueAtTime(0.0001,now);gain.gain.exponentialRampToValueAtTime(.65,now+.045);
-       gain.gain.exponentialRampToValueAtTime(.0001,now+Math.max(.23,tune.tempo/1000*.91));
-       osc.connect(gain);gain.connect(master);osc.start(now);osc.stop(now+Math.max(.24,tune.tempo/1000));step++;
-     };
-     beat();interval=setInterval(beat,tune.tempo);
-     context.resume().catch(()=>{});
-   }catch(e){stop();}
+ let el=null;
+ const tracks={emotional:'assets/trilha-emocionante.mp3',light:'assets/trilha-leve.mp3',upbeat:'assets/trilha-animada.mp3'};
+ const stop=()=>{if(el){el.pause();el.currentTime=0;el=null}};
+ const start=async(style)=>{
+   stop();if(style==='off')return true;
+   el=new Audio(tracks[style]||tracks.emotional);el.loop=true;el.volume=.55;el.preload='auto';
+   try{await el.play();return true}catch(e){console.warn('Áudio bloqueado',e);return false}
  };
- return {start,stop};
+ const volume=v=>{if(el)el.volume=Math.max(0,Math.min(1,Number(v)||0))};
+ return {start,stop,volume};
 }
+
 function ipaBindMovie2(){
  const root=document.querySelector('.movie3-shell');if(!root)return;
  const els=[...root.querySelectorAll('[data-movie2-scene]')],bar=root.querySelector('[data-movie2-progress]');
  const plays=[...root.querySelectorAll('[data-movie2-play]')],audio=ipaMovieMusicEngine();
- const music=root.querySelector('[data-movie3-music]'),format=root.querySelector('[data-movie3-format]');
+ const music=root.querySelector('[data-movie3-music]'),format=root.querySelector('[data-movie3-format]'),audioStatus=root.querySelector('[data-movie3-audio-status]');
  let i=0,timer=null,playing=false,startTime=0,duration=0,remaining=0,raf=0,disposed=false;
  const sceneDuration=()=>{const v=els[i]?.querySelector('video');return v&&Number.isFinite(v.duration)&&v.duration>0?Math.min(Math.max(v.duration*1000,4000),8000):(i===0||i===els.length-1?3000:3600)};
  const stopVideo=()=>els.forEach(x=>{const v=x.querySelector('video');if(v){try{v.pause()}catch(e){}}});
@@ -3968,12 +3971,13 @@ function ipaBindMovie2(){
    timer=setTimeout(()=>{if(i>=els.length-1){playing=false;audio.stop();i=0;paint();return}i++;paint();schedule()},duration);
  };
  const pause=()=>{if(!playing)return;remaining=Math.max(150,duration-(performance.now()-startTime));playing=false;clearTimeout(timer);cancelAnimationFrame(raf);audio.stop();const v=els[i]?.querySelector('video');if(v)try{v.pause()}catch(e){};plays.forEach(b=>b.textContent='▶ Continuar')};
- const resume=()=>{playing=true;audio.start(music.value);paint(false);schedule(remaining>0);remaining=0};
+ const resume=()=>{playing=true;audio.start(music.value).then(ok=>{if(audioStatus)audioStatus.textContent=ok?(music.value==='off'?'Sem música':'♫ Trilha tocando'):'Áudio bloqueado: toque em Testar música';});paint(false);schedule(remaining>0);remaining=0};
  plays.forEach(b=>b.onclick=()=>playing?pause():resume());
  root.querySelector('[data-movie2-next]').onclick=()=>{i=(i+1)%els.length;remaining=0;paint();schedule()};
  root.querySelector('[data-movie2-prev]').onclick=()=>{i=(i-1+els.length)%els.length;remaining=0;paint();schedule()};
  root.querySelectorAll('[data-movie3-goto]').forEach(b=>b.onclick=()=>{i=Math.max(0,Math.min(els.length-1,Number(b.dataset.movie3Goto)));remaining=0;paint();schedule()});
- music.onchange=()=>{if(playing)audio.start(music.value)};
+ music.onchange=()=>{if(playing)audio.start(music.value).then(ok=>{if(audioStatus)audioStatus.textContent=ok?'♫ Trilha tocando':'Toque em Testar música'})};
+ const soundTest=root.querySelector('[data-movie3-test-sound]');if(soundTest)soundTest.onclick=()=>{if(music.value==='off')music.value='light';audio.start(music.value).then(ok=>{if(audioStatus)audioStatus.textContent=ok?'♫ Áudio ligado':'O navegador bloqueou o som. Verifique o volume e toque novamente.'})};
  format.onchange=()=>root.classList.toggle('movie3-vertical',format.value==='vertical');
  const dispose=()=>{disposed=true;clearTimeout(timer);cancelAnimationFrame(raf);audio.stop();stopVideo();modal.removeEventListener('close',dispose)};
  modal.addEventListener('close',dispose);

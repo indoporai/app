@@ -583,6 +583,16 @@ window.IPAFirebase = {
     });
     return ref.id;
   },
+  async saveMemory(record){
+    if(!currentUser)throw new Error("Entre na sua conta para sincronizar a memória.");
+    if(!record?.id||!record?.tripId||!record?.clientId||!record?.url)throw new Error("Memória incompleta: viagem ou arquivo não identificado.");
+    if(!String(record.url).startsWith("https://"))throw new Error("Arquivo ainda não está salvo na nuvem.");
+    const payload={...record,updatedAt:new Date().toISOString()};
+    await setDoc(doc(firestore,"memories",record.id),payload);
+    const checked=await getDocFromServer(doc(firestore,"memories",record.id));
+    if(!checked.exists())throw new Error("Não foi possível confirmar a memória no Firebase.");
+    return record.id;
+  },
   async uploadMemory(file,clientId,tripId){
     if(!currentUser)throw new Error("Faça login para enviar a memória.");
     const safe=(file.name||"arquivo").replace(/[^a-zA-Z0-9._-]/g,"_");

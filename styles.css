@@ -1195,10 +1195,10 @@ dialog:has(#routeCatalogPlace) .smart-place-actions button{
 .v2-journey-step.done .ipa-prep-counter{color:#207a37;background:#e2f6e5}
 .v2-journey-step .ipa-journey-symbol{font-size:21px;line-height:1}
 
-/* 6.29.99: feedback localizado no editor Entre no Clima */
+/* 6.30.00: feedback localizado no editor Entre no Clima */
 .ipa-climate-save-status{margin:10px 0 12px;color:#365966;font-size:.9rem;line-height:1.45;overflow-wrap:anywhere}
 
-/* Beta 6.29.99 — Filme da Viagem 2.0: fotos inteiras, transições cinematográficas */
+/* Beta 6.30.00 — Filme da Viagem 2.0: fotos inteiras, transições cinematográficas */
 .movie3-shell .movie3-screen{isolation:isolate;transition:aspect-ratio .35s ease;max-height:76vh;margin-inline:auto}
 .movie3-shell.movie3-vertical .movie3-screen{aspect-ratio:9/16;width:min(100%,390px)}
 .movie3-shell .movie3-scene{transform:none;opacity:0;transition:opacity 850ms ease;will-change:opacity}
@@ -1218,3 +1218,9 @@ dialog:has(#routeCatalogPlace) .smart-place-actions button{
 .movie3-shell .movie3-note{font-size:11px;color:#63777d;line-height:1.5;margin:8px 0 0}
 @media(max-width:620px){.movie3-shell .movie3-options label{min-width:100%}.movie3-shell.movie3-vertical .movie3-screen{width:min(100%,310px)}}
 @media(prefers-reduced-motion:reduce){.movie3-shell .movie3-scene,.movie3-shell .movie3-scene .movie3-foreground{transition:none!important;transform:none!important}}
+
+/* 6.30.00 — Registros vinculados ao passeio */
+.ipa-place-feedback .ipa-place-memory{grid-column:1/-1;background:#e0f3f2;color:#055f68;text-align:center;font-size:13px;font-weight:800;border:1px solid #c1e3e1}
+.ipa-place-feedback .ipa-place-memory:disabled{opacity:.6}
+.movie3-test-sound{border:1px solid #b2dfdb;border-radius:10px;padding:9px 12px;background:#e7f5f3;color:#056575;cursor:pointer;font-weight:800}
+.movie3-audio-status{font-size:12px;color:#52727b}
