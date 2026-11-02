@@ -1,0 +1,1 @@
+Beta 6.30.29 — Todos os dias da sugestão de roteiro do ADM iniciam recolhidos. Botão Expandir/Recolher controla corretamente a visibilidade, com regra CSS respeitando [hidden]. Base 6.30.28. Validar após publicação.

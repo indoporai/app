@@ -1,0 +1,1 @@
+Beta 6.30.28: corrigido mapeamento de bandeiras de Marrocos (MA) e Vaticano (VA), inclusive Cidade do Vaticano e Santa Sé. Base 6.30.27; funções existentes preservadas.

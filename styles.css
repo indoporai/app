@@ -1489,3 +1489,6 @@ dialog:has(#routeCatalogPlace) .smart-place-actions button{
 
 /* Beta 6.30.27 — mensagem persistente com o erro específico de participantes */
 .ipa-participant-error{margin:10px 0;padding:12px;background:#fff1ed;border:1px solid #efc7ba;color:#9b311d;border-radius:12px;font-size:13px;line-height:1.45;overflow-wrap:anywhere}.ipa-participant-error[hidden]{display:none!important}
+
+/* Beta 6.30.29: respeitar ocultação dos roteiros no ADM */
+.admin-only-suggestion .planner-day-body[hidden]{display:none!important}
