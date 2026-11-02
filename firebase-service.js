@@ -910,6 +910,18 @@ window.IPAFirebase = {
     if(!snapshot.exists()||Number(snapshot.data().budget)!==payload.budget||snapshot.data().currency!==payload.currency)throw new Error('O orçamento não foi confirmado no servidor.');
     return true;
   },
+  // Persiste as correções dos destinos diretamente no pedido, verificando a resposta do Firebase.
+  async saveLeadCitiesConfirmed(leadId){
+    if(!currentUser||currentUser.uid!==ADMIN_UID)throw new Error('Entre como ADM para corrigir cidades.');
+    const lead=(window.IPAData?.getAll?.().travelLeads||[]).find(l=>String(l.id)===String(leadId));
+    if(!lead)throw new Error('Pedido não encontrado.');
+    const ref=doc(firestore,'travelLeads',String(leadId));
+    const payload={destination:lead.destination,stages:lead.stages||[],cityOriginal:lead.cityOriginal,cityHistory:lead.cityHistory||[],cityUpdatedAt:lead.cityUpdatedAt,adminSuggestion:null,updatedAt:serverTimestamp()};
+    await setDoc(ref,payload,{merge:true});
+    const check=await getDoc(ref);
+    if(!check.exists()||check.data().destination!==payload.destination||JSON.stringify(check.data().stages||[])!==JSON.stringify(payload.stages))throw new Error('As cidades não foram confirmadas no Firebase.');
+    return true;
+  },
   // Salva a ordem escolhida pelo ADM sem depender de sincronização global.
   async saveLeadSuggestionConfirmed(leadId){
     if(!currentUser||currentUser.uid!==ADMIN_UID)throw new Error('Entre como ADM para salvar a ordem.');

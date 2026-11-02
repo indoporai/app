@@ -1,0 +1,1 @@
+Beta 6.30.24: ADM > Pedidos > Corrigir cidades. Edite destinos individualmente, incluindo multidestino. Preserva histórico, confirma no Firebase, invalida sugestão antiga. Depois clique em Gerar sugestão. Base 6.30.23. Testar em produção antes de considerar validado.
