@@ -1,0 +1,1 @@
+Beta 6.30.25: melhora de layout no bloco Corrigir cidades e na Sugestão Interna do ADM. Dias da sugestão agora têm botão de expandir/recolher e cabeçalho mais limpo. Base 6.30.24. Testar em produção antes de considerar validado.
