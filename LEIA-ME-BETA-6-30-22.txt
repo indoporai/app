@@ -1,0 +1,1 @@
+Beta 6.30.22: pesquisa cultural por fontes públicas, sem títulos inventados; gravação direta e verificada de participantes e curadoria no Firebase. Requer teste real com login ADM e rede.

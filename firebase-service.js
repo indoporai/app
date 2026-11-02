@@ -946,6 +946,25 @@ window.IPAFirebase = {
     }
     return {tripId,clientId,leadId};
   },
+  async saveTripParticipantsConfirmed(tripId,participants){
+    if(!currentUser || currentUser.uid!==ADMIN_UID)throw new Error('Entre com a conta ADM autorizada.');
+    if(!tripId||!Array.isArray(participants))throw new Error('Dados dos participantes inválidos.');
+    const tripRef=doc(firestore,'trips',String(tripId));
+    await setDoc(tripRef,{participants,updatedAt:serverTimestamp()},{merge:true});
+    const snap=await getDocFromServer(tripRef);
+    if(!snap.exists())throw new Error('Viagem não encontrada no Firebase.');
+    const saved=snap.data().participants||[];
+    if(JSON.stringify(saved)!==JSON.stringify(participants))throw new Error('Participantes divergentes após salvar no Firebase.');
+    return true;
+  },
+  async saveTripClimateConfirmed(tripId,climateContent){
+    if(!currentUser || currentUser.uid!==ADMIN_UID)throw new Error('Entre com a conta ADM autorizada.');
+    const tripRef=doc(firestore,'trips',String(tripId));
+    await setDoc(tripRef,{climateContent,climateSource:'destination-curation',climateGeneratedAt:new Date().toISOString(),updatedAt:serverTimestamp()},{merge:true});
+    const snap=await getDocFromServer(tripRef);
+    if(!snap.exists()||JSON.stringify(snap.data().climateContent||[])!==JSON.stringify(climateContent))throw new Error('Curadoria não confirmada no Firebase.');
+    return true;
+  },
   async syncNow(){
     if(!currentUser) throw new Error("Faça login primeiro.");
     return syncAll(window.IPAData?.getAll?.());

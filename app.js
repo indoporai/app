@@ -878,10 +878,17 @@ function bind(){
 
  document.querySelectorAll('[data-admin-generate-climate]').forEach(b=>b.onclick=async()=>{
    const tripId=b.dataset.adminGenerateClimate,d=adminData(),t=(d.trips||[]).find(x=>x.id===tripId);if(!t)return;
-   const generated=climateForTrip({...t,climateContent:[]}).map(x=>({icon:x[0],type:x[1],title:x[2],description:x[3],url:x[4]||''}));
-   IPAData.updateTrip(tripId,{climateContent:generated,climateGeneratedAt:new Date().toISOString(),climateSource:'destination-curation',climateCurationVersion:IPA_CLIMATE_CURATED_VERSION});
-   try{if(window.IPAFirebase?.user)await window.IPAFirebase.syncNow()}catch(e){console.warn(e);toast('Conteúdo salvo; sincronização com o cliente ficou pendente');return}
-   toast('Entre no Clima preparado e salvo ✓');view.innerHTML=adminTripEditor(tripId);bind();
+   if(t.climateEditedAt || (t.climateContent||[]).some(x=>x?.manuallyEdited||x?.manual)){toast('Conteúdo editado pelo ADM: alterações preservadas. Edite os itens individualmente.');return;}
+   b.disabled=true;b.textContent='Pesquisando fontes...';
+   try{
+     const curated=ipaClimateCuratedRows(t);
+     const generated=curated?curated.map(x=>({icon:x[0],type:x[1],title:x[2],description:x[3],url:x[4]||'',source:'curated'})):await ipaDiscoverClimateWorldwide(t);
+     if(!generated.length){toast('Não encontrei referências com fonte confirmada para esta cidade. Nenhum conteúdo fictício foi criado.');return;}
+     IPAData.updateTrip(tripId,{climateContent:generated,climateGeneratedAt:new Date().toISOString(),climateSource:'destination-curation',climateCurationVersion:IPA_CLIMATE_CURATED_VERSION});
+     await window.IPAFirebase.saveTripClimateConfirmed(tripId,generated);
+     toast('Conteúdo com fontes salvo no Firebase ✓');view.innerHTML=adminTripEditor(tripId);bind();
+   }catch(e){console.error(e);toast('Não foi possível confirmar a curadoria no Firebase: '+(e?.message||'erro'));}
+   finally{if(b.isConnected){b.disabled=false;b.textContent='🔄 Atualizar conteúdo';}}
  });
  document.querySelectorAll('[data-admin-edit-climate]').forEach(b=>b.onclick=()=>{
    const [tripId,idxRaw]=b.dataset.adminEditClimate.split(':'),idx=Number(idxRaw),d=adminData(),t=(d.trips||[]).find(x=>x.id===tripId),item=t?.climateContent?.[idx];if(!item)return;
@@ -1724,8 +1731,8 @@ function bind(){
      try{
        list.push({id:'part-'+Date.now(),name,email,seat:document.querySelector('#partSeat').value.trim(),minor:document.querySelector('#partMinor').checked,status:'pending'});
        IPAData.updateTrip(tripId,{participants:list});
-       if(window.IPAFirebase?.user)await window.IPAFirebase.syncNow();
-       toast('Participante adicionado ✓');modal.close();view.innerHTML=adminTripEditor(tripId);bind();
+       await window.IPAFirebase.saveTripParticipantsConfirmed(tripId,list);
+       toast('Participante salvo no Firebase ✓');modal.close();view.innerHTML=adminTripEditor(tripId);bind();
      }catch(e){console.error(e);toast('Erro ao salvar participante');saveBtn.disabled=false;saveBtn.textContent='Adicionar participante'}
    },0);
  });
@@ -1737,8 +1744,9 @@ function bind(){
    if(!confirm('Excluir o participante '+(target.name||target.email)+' desta viagem? O acesso e os convites associados podem ser afetados.'))return;
    b.disabled=true;
    try{
-     IPAData.updateTrip(tripId,{participants:participants.filter(p=>String(p.id)!==partId)});
-     if(window.IPAFirebase?.user)await window.IPAFirebase.syncNow();
+     const remaining=participants.filter(p=>String(p.id)!==partId);
+     IPAData.updateTrip(tripId,{participants:remaining});
+     await window.IPAFirebase.saveTripParticipantsConfirmed(tripId,remaining);
      toast('Participante excluído ✓');view.innerHTML=adminTripEditor(tripId);bind();
    }catch(e){console.error(e);toast('Erro ao excluir participante');b.disabled=false}
  });
@@ -2429,7 +2437,7 @@ function paymentsView(){
 
 // Curadoria identificada por versão: publicações novas são exibidas sem exigir que o
 // cliente ou ADM recadastrem a viagem. Conteúdo personalizado permanece intocado.
-const IPA_CLIMATE_CURATED_VERSION='2026-10-auto-links-3';
+const IPA_CLIMATE_CURATED_VERSION='2026-11-real-curation-1';
 function ipaClimateLegacyAutomatic(t){
  const list=t?.climateContent;
  if(!Array.isArray(list)||!list.length)return false;
@@ -2442,6 +2450,14 @@ function ipaClimateLegacyAutomatic(t){
 }
 function ipaClimateCuratedRows(t){
  const dest=tripDestination(t), country=tripCountry(t), k=(dest+' '+country).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+ if(k.includes('casablanca'))return [
+  ['🎬','Filme / série','Casablanca Beats (Haut et Fort)','Filme de Nabil Ayouch (2021), ambientado em Casablanca, sobre jovens que encontram expressão no hip-hop.'],
+  ['🎵','Playlist','Nass El Ghiwane','Conheça o repertório do grupo musical marroquino formado em Casablanca; não é uma playlist específica verificada.'],
+  ['📚','Livro','O Passado Simples','Romance de Driss Chraïbi que retrata tensões familiares e sociais no Marrocos.'],
+  ['🗣️','Expressão local','Salam alaykum','Saudação comum em árabe, equivalente a “a paz esteja com você”.'],
+  ['🍽️','Prato típico','Harira','Sopa marroquina tradicional com tomate, leguminosas e ervas.'],
+  ['💡','Curiosidade','Mesquita Hassan II','Um dos símbolos de Casablanca, inaugurada em 1993 e construída parcialmente sobre o Atlântico.']
+ ];
  if(k.includes('sao paulo')||k.includes('sampa')){
   // Duas seleções verificáveis da cultura paulistana: alternância mensal, sem
   // insinuar disponibilidade de streaming ou criar títulos fictícios.
@@ -2463,6 +2479,37 @@ function ipaClimateCuratedRows(t){
   ];
  }
  return null;
+}
+
+// Descoberta dinâmica sem títulos inventados: consulta o índice público da Wikipédia.
+// Resultados são apresentados como referências culturais, nunca como disponibilidade de streaming.
+async function ipaDiscoverClimateWorldwide(t){
+ const dest=String(tripDestination(t)||'').trim();
+ if(!dest)throw new Error('Defina a cidade de destino antes de atualizar.');
+ const terms=[
+  ['🎬','Filme / série',`filme ${dest}`],
+  ['🎵','Música',`música ${dest}`],
+  ['📚','Livro',`literatura ${dest}`],
+  ['🍽️','Gastronomia',`culinária ${dest}`],
+  ['💡','Cultura e história',`${dest} história`]
+ ];
+ const rows=[];
+ for(const [icon,type,term] of terms){
+  const u='https://pt.wikipedia.org/w/api.php?origin=*&action=opensearch&format=json&limit=5&search='+encodeURIComponent(term);
+  try{
+   const response=await fetch(u,{mode:'cors',cache:'no-store'});
+   if(!response.ok)continue;
+   const result=await response.json();
+   const titles=Array.isArray(result?.[1])?result[1]:[];
+   const descriptions=Array.isArray(result?.[2])?result[2]:[];
+   const links=Array.isArray(result?.[3])?result[3]:[];
+   const norm=v=>String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+   const index=titles.findIndex((name,i)=>links[i]?.startsWith('https://pt.wikipedia.org/wiki/') && (norm(name).includes(norm(dest)) || norm(descriptions[i]).includes(norm(dest))));
+   if(index<0)continue;
+   rows.push({icon,type,title:titles[index],description:(descriptions[index]||'Referência cultural relacionada ao destino. Consulte a fonte antes de recomendar.').slice(0,300),url:links[index],source:'wikipedia-opensearch'});
+  }catch(e){console.warn('Pesquisa cultural indisponível',type,e);}
+ }
+ return rows;
 }
 function climateForTrip(t){
  const curated=ipaClimateCuratedRows(t);
@@ -2521,14 +2568,7 @@ function climateForTrip(t){
  ];
  const hit=presets.find(p=>p.keys.some(key=>k.includes(key)));
  if(hit)return hit.items;
- return [
-  ['🎬','Filme / série',dest+' em cena','Uma seleção cultural para começar a descobrir '+dest+' antes do embarque.'],
-  ['🎵','Playlist','Sons de '+dest,'Uma trilha inspirada no destino para acompanhar o planejamento da viagem.'],
-  ['📚','Livro','Descobrindo '+dest,'Uma leitura para conhecer melhor a cultura e as histórias do destino.'],
-  ['🗣️','Expressão local','Fale como um local','Conheça palavras e expressões úteis antes de chegar.'],
-  ['🍽️','Prato típico','Sabores de '+dest,'Descubra sabores tradicionais para procurar durante a viagem.'],
-  ['💡','Curiosidade','Você sabia?','Uma curiosidade cultural para começar a explorar '+dest+'.']
- ];
+ return []; // Sem curadoria específica: não criar títulos ou recomendações fictícios.
 }
 function hotelStaySection(t){
  const d=adminData(), stays=Array.isArray(t.hotelBookings)?t.hotelBookings:[];
@@ -2658,6 +2698,7 @@ function ipaStreamButtons(item){
 
 function climateSection(t){
  const dest=tripDestination(t),cards=climateForTrip(t);
+ if(!cards.length)return `<section class="section climate-section"><div class="section-head"><div><span class="eyebrow">✨ ENTRE NO CLIMA</span><h2>${ipaEscape(dest)}</h2></div></div><p>Estamos preparando recomendações culturais verificadas para este destino.</p></section>`;
  return `<section class="section climate-section"><div class="section-head"><div><span class="eyebrow">✨ ENTRE NO CLIMA</span><h2>${dest} começa antes do embarque</h2></div></div><div class="climate-grid">${cards.map((x,i)=>`<article data-ipa-climate-card="1" data-ipa-climate-type="${ipaEscape(x[1])}" data-ipa-climate-title="${ipaEscape(x[2])}" data-ipa-climate-destination="${ipaEscape(dest)}" data-ipa-climate-url="${ipaEscape(x[4]||'')}"><span>${x[0]}</span><small>${x[1]}</small><b>${x[2]}</b><p>${x[3]}</p><div class="ipa-climate-actions">${ipaStreamButtons(x)}</div>${x[4]&&!ipaClimateProviderFromUrl(x[4])?`<button data-external-route="${ipaEscape(x[4])}">Abrir sugestão ↗</button>`:i===4?`<button data-climate-explore="${encodeURIComponent(x[2])}">📍 Ver no Explorar</button>`:''}</article>`).join('')}</div></section>`;
 }
 function flightWalletSection(t,d){
@@ -3119,7 +3160,7 @@ function adminTripEditor(id){
  <div class="smart-route-banner"><span>✨</span><div><b>Dica Inteligente</b><small>Cadastre atrações, cafés, restaurantes, lojas e experiências. Use “Adicionar como dica” para recomendações fora do roteiro principal.</small></div></div>
  <div class="ipa-admin-days">${(t.itinerary||[]).sort((a,b)=>a.day-b.day).map(day=>`<div class="admin-day-expanded"><div class="admin-day-title"><strong>${day.day}</strong><span><b>${day.title}</b><small>${day.date||''}</small></span><button class="admin-add-place-btn" data-admin-add-place="${t.id}:${day.day}">+ Lugar / dica</button></div><div class="admin-place-list">${normalizedPlaces(day).map((p,i)=>`<div><span>${i+1}</span><div><b>${p.time?`${p.time} · `:''}${p.category||'📍'} ${p.name}</b><small>${p.address||p.note||''}</small>${p.smartTip?`<em>💡 ${p.smartTip}</em>`:''}</div>${p.mapsUrl?`<button type="button" class="admin-place-map" data-external-route="${ipaEscape(p.mapsUrl)}" aria-label="Abrir ${ipaEscape(p.name)} no Google Maps">↗ Maps</button>`:''}</div>`).join('')||'<small>Nenhum local neste dia.</small>'}</div></div>`).join('')||'<p>Comece adicionando o primeiro dia.</p>'}</div>
  <div class="network-tip-list">${(d.recommendations||[]).filter(r=>r.tripId===t.id).map(r=>`<div><span>💡</span><div><b>${r.category||'Dica'} · ${r.name}</b><small>${r.address||''}</small><em>${r.smartTip||'Indo por Aí recomenda'}</em></div></div>`).join('')||'<small>Nenhuma dica extra cadastrada.</small>'}</div></section>
- <section class="ipa-admin-panel"><div class="section-head"><div><span class="eyebrow">✨ ANTES · ENTRE NO CLIMA</span><h2>Conteúdo do destino</h2></div><button class="btn btn-primary" data-admin-generate-climate="${t.id}">${t.climateContent?.length?'🔄 Atualizar conteúdo':'✨ Preparar conteúdo'}</button></div><p>Sugestões culturais reais são atualizadas pela curadoria do app, inclusive em viagens antigas. Conteúdo editado manualmente pelo ADM é preservado. Os ícones dos serviços são exibidos; aqueles com link direto confirmado podem ser abertos. O aplicativo procura links públicos automaticamente; links individuais podem ser editados como alternativa. Disponibilidade pode variar.</p><div class="climate-admin-grid">${climateForTrip(t).map((x,i)=>`<div><span>${x[0]}</span><small>${x[1]}</small><b>${x[2]}</b><p>${x[3]}</p>${ipaStreamButtons(x)}${t.climateContent?.length?`<button class="btn btn-light" data-admin-edit-climate="${t.id}:${i}">✏️ Editar</button>`:''}</div>`).join('')}</div></section>
+ <section class="ipa-admin-panel"><div class="section-head"><div><span class="eyebrow">✨ ANTES · ENTRE NO CLIMA</span><h2>Conteúdo do destino</h2></div><button class="btn btn-primary" data-admin-generate-climate="${t.id}">${t.climateContent?.length?'🔄 Atualizar conteúdo':'✨ Preparar conteúdo'}</button></div><p>Sugestões disponíveis são provenientes da curadoria cadastrada. A atualização consulta fontes públicas para destinos sem curadoria; os resultados dependem da disponibilidade de referências verificáveis. Conteúdo editado manualmente pelo ADM é preservado. Os ícones dos serviços são exibidos; aqueles com link direto confirmado podem ser abertos. O aplicativo procura links públicos automaticamente; links individuais podem ser editados como alternativa. Disponibilidade pode variar.</p><div class="climate-admin-grid">${climateForTrip(t).map((x,i)=>`<div><span>${x[0]}</span><small>${x[1]}</small><b>${x[2]}</b><p>${x[3]}</p>${ipaStreamButtons(x)}${t.climateContent?.length?`<button class="btn btn-light" data-admin-edit-climate="${t.id}:${i}">✏️ Editar</button>`:''}</div>`).join('')}</div></section>
  <section class="ipa-admin-panel"><div class="section-head"><div><span class="eyebrow">ANTES · CARTEIRA DA VIAGEM</span><h2>Documentos do cliente</h2></div><button class="btn btn-light" data-admin-document="${t.id}" data-client-id="${t.clientId}">+ Documento</button></div><p>Passagens, hotel, vouchers, seguro, ingressos e transfer. O ADM cadastra e o cliente consulta no Antes.</p><div class="admin-doc-list">${(d.tripDocuments||[]).filter(x=>x.tripId===t.id).map(x=>`<div><span>${x.type==='Passagem aérea'?'✈️':x.type.includes('Hospedagem')?'🏨':x.type.includes('trem')?'🚆':x.type.includes('ônibus')?'🚌':x.type.includes('Ingresso')?'🎟️':x.type.includes('Seguro')?'🛡️':'📄'}</span><div><b>${x.title}</b><small>${[x.date,x.time,x.terminal&&('Terminal '+x.terminal),x.gate&&('Portão '+x.gate)].filter(Boolean).join(' · ')}</small></div>${x.url?`<button data-external-route="${ipaEscape(x.url)}">Abrir</button>`:''}<button type="button" class="btn btn-light doc-delete-btn" data-admin-delete-document="${ipaEscape(x.id)}" data-document-trip="${ipaEscape(t.id)}" aria-label="Excluir documento ${ipaEscape(x.title)}">🗑 Excluir</button></div>`).join('')||'<small>Nenhum documento cadastrado.</small>'}</div></section>
 
  <section class="ipa-admin-panel"><div class="section-head"><div><span class="eyebrow">👥 PARTICIPANTES</span><h2>Quem vai nessa viagem?</h2></div><button class="btn btn-light" data-admin-add-participant="${t.id}">+ Participante</button></div>
