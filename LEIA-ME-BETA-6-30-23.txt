@@ -1,0 +1,1 @@
+Beta 6.30.23: ADM > Pedidos > Corrigir orçamento. Valor por pessoa e moeda editáveis, histórico do orçamento original e alterações; geração automática recalculada; confirmação de gravação no Firebase. Testar com login ADM em produção.

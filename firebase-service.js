@@ -898,6 +898,18 @@ window.IPAFirebase = {
     }
     return true;
   },
+  // Gravação explícita e conferida de correções de orçamento no pedido.
+  async saveLeadBudgetConfirmed(leadId){
+    if(!currentUser||currentUser.uid!==ADMIN_UID)throw new Error('Entre como ADM para alterar o orçamento.');
+    const lead=(window.IPAData?.getAll?.().travelLeads||[]).find(l=>String(l.id)===String(leadId));
+    if(!lead)throw new Error('Pedido não encontrado.');
+    const ref=doc(firestore,'travelLeads',String(leadId));
+    const payload={budget:Number(lead.budget),currency:lead.currency,budgetOriginal:lead.budgetOriginal,budgetCurrencyOriginal:lead.budgetCurrencyOriginal,budgetHistory:lead.budgetHistory||[],budgetUpdatedAt:lead.budgetUpdatedAt,adminSuggestion:null,updatedAt:serverTimestamp()};
+    await setDoc(ref,payload,{merge:true});
+    const snapshot=await getDoc(ref);
+    if(!snapshot.exists()||Number(snapshot.data().budget)!==payload.budget||snapshot.data().currency!==payload.currency)throw new Error('O orçamento não foi confirmado no servidor.');
+    return true;
+  },
   // Salva a ordem escolhida pelo ADM sem depender de sincronização global.
   async saveLeadSuggestionConfirmed(leadId){
     if(!currentUser||currentUser.uid!==ADMIN_UID)throw new Error('Entre como ADM para salvar a ordem.');

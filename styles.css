@@ -1444,3 +1444,6 @@ dialog:has(#routeCatalogPlace) .smart-place-actions button{
  .ipa-reorder-item>.ipa-move-controls button{min-width:32px;padding:7px 0}
 }
 @media(max-width:370px){.ipa-reorder-item{grid-template-columns:34px 66px minmax(0,1fr) 30px!important;gap:6px!important}.ipa-reorder-item>.ipa-itinerary-thumbnail{width:66px!important;height:66px!important}}
+
+/* Beta 6.30.23 — correção de orçamento de pedidos */
+.ipa-lead-budget-editor{margin:0 0 12px}.ipa-lead-budget-fields{display:grid;grid-template-columns:1fr 130px;gap:10px;margin-top:12px;padding:14px;background:#f4f8f8;border:1px solid #dce8e9;border-radius:14px}.ipa-lead-budget-fields[hidden]{display:none}.ipa-lead-budget-fields label{display:grid;gap:5px;font-weight:700;font-size:13px}.ipa-lead-budget-fields input,.ipa-lead-budget-fields select{width:100%;min-width:0;border:1px solid #c9dadd;border-radius:10px;padding:10px;background:white}.ipa-lead-budget-fields small,.ipa-lead-budget-fields button{grid-column:1/-1}@media(max-width:480px){.ipa-lead-budget-fields{grid-template-columns:1fr}}
