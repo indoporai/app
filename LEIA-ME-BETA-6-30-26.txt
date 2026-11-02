@@ -1,0 +1,1 @@
+Beta 6.30.26 — Participantes: gravação confirmada no Firebase antes de atualizar o cache local; erros com detalhe; exclusão com a mesma proteção. Não altera layout. Se persistir falha, informar mensagem exata para identificar permissões/serviço. Validar em produção.

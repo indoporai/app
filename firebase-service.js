@@ -974,7 +974,8 @@ window.IPAFirebase = {
     if(!currentUser || currentUser.uid!==ADMIN_UID)throw new Error('Entre com a conta ADM autorizada.');
     if(!tripId||!Array.isArray(participants))throw new Error('Dados dos participantes inválidos.');
     const tripRef=doc(firestore,'trips',String(tripId));
-    await setDoc(tripRef,{participants,updatedAt:serverTimestamp()},{merge:true});
+    try{await setDoc(tripRef,{participants,updatedAt:serverTimestamp()},{merge:true});}
+    catch(e){throw new Error('Falha na gravação Firebase ('+(e?.code||'sem código')+'): '+(e?.message||'verifique permissões e conexão'));}
     const snap=await getDocFromServer(tripRef);
     if(!snap.exists())throw new Error('Viagem não encontrada no Firebase.');
     const saved=snap.data().participants||[];

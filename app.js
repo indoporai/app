@@ -1760,10 +1760,12 @@ function bind(){
      saveBtn.disabled=true;saveBtn.textContent='Salvando...';
      try{
        list.push({id:'part-'+Date.now(),name,email,seat:document.querySelector('#partSeat').value.trim(),minor:document.querySelector('#partMinor').checked,status:'pending'});
-       IPAData.updateTrip(tripId,{participants:list});
+       if(!window.IPAFirebase?.saveTripParticipantsConfirmed)throw new Error('Módulo do Firebase não carregado. Reabra o app e tente novamente.');
+       // Grava primeiro no servidor: evita que uma sincronização local antiga sobrescreva a mudança.
        await window.IPAFirebase.saveTripParticipantsConfirmed(tripId,list);
-       toast('Participante salvo no Firebase ✓');modal.close();view.innerHTML=adminTripEditor(tripId);bind();
-     }catch(e){console.error(e);toast('Erro ao salvar participante');saveBtn.disabled=false;saveBtn.textContent='Adicionar participante'}
+       IPAData.updateTrip(tripId,{participants:list});
+       toast('Participante confirmado no Firebase ✓');modal.close();view.innerHTML=adminTripEditor(tripId);bind();
+     }catch(e){console.error('Falha ao salvar participante',e);toast('Não foi possível salvar: '+(e?.code||e?.message||'erro desconhecido'));saveBtn.disabled=false;saveBtn.textContent='Adicionar participante'}
    },0);
  });
  document.querySelectorAll('[data-admin-delete-participant]').forEach(b=>b.onclick=async()=>{
@@ -1775,10 +1777,11 @@ function bind(){
    b.disabled=true;
    try{
      const remaining=participants.filter(p=>String(p.id)!==partId);
-     IPAData.updateTrip(tripId,{participants:remaining});
+     if(!window.IPAFirebase?.saveTripParticipantsConfirmed)throw new Error('Módulo do Firebase indisponível.');
      await window.IPAFirebase.saveTripParticipantsConfirmed(tripId,remaining);
-     toast('Participante excluído ✓');view.innerHTML=adminTripEditor(tripId);bind();
-   }catch(e){console.error(e);toast('Erro ao excluir participante');b.disabled=false}
+     IPAData.updateTrip(tripId,{participants:remaining});
+     toast('Participante excluído e confirmado ✓');view.innerHTML=adminTripEditor(tripId);bind();
+   }catch(e){console.error(e);toast('Erro ao excluir participante: '+(e?.code||e?.message||'erro desconhecido'));b.disabled=false}
  });
  document.querySelectorAll('[data-admin-save-flight]').forEach(b=>b.onclick=async()=>{
    const flight={};document.querySelectorAll('[data-flight-field]').forEach(x=>flight[x.dataset.flightField]=x.value.trim());
