@@ -1,0 +1,1 @@
+Beta 6.30.27: diagnóstico do salvamento de participantes. Remove o timeout genérico de feedback do botão, mostra mensagem detalhada persistente no modal e impede espera indefinida em caso de falha/indisponibilidade de Firebase. O sucesso continua dependendo de gravação confirmada no Firebase. Verificar no app publicado a mensagem específica que aparecer. Base 6.30.26.

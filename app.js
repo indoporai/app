@@ -41,7 +41,7 @@ const state={route:'today',mode:'during',profile:savedProfile,scenarioChosen:fal
  function restore(btn){const p=pending.get(btn);if(!p)return;clearTimeout(p.timer);btn.disabled=p.disabled;btn.innerHTML=p.html;btn.classList.remove('ipa-is-saving','ipa-save-complete');btn.removeAttribute('aria-busy');pending.delete(btn)}
  function finish(btn,ok){const p=pending.get(btn);if(!p)return;if(!ok){restore(btn);return}btn.innerHTML='✓ Concluído!';btn.classList.add('ipa-save-complete');clearTimeout(p.timer);p.timer=setTimeout(()=>restore(btn),1000)}
  document.addEventListener('click',e=>{
-  const btn=e.target.closest('button,input[type="submit"]');if(!btn||btn.disabled||pending.has(btn)||btn.hasAttribute('data-no-save-feedback'))return;
+  const btn=e.target.closest('button,input[type="submit"]');if(!btn||btn.disabled||pending.has(btn)||btn.hasAttribute('data-no-save-feedback')||btn.id==='saveParticipant')return;
   const label=(btn.textContent||btn.value||'').trim();if(!writes.test(label)||reads.test(label))return;
   const previous={html:btn.innerHTML,disabled:btn.disabled,timer:null};
   // Defer disabling until after existing click handlers run; never prevent their action.
@@ -1748,7 +1748,7 @@ function bind(){
    <label>E-mail</label><input id="partEmail" class="v2-concierge-input" placeholder="email@exemplo.com">
    <label>Assento</label><input id="partSeat" class="v2-concierge-input" placeholder="Ex.: 18A">
    <label class="participant-minor-check"><input id="partMinor" type="checkbox"> Menor vinculado ao responsável (sem login próprio)</label>
-   <button id="saveParticipant" class="btn btn-primary btn-block">Adicionar participante</button>`);
+   <p id="participantSaveError" class="ipa-participant-error" role="alert" hidden></p><button id="saveParticipant" data-no-save-feedback class="btn btn-primary btn-block">Adicionar participante</button>`);
    setTimeout(()=>document.querySelector('#saveParticipant').onclick=async()=>{
      const d=adminData(),t=d.trips.find(x=>x.id===tripId);if(!t)return;
      const name=document.querySelector('#partName').value.trim();if(!name)return toast('Informe o nome');
@@ -1762,10 +1762,13 @@ function bind(){
        list.push({id:'part-'+Date.now(),name,email,seat:document.querySelector('#partSeat').value.trim(),minor:document.querySelector('#partMinor').checked,status:'pending'});
        if(!window.IPAFirebase?.saveTripParticipantsConfirmed)throw new Error('Módulo do Firebase não carregado. Reabra o app e tente novamente.');
        // Grava primeiro no servidor: evita que uma sincronização local antiga sobrescreva a mudança.
-       await window.IPAFirebase.saveTripParticipantsConfirmed(tripId,list);
+       // Timeout explícito: nunca deixar o modal preso enquanto a conexão aguarda resposta.
+       let deadline;
+       try{await Promise.race([window.IPAFirebase.saveTripParticipantsConfirmed(tripId,list),new Promise((_,reject)=>{deadline=setTimeout(()=>reject(new Error('Tempo esgotado ao contatar o Firebase. Confira a conexão, as permissões do ADM e se a viagem existe na nuvem.')),25000)})]);}
+       finally{clearTimeout(deadline)}
        IPAData.updateTrip(tripId,{participants:list});
        toast('Participante confirmado no Firebase ✓');modal.close();view.innerHTML=adminTripEditor(tripId);bind();
-     }catch(e){console.error('Falha ao salvar participante',e);toast('Não foi possível salvar: '+(e?.code||e?.message||'erro desconhecido'));saveBtn.disabled=false;saveBtn.textContent='Adicionar participante'}
+     }catch(e){console.error('Falha ao salvar participante',e);const detail=String(e?.code||e?.message||'erro desconhecido');const message='Não foi possível salvar o participante: '+detail;const errorEl=document.querySelector('#participantSaveError');if(errorEl){errorEl.textContent=message;errorEl.hidden=false}toast(message);saveBtn.disabled=false;saveBtn.textContent='Adicionar participante'}
    },0);
  });
  document.querySelectorAll('[data-admin-delete-participant]').forEach(b=>b.onclick=async()=>{

@@ -1486,3 +1486,6 @@ dialog:has(#routeCatalogPlace) .smart-place-actions button{
  .admin-only-suggestion .planner-day-body>.ipa-lead-place em{grid-column:2;grid-row:2;font-size:12px}
  .admin-only-suggestion .planner-day-body>.ipa-lead-place .ipa-lead-reorder{grid-column:3;grid-row:1/span 2}
 }
+
+/* Beta 6.30.27 — mensagem persistente com o erro específico de participantes */
+.ipa-participant-error{margin:10px 0;padding:12px;background:#fff1ed;border:1px solid #efc7ba;color:#9b311d;border-radius:12px;font-size:13px;line-height:1.45;overflow-wrap:anywhere}.ipa-participant-error[hidden]{display:none!important}
