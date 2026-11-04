@@ -1,0 +1,7 @@
+BETA 6.30.37 — CORREÇÃO DO LOGO E ATUALIZAÇÃO DO PAINEL
+- Restaurada exatamente a imagem pré-existente do cabeçalho da tela principal e mantido o splash original.
+- Mantida a marca oficial nos ícones do PWA e a arte original em assets/logo.png.
+- Removido o card Próximas ações das duas versões do dashboard ADM (app.js e admin.js), conforme solicitado na versão anterior.
+- Corrigida a versão de cache do admin.js e data-service.js em admin.html; atualizadas as versões de cache no PWA.
+- Mochilito e módulos de PIX/Firebase/Mercado Pago preservados.
+- Após instalar, atualizar a aba do navegador; se usar o app instalado, fechar e abrir. Para ícones antigos, pode ser necessário reinstalar o atalho.
