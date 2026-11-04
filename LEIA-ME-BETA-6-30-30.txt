@@ -1,0 +1,1 @@
+Beta 6.30.30: ADM > Viagens > Antes > Entre no Clima. Botão Editar visível também nos cards gerados por sugestões automáticas; Spotify pode ser cadastrado sem preparar conteúdo previamente. Salva o conjunto existente como curadoria manual no Firebase e preserva os demais cards. Base 6.30.29. Validar em produção.

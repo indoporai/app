@@ -155,6 +155,52 @@ async function verifyMpWebhook(request,url,env){
   return {ok:hex===v1};
 }
 
+
+const IPA_PAYMENT_EMAIL_DOC=`https://firestore.googleapis.com/v1/projects/indo-por-ai-app/databases/(default)/documents/settings/paymentEmail`;
+function ipaFsStr(fields,key,defaultValue=''){return String(fields?.[key]?.stringValue??defaultValue)}
+async function ipaPaymentEmailFirestore(env,method='GET',content){
+ const access=await ipaGoogleServiceToken(env,'https://www.googleapis.com/auth/datastore');
+ const opts={method,headers:{Authorization:'Bearer '+access,'content-type':'application/json'}};
+ if(content)opts.body=JSON.stringify(content);
+ const r=await fetch(IPA_PAYMENT_EMAIL_DOC,opts);
+ const data=await r.json().catch(()=>({}));
+ if(method==='GET'&&r.status===404)return {enabled:false,subject:'Pagamento confirmado — Indo por Aí',message:'Recebemos seu pagamento! Obrigado por viajar com o Indo por Aí.',replyTo:''};
+ if(!r.ok)throw Error(data?.error?.message||`Firestore ${r.status}`);
+ const f=data.fields||{};
+ return {enabled:f.enabled?.booleanValue===true,subject:ipaFsStr(f,'subject','Pagamento confirmado — Indo por Aí'),message:ipaFsStr(f,'message','Recebemos seu pagamento!'),replyTo:ipaFsStr(f,'replyTo')};
+}
+async function ipaPaymentEmailSettings(request,env){
+ let identity;try{identity=await ipaAdminIdentity(request,env)}catch{return json({ok:false,error:'Falha ao autenticar ADM.'},502)}
+ if(!identity)return json({ok:false,error:'Faça login no ADM.'},401);
+ if(identity.localId!==IPA_ADMIN_UID)return json({ok:false,error:'Apenas ADM.'},403);
+ try{
+  if(request.method==='GET')return json({ok:true,settings:await ipaPaymentEmailFirestore(env)});
+  const data=await request.json();const subject=String(data.subject||'').trim().slice(0,150),message=String(data.message||'').trim().slice(0,1800),replyTo=String(data.replyTo||'').trim().toLowerCase(),enabled=data.enabled===true;
+  if(!subject||!message||replyTo&&!validEmail(replyTo))return json({ok:false,error:'Assunto, mensagem ou e-mail de resposta inválidos.'},400);
+  const fields={enabled:{booleanValue:enabled},subject:{stringValue:subject},message:{stringValue:message},replyTo:{stringValue:replyTo}};
+  // Patch document via server OAuth. Only authenticated admin can configure.
+  await ipaPaymentEmailFirestore(env,'PATCH',{fields});
+  return json({ok:true,settings:{enabled,subject,message,replyTo}});
+ }catch(e){return json({ok:false,error:'Configuração não salva: '+(e.message||'falha')},502)}
+}
+async function ipaSendPaymentConfirmation(payment,env){
+ if(!env.RESEND_API_KEY||!env.MERCADO_PAGO_WEBHOOK_SECRET)return {skipped:'Sem configuração segura de envio'};
+ if(String(payment?.status||'').toLowerCase()!=='approved')return {skipped:'Pagamento não aprovado'};
+ const email=String(payment?.payer?.email||'').trim().toLowerCase();
+ if(!validEmail(email))return {skipped:'Sem e-mail de pagador'};
+ const config=await ipaPaymentEmailFirestore(env);
+ if(!config.enabled)return {skipped:'Confirmações desativadas'};
+ const id=String(payment.id||'').trim();if(!/^\d+$/.test(id))return {skipped:'ID inválido'};
+ const amount=new Intl.NumberFormat('pt-BR',{style:'currency',currency:payment.currency_id||'BRL'}).format(Number(payment.transaction_amount||0));
+ const safe=ipaEmailEscape;
+ const text=String(config.message).replace(/\{valor\}/gi,amount).replace(/\{pagamento\}/gi,id);
+ const html=`<!doctype html><html lang="pt-BR"><meta charset="UTF-8"><body style="font-family:Arial,sans-serif;background:#f5f9fa;padding:24px"><div style="background:white;max-width:580px;margin:auto;padding:24px;border-radius:18px;border:1px solid #e1eded"><h1 style="color:#075668">✈️ Indo por Aí</h1><h2>${safe(config.subject)}</h2><p style="white-space:pre-line;line-height:1.7">${safe(text)}</p><p><b>Valor recebido:</b> ${safe(amount)}<br><b>Pagamento:</b> ${safe(id)}</p><p>Equipe Indo por Aí 💙</p></div></body></html>`;
+ const payload={from:'Indo por Aí <acesso@indoporaicomagente.com>',to:[email],subject:config.subject,html};
+ if(config.replyTo)payload.reply_to=config.replyTo;
+ const response=await fetch('https://api.resend.com/emails',{method:'POST',headers:{Authorization:'Bearer '+env.RESEND_API_KEY,'content-type':'application/json','Idempotency-Key':'ipa-payment-'+id},body:JSON.stringify(payload)});
+ if(!response.ok){console.error('payment receipt rejected',response.status);return {error:'Resend rejeitou o envio: '+response.status}}
+ return {sent:true};
+}
 async function mercadoPagoWebhook(request,url,env){
   const verified=await verifyMpWebhook(request,url,env);
   if(!verified.ok)return json({ok:false,error:"Assinatura inválida."},401);
@@ -166,7 +212,13 @@ async function mercadoPagoWebhook(request,url,env){
     const result=await mercadoPagoFetch(env,`/v1/payments/${encodeURIComponent(dataId)}`,{method:"GET"});
     if(result.ok){
       const p=extractPixPayment(result.body);
-      return json({ok:true,received:true,status:p.paymentStatus,externalReference:p.externalReference,setup:!!verified.setup});
+      // O webhook responde normalmente mesmo quando o serviço de e-mail falhar.
+      // Não confia no status do navegador: verifica o pagamento pela API do Mercado Pago.
+      let receipt={skipped:'Não aprovado'};
+      if(String(result.body?.status||'').toLowerCase()==='approved'){
+        try{receipt=await ipaSendPaymentConfirmation(result.body,env)}catch(e){console.error('payment receipt issue',e);receipt={error:'Não foi possível processar confirmação'}}
+      }
+      return json({ok:true,received:true,status:p.paymentStatus,externalReference:p.externalReference,setup:!!verified.setup,receipt});
     }
   }
   return json({ok:true,received:true,setup:!!verified.setup});
@@ -362,7 +414,7 @@ function ipaBase64Url(bytes){
  let str='';for(let i=0;i<b.length;i+=8192)str+=String.fromCharCode(...b.subarray(i,i+8192));
  return btoa(str).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/g,'');
 }
-async function ipaGoogleServiceToken(env){
+async function ipaGoogleServiceToken(env,scope="https://www.googleapis.com/auth/identitytoolkit"){
  if(!env.FIREBASE_SERVICE_ACCOUNT_JSON)throw new Error('FIREBASE_SERVICE_ACCOUNT_JSON ausente em Production.');
  let sa;try{sa=JSON.parse(env.FIREBASE_SERVICE_ACCOUNT_JSON)}catch{throw new Error('FIREBASE_SERVICE_ACCOUNT_JSON não contém JSON válido.')}
  if(sa.project_id!==IPA_FIREBASE_PROJECT||sa.client_email!==`indo-por-ai-convites@${IPA_FIREBASE_PROJECT}.iam.gserviceaccount.com`||!sa.private_key)throw new Error('A credencial não pertence à conta exclusiva de convites.');
@@ -370,7 +422,7 @@ async function ipaGoogleServiceToken(env){
  const der=Uint8Array.from(atob(pem),x=>x.charCodeAt(0));
  const key=await crypto.subtle.importKey('pkcs8',der,{name:'RSASSA-PKCS1-v1_5',hash:'SHA-256'},false,['sign']);
  const issued=Math.floor(Date.now()/1000);
- const payload={iss:sa.client_email,scope:'https://www.googleapis.com/auth/identitytoolkit',aud:'https://oauth2.googleapis.com/token',iat:issued,exp:issued+3600};
+ const payload={iss:sa.client_email,scope,aud:'https://oauth2.googleapis.com/token',iat:issued,exp:issued+3600};
  const head=ipaBase64Url(new TextEncoder().encode(JSON.stringify({alg:'RS256',typ:'JWT'})));
  const body=ipaBase64Url(new TextEncoder().encode(JSON.stringify(payload)));
  const unsigned=head+'.'+body;
@@ -488,6 +540,7 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
 
+    if (url.pathname === "/api/admin/payment-email" && (request.method === "GET" || request.method === "POST")) return ipaPaymentEmailSettings(request,env);
     if (url.pathname === "/api/email/invite" && request.method === "POST") return ipaCustomInvite(request,env);
     if (url.pathname === "/api/email/test" && request.method === "POST") return ipaResendTest(request,env);
     if (url.pathname === "/api/maps/browser-key" && request.method === "GET") {

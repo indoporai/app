@@ -1,0 +1,13 @@
+INDO POR AÍ — BETA 6.30.31 (base congelada 6.30.30)
+
+ALTERAÇÕES PONTUAIS
+- Remove card e botão de teste de Resend do dashboard ADM; envio de convites permanece.
+- Campo Salvar nome da viagem dentro de ADM > Viagens > abrir viagem.
+- Contagem de pedidos novos e Concierge com selo vermelho.
+- Chat flutuante "Aí" no ADM e área do cliente, usando os atendimentos já persistidos no Firebase. Aí é o nome da interface de concierge humano, não um chatbot autônomo.
+- ADM > Financeiro: formulário de confirmação por e-mail pós-pagamento (assunto, texto, reply-to, ativar/desativar).
+- Worker: envio Resend a partir de webhook Mercado Pago: só quando status aprovado confirmado na API; usa Idempotency-Key por pagamento, email do pagador, configuração no Firestore. Requer RESEND_API_KEY, MERCADO_PAGO_WEBHOOK_SECRET e FIREBASE_SERVICE_ACCOUNT_JSON com permissão de acesso ao documento settings/paymentEmail e credenciais válidas.
+
+ATENÇÃO: o envio de e-mail depende do webhook Mercado Pago configurado e de testes reais de produção. Se a conta de serviço do Firebase estiver limitada apenas ao Auth, o formulário exibirá erro e as permissões de Firestore devem ser concedidas explicitamente. Não informar que as mensagens foram entregues sem validar o Resend. Não há automação LLM de respostas do concierge; as respostas são de atendentes.
+
+TESTES OBRIGATÓRIOS: nome da viagem após recarregar, badges com pedido pendente, chat enviado/recebido em dois logins, publicação sem regressão, teste autorizado de pagamento aprovado e duplicação de evento, configuração e-mail em ADM Financeiro, teste da conexão segura e do recebimento.
