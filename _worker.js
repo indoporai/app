@@ -188,8 +188,7 @@ async function ipaSendPaymentConfirmation(payment,env){
  if(String(payment?.status||'').toLowerCase()!=='approved')return {skipped:'Pagamento não aprovado'};
  const email=String(payment?.payer?.email||'').trim().toLowerCase();
  if(!validEmail(email))return {skipped:'Sem e-mail de pagador'};
- const config=await ipaPaymentEmailFirestore(env);
- if(!config.enabled)return {skipped:'Confirmações desativadas'};
+ const config={enabled:true,subject:'✈️ Pagamento confirmado — Indo por Aí',message:'Olá!\n\nRecebemos seu pagamento no valor de {valor}, identificado pela transação {pagamento}.\n\nObrigado por viajar com o Indo por Aí! 💙\nEquipe Indo por Aí',replyTo:'financeiro@indoporaicomagente.com'};
  const id=String(payment.id||'').trim();if(!/^\d+$/.test(id))return {skipped:'ID inválido'};
  const amount=new Intl.NumberFormat('pt-BR',{style:'currency',currency:payment.currency_id||'BRL'}).format(Number(payment.transaction_amount||0));
  const safe=ipaEmailEscape;
@@ -213,7 +212,7 @@ async function ipaReadPaymentDoc(env,id){
   const resp=await fetch(url,{headers:{Authorization:'Bearer '+token},cache:'no-store'});
   if(resp.status===404)throw new Error('Cobrança não encontrada no Firebase.');
   const doc=await resp.json().catch(()=>({}));
-  if(!resp.ok)throw new Error(doc?.error?.message||'Falha no Firestore ('+resp.status+').');
+  if(!resp.ok)throw new Error(resp.status===403?'Permissão negada pelo Firestore. Conceda à conta de serviço do Cloudflare a função Cloud Datastore User no projeto Firebase; nenhuma baixa foi efetuada.':doc?.error?.message||'Falha no Firestore ('+resp.status+').');
   return {doc,token,url};
 }
 async function ipaFindPaymentByReference(env,id){
@@ -253,7 +252,7 @@ async function ipaReconcileApprovedPayment(env,payment){
   for(const key of Object.keys(updates))u.searchParams.append('updateMask.fieldPaths',key);
   u.searchParams.set('currentDocument.updateTime',doc.updateTime);
   const result=await fetch(u.toString(),{method:'PATCH',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({fields:updates})});
-  if(!result.ok){const error=await result.json().catch(()=>({}));throw Error(result.status===409||result.status===412?'A cobrança foi modificada durante a conciliação. Atualize e tente novamente.':error?.error?.message||'Falha ao registrar baixa no Firebase.');}
+  if(!result.ok){const error=await result.json().catch(()=>({}));throw Error(result.status===403?'Permissão negada pelo Firestore na gravação. A conta de serviço precisa ter Cloud Datastore User; nenhuma baixa foi confirmada.':result.status===409||result.status===412?'A cobrança foi modificada durante a conciliação. Atualize e tente novamente.':error?.error?.message||'Falha ao registrar baixa no Firebase.');}
   return {state:'paid',paymentId:id,mpPaymentId:mpId,paidAt,message:'PIX aprovado e registrado no Firebase.'};
 }
 async function ipaAdminReconcilePix(request,env){
@@ -627,7 +626,7 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
 
-    if (url.pathname === "/api/admin/payment-email" && (request.method === "GET" || request.method === "POST")) return ipaPaymentEmailSettings(request,env);
+    if (url.pathname === "/api/admin/payment-email" && (request.method === "GET" || request.method === "POST")) return json({ok:false,error:"A configuração do e-mail é fixa desde a Beta 6.30.33."},410);
     if (url.pathname === "/api/admin/reconcile-pix" && request.method === "POST") return ipaAdminReconcilePix(request,env);
     if (url.pathname === "/api/email/invite" && request.method === "POST") return ipaCustomInvite(request,env);
     if (url.pathname === "/api/email/test" && request.method === "POST") return ipaResendTest(request,env);

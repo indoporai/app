@@ -1,0 +1,9 @@
+Beta 6.30.33 — base imutável funcional 6.30.32 + seis melhorias.
+1. Cards compactos no ADM > Pedidos, preservando edição e geração.
+2. Sugestão Interna recolhida por padrão; expandir/recolher geral preserva dias individuais.
+3. Removidos cards estáticos Explore/Signature/Elite/Groups de ADM > Clientes.
+4. Removido formulário de e-mail com falha; e-mail fixo após baixa PIX confirmada: de acesso@indoporaicomagente.com, reply-to financeiro@indoporaicomagente.com.
+5. Verificar PIX mantém verificação segura e agora explica erro 403 do Firestore. IMPORTANTE: uma regra IAM de servidor não pode ser corrigida pelo ZIP; conceda 'Cloud Datastore User' à conta de serviço do Firebase no GCP antes de testar. Não tente dar baixa manual sem conciliação confirmada.
+6. Links editoriais oficiais de C6 Bank, Decolar, Booking.com, Accor. Não são apresentados como parceiros oficiais.
+
+Publicação: publicar ZIP inteiro no Cloudflare Pages, manter segredos; garantir o Worker _worker.js ativo (para /api/admin/reconcile-pix). Testar com credenciais reais e no celular. O arquivo não modifica pagamentos existentes em produção. Checar log do Worker, perfil IAM Firestore e webhook do Mercado Pago.

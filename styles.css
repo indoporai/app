@@ -1507,3 +1507,28 @@ dialog:has(#routeCatalogPlace) .smart-place-actions button{
 .ipa-aii-management select,.ipa-aii-management textarea{width:100%;max-width:100%;box-sizing:border-box;font:inherit;font-size:13px;border:1px solid #d5e1e1;border-radius:9px;background:#fff;padding:8px}
 .ipa-reconcile-pix{background:#e9f7f5;border:1px solid #b7dddb;border-radius:10px;padding:9px 12px;color:#056c75;font-weight:800;cursor:pointer}
 .ipa-reconcile-pix:disabled{opacity:.65;cursor:wait}
+
+/* Beta 6.30.33 — Pedidos executivos e sugestão recolhível */
+.ipa-lead-compact{border-radius:22px!important;border:1px solid #e1ebec!important;box-shadow:0 9px 24px rgba(5,64,74,.06);padding:20px!important;min-width:0}
+.ipa-lead-compact h3{font-size:22px!important;color:#073f49;margin:14px 0 8px;overflow-wrap:anywhere}
+.ipa-lead-compact>p{margin:7px 0;color:#45626b}
+.ipa-lead-compact>small{display:block;line-height:1.7;color:#6a8188}
+.ipa-lead-compact .lead-budget{background:#eef5f4!important;border-radius:15px;padding:14px!important;margin:16px 0 14px;gap:8px;flex-wrap:wrap}
+.ipa-lead-compact .ipa-lead-city-editor,.ipa-lead-compact .ipa-lead-budget-editor{display:inline-flex;vertical-align:top;max-width:100%;margin:0 6px 12px 0;flex-direction:column}
+.ipa-lead-compact .ipa-lead-city-editor:has(.ipa-lead-city-fields:not([hidden])),.ipa-lead-compact .ipa-lead-budget-editor:has(.ipa-lead-budget-fields:not([hidden])){display:flex;width:100%}
+.ipa-lead-compact .ipa-lead-city-editor>.btn,.ipa-lead-compact .ipa-lead-budget-editor>.btn{font-size:13px;padding:10px 12px;min-height:42px;max-width:100%;white-space:normal;background:#eaf6f5;border:1px solid #cce6e4;color:#056c75}
+.ipa-lead-compact .ipa-lead-primary-action>.btn{background:#ff6918;color:#fff;border-color:#ff6918;min-height:46px;width:100%;font-weight:800}
+.ipa-lead-compact .lead-admin-top{gap:8px}
+.admin-only-suggestion>.planner-result-head{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.admin-only-suggestion>.planner-result-head>div{min-width:0;flex:1}
+.ipa-suggestion-master-toggle{border:1px solid #c7e4e3;background:#eff8f7;color:#086b75;border-radius:999px;padding:10px 14px;font-weight:800;cursor:pointer}
+.ipa-suggestion-day-collection[hidden]{display:none!important}
+.ipa-editorial-services{margin:20px 0}
+.ipa-editorial-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.ipa-editorial-card{display:flex;flex-direction:column;gap:8px;text-decoration:none;color:#073f49!important;background:white;border:1px solid #dbe8e9;border-radius:18px;padding:16px;min-width:0;box-shadow:0 4px 18px rgba(5,70,77,.05)}
+.ipa-editorial-card .ipa-editorial-icon{font-size:27px}
+.ipa-editorial-card b{font-size:17px}
+.ipa-editorial-card small{color:#5c737b}
+.ipa-editorial-card .ipa-editorial-action{margin-top:auto;color:#087f86;font-weight:800;font-size:13px}
+.ipa-editorial-disclaimer{display:block;margin-top:10px;color:#657d82;line-height:1.5}
+@media(max-width:480px){.ipa-lead-compact{padding:14px!important}.ipa-editorial-grid{grid-template-columns:1fr 1fr;gap:8px}.ipa-editorial-card{padding:12px}.ipa-editorial-card b{font-size:14px}.ipa-suggestion-master-toggle{width:100%}}
