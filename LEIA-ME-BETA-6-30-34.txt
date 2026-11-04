@@ -1,0 +1,1 @@
+Beta 6.30.34 — corrigida quebra de e-mail nos cards de Clientes no desktop, usando uma coluna em larguras intermediárias e duas em telas largas. Texto de e-mail não quebra no meio; quando não couber, mostra reticências. Base 6.30.33. Demais recursos mantidos. Verificar visualmente após publicar.

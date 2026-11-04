@@ -1532,3 +1532,22 @@ dialog:has(#routeCatalogPlace) .smart-place-actions button{
 .ipa-editorial-card .ipa-editorial-action{margin-top:auto;color:#087f86;font-weight:800;font-size:13px}
 .ipa-editorial-disclaimer{display:block;margin-top:10px;color:#657d82;line-height:1.5}
 @media(max-width:480px){.ipa-lead-compact{padding:14px!important}.ipa-editorial-grid{grid-template-columns:1fr 1fr;gap:8px}.ipa-editorial-card{padding:12px}.ipa-editorial-card b{font-size:14px}.ipa-suggestion-master-toggle{width:100%}}
+
+/* Beta 6.30.34 — CRM: prevenir quebra de e-mail no desktop.
+   Em larguras intermediárias, manter um card por linha para não
+   comprimir a identificação entre avatar e botão Editar. */
+@media (min-width:850px) and (max-width:1249px) {
+  .ipa-admin-client-grid { grid-template-columns:minmax(0,1fr); }
+}
+@media (min-width:1250px) {
+  .ipa-admin-client-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+}
+.ipa-client-card-identity p {
+  word-break:normal;
+  overflow-wrap:normal;
+}
+.ipa-client-card-identity p:first-of-type {
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
