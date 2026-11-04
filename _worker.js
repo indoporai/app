@@ -141,7 +141,7 @@ async function getPixStatus(url, env) {
 
 async function verifyMpWebhook(request,url,env){
   const secret=String(env.MERCADO_PAGO_WEBHOOK_SECRET||"").trim();
-  if(!secret)return {ok:true,setup:true};
+  if(!secret)return {ok:false,setup:false};
   const signature=request.headers.get("x-signature")||"";
   const requestId=request.headers.get("x-request-id")||"";
   const parts=Object.fromEntries(signature.split(",").map(x=>x.trim().split("=")));
@@ -201,6 +201,88 @@ async function ipaSendPaymentConfirmation(payment,env){
  if(!response.ok){console.error('payment receipt rejected',response.status);return {error:'Resend rejeitou o envio: '+response.status}}
  return {sent:true};
 }
+
+// Beta 6.30.32 — server-side payment reconciliation (no client-side approval).
+const IPA_PAYMENTS_FS='https://firestore.googleapis.com/v1/projects/indo-por-ai-app/databases/(default)/documents/payments';
+function ipaPaymentString(fields,name){return String(fields?.[name]?.stringValue||'')}
+function ipaPaymentNumber(fields,name){return Number(fields?.[name]?.doubleValue??fields?.[name]?.integerValue??fields?.[name]?.stringValue??0)}
+async function ipaReadPaymentDoc(env,id){
+  if(!/^[a-zA-Z0-9_-]{3,120}$/.test(id))throw new Error('Identificador de cobrança inválido.');
+  const token=await ipaGoogleServiceToken(env,'https://www.googleapis.com/auth/datastore');
+  const url=IPA_PAYMENTS_FS+'/'+encodeURIComponent(id);
+  const resp=await fetch(url,{headers:{Authorization:'Bearer '+token},cache:'no-store'});
+  if(resp.status===404)throw new Error('Cobrança não encontrada no Firebase.');
+  const doc=await resp.json().catch(()=>({}));
+  if(!resp.ok)throw new Error(doc?.error?.message||'Falha no Firestore ('+resp.status+').');
+  return {doc,token,url};
+}
+async function ipaFindPaymentByReference(env,id){
+  const ref='indoporai_'+id;
+  const res=await mercadoPagoFetch(env,'/v1/payments/search?external_reference='+encodeURIComponent(ref)+'&sort=date_created&criteria=desc&limit=50',{method:'GET'});
+  if(!res.ok)throw new Error('Não foi possível pesquisar o Mercado Pago.');
+  const matches=(res.body?.results||[]).filter(p=>p.external_reference===ref && p.payment_method_id==='pix' && p.status==='approved');
+  if(matches.length===0)return null;
+  const unique=new Map(matches.map(p=>[String(p.id),p]));
+  if(unique.size!==1)throw new Error('Mais de um PIX aprovado corresponde à cobrança. Confira manualmente antes de baixar.');
+  return [...unique.values()][0];
+}
+async function ipaReconcileApprovedPayment(env,payment){
+  if(payment?.status!=='approved')return {state:'pending',message:'Pagamento ainda não aprovado.'};
+  if(payment?.payment_method_id!=='pix')return {state:'not-pix',message:'Esta conciliação atende apenas PIX.'};
+  const ref=String(payment?.external_reference||'');
+  if(!/^indoporai_[a-zA-Z0-9_-]{3,120}$/.test(ref))return {state:'unmatched',message:'PIX sem referência do Indo por Aí. Não houve baixa.'};
+  const id=ref.slice('indoporai_'.length);
+  const {doc,token,url}=await ipaReadPaymentDoc(env,id);
+  const f=doc.fields||{};
+  const originalId=ipaPaymentString(f,'id')||id;
+  if(originalId!==id)throw Error('Identificador divergente na cobrança do Firebase.');
+  const amount=ipaPaymentNumber(f,'amount'),mpAmount=Number(payment.transaction_amount);
+  if(!Number.isFinite(amount)||!Number.isFinite(mpAmount)||Math.abs(amount-mpAmount)>0.005)throw Error('Valor do PIX não corresponde à parcela. Não houve baixa.');
+  const currency=ipaPaymentString(f,'currency')||'BRL';
+  if(currency!==String(payment.currency_id||''))throw Error('Moeda da cobrança não corresponde à do Mercado Pago.');
+  const currentMpId=ipaPaymentString(f,'mpPaymentId'),mpId=String(payment.id);
+  if(currentMpId&&currentMpId!==mpId)throw Error('A cobrança já está vinculada a outro pagamento Mercado Pago.');
+  const status=ipaPaymentString(f,'status');
+  if(status==='Pago'){
+    if(currentMpId!==mpId)throw Error('Cobrança já marcada como paga sem correspondência inequívoca. Revisão manual necessária.');
+    return {state:'already-paid',paymentId:id,mpPaymentId:mpId,message:'Pagamento já conciliado.'};
+  }
+  const now=new Date().toISOString(),paidAt=(payment.date_approved||now).slice(0,10);
+  const updates={status:{stringValue:'Pago'},paidAt:{stringValue:paidAt},mpPaymentId:{stringValue:mpId},mpStatus:{stringValue:'approved'},mpStatusDetail:{stringValue:String(payment.status_detail||'')},paymentEnvironment:{stringValue:'production'},reconciledAt:{stringValue:now},mpExternalReference:{stringValue:ref}};
+  const u=new URL(url);
+  for(const key of Object.keys(updates))u.searchParams.append('updateMask.fieldPaths',key);
+  u.searchParams.set('currentDocument.updateTime',doc.updateTime);
+  const result=await fetch(u.toString(),{method:'PATCH',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({fields:updates})});
+  if(!result.ok){const error=await result.json().catch(()=>({}));throw Error(result.status===409||result.status===412?'A cobrança foi modificada durante a conciliação. Atualize e tente novamente.':error?.error?.message||'Falha ao registrar baixa no Firebase.');}
+  return {state:'paid',paymentId:id,mpPaymentId:mpId,paidAt,message:'PIX aprovado e registrado no Firebase.'};
+}
+async function ipaAdminReconcilePix(request,env){
+  let identity;try{identity=await ipaAdminIdentity(request,env)}catch{return json({ok:false,error:'Falha ao validar o ADM.'},502)}
+  if(!identity)return json({ok:false,error:'Faça login como ADM.'},401);
+  if(identity.localId!==IPA_ADMIN_UID)return json({ok:false,error:'Apenas ADM.'},403);
+  let body={};try{body=await request.json()}catch{return json({ok:false,error:'Dados inválidos.'},400)}
+  const id=String(body.paymentId||'').trim();
+  if(!/^[a-zA-Z0-9_-]{3,120}$/.test(id))return json({ok:false,error:'Cobrança inválida.'},400);
+  try{
+    const {doc}=await ipaReadPaymentDoc(env,id);
+    const f=doc.fields||{};
+    const mpId=ipaPaymentString(f,'mpPaymentId');
+    let payment=null;
+    if(mpId){
+      if(!/^\d{5,25}$/.test(mpId))throw Error('ID do Mercado Pago inválido.');
+      const found=await mercadoPagoFetch(env,'/v1/payments/'+encodeURIComponent(mpId),{method:'GET'});
+      if(!found.ok)throw Error('O Mercado Pago não encontrou o pagamento vinculado.');
+      payment=found.body;
+    }else{payment=await ipaFindPaymentByReference(env,id);}
+    if(!payment)return json({ok:true,state:'not-found',message:'Nenhum PIX aprovado encontrado para esta referência. Se foi transferência direta, concilie manualmente após confirmar o comprovante.'});
+    const outcome=await ipaReconcileApprovedPayment(env,payment);
+    if(outcome.state==='paid'){
+      try{outcome.receipt=await ipaSendPaymentConfirmation(payment,env)}catch(e){outcome.receipt={error:'E-mail não enviado; baixa já registrada.'};console.error('Email reconciliation',e)}
+    }
+    return json({ok:true,...outcome});
+  }catch(e){console.error('PIX reconciliation rejected',e?.message);return json({ok:false,error:e.message||'Falha na conciliação. Nenhuma baixa foi feita.'},409)}
+}
+
 async function mercadoPagoWebhook(request,url,env){
   const verified=await verifyMpWebhook(request,url,env);
   if(!verified.ok)return json({ok:false,error:"Assinatura inválida."},401);
@@ -212,16 +294,21 @@ async function mercadoPagoWebhook(request,url,env){
     const result=await mercadoPagoFetch(env,`/v1/payments/${encodeURIComponent(dataId)}`,{method:"GET"});
     if(result.ok){
       const p=extractPixPayment(result.body);
-      // O webhook responde normalmente mesmo quando o serviço de e-mail falhar.
-      // Não confia no status do navegador: verifica o pagamento pela API do Mercado Pago.
-      let receipt={skipped:'Não aprovado'};
-      if(String(result.body?.status||'').toLowerCase()==='approved'){
-        try{receipt=await ipaSendPaymentConfirmation(result.body,env)}catch(e){console.error('payment receipt issue',e);receipt={error:'Não foi possível processar confirmação'}}
+      let reconciliation={state:'not-approved'},receipt={skipped:'Aguardando baixa'};
+      if(String(result.body?.status||'').toLowerCase()==='approved' && result.body?.payment_method_id==='pix'){
+        try{
+          reconciliation=await ipaReconcileApprovedPayment(env,result.body);
+          if(reconciliation.state==='paid'){
+            try{receipt=await ipaSendPaymentConfirmation(result.body,env)}catch(e){console.error('Receipt failed after ledger',e);receipt={error:'E-mail pendente'}}
+          }
+        }catch(e){console.error('PIX webhook conciliation',e);return json({ok:false,error:'Conciliação pendente; notificação deve ser repetida.'},503)}
       }
-      return json({ok:true,received:true,status:p.paymentStatus,externalReference:p.externalReference,setup:!!verified.setup,receipt});
+      return json({ok:true,received:true,status:p.paymentStatus,externalReference:p.externalReference,reconciliation:reconciliation.state,receipt});
     }
+    // Erro temporário no Mercado Pago: peça reenvio do webhook, não marque como recebido.
+    return json({ok:false,error:'Consulta ao Mercado Pago indisponível. Tente novamente.'},503);
   }
-  return json({ok:true,received:true,setup:!!verified.setup});
+  return json({ok:true,received:true});
 }
 
 
@@ -541,6 +628,7 @@ export default {
     const url = new URL(request.url);
 
     if (url.pathname === "/api/admin/payment-email" && (request.method === "GET" || request.method === "POST")) return ipaPaymentEmailSettings(request,env);
+    if (url.pathname === "/api/admin/reconcile-pix" && request.method === "POST") return ipaAdminReconcilePix(request,env);
     if (url.pathname === "/api/email/invite" && request.method === "POST") return ipaCustomInvite(request,env);
     if (url.pathname === "/api/email/test" && request.method === "POST") return ipaResendTest(request,env);
     if (url.pathname === "/api/maps/browser-key" && request.method === "GET") {

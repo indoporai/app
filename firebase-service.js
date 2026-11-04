@@ -28,6 +28,7 @@ import {
   orderBy,
   onSnapshot,
   updateDoc,
+  runTransaction,
   arrayUnion
 } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-firestore.js";
 import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-storage.js";
@@ -125,6 +126,28 @@ async function upsertCollection(name,items){
   }
 }
 
+async function upsertPaymentsPreservingApproved(items){
+  for(const payment of (items||[])){
+    if(!payment?.id)continue;
+    const ref=doc(firestore,'payments',String(payment.id));
+    const remote=await runTransaction(firestore,async transaction=>{
+      const snap=await transaction.get(ref);
+      const previous=snap.exists()?snap.data():null;
+      const approved=previous?.status==='Pago'&&previous?.mpStatus==='approved'&&previous?.mpPaymentId;
+      const guarded=approved?{
+        ...payment,status:'Pago',paidAt:previous.paidAt,mpPaymentId:previous.mpPaymentId,
+        mpStatus:'approved',mpStatusDetail:previous.mpStatusDetail||'',
+        paymentEnvironment:previous.paymentEnvironment||'production',reconciledAt:previous.reconciledAt||''
+      }:payment;
+      transaction.set(ref,{...guarded,updatedAt:serverTimestamp()},{merge:true});
+      return approved?previous:null;
+    });
+    if(remote&&window.IPAData?.updatePayment){
+      window.IPAData.updatePayment(payment.id,{status:'Pago',paidAt:remote.paidAt,mpPaymentId:remote.mpPaymentId,mpStatus:'approved',paymentEnvironment:remote.paymentEnvironment||'production'});
+    }
+  }
+}
+
 async function syncAll(data){
   if(!currentUser || currentUser.uid!==ADMIN_UID || syncing || !data) return;
   syncing = true;
@@ -132,7 +155,7 @@ async function syncAll(data){
     await Promise.all([
       upsertCollection("clients",data.clients),
       upsertCollection("trips",data.trips),
-      upsertCollection("payments",data.payments),
+      upsertPaymentsPreservingApproved(data.payments),
       upsertCollection("benefits",data.benefits),
       upsertCollection("itineraryTemplates",data.itineraryTemplates),
       upsertCollection("paymentPlans",data.paymentPlans),

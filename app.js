@@ -1214,6 +1214,20 @@ function bind(){
    }catch(e){if(status)status.textContent='Configuração indisponível: '+(e.message||'erro')}})();
    emailForm.onsubmit=async ev=>{ev.preventDefault();const btn=emailForm.querySelector('button[type="submit"]');btn.disabled=true;status.textContent='Salvando...';try{const token=await access();const body={enabled:emailForm.elements.enabled.checked,replyTo:emailForm.elements.replyTo.value.trim(),subject:emailForm.elements.subject.value.trim(),message:emailForm.elements.message.value.trim()};const r=await fetch('/api/admin/payment-email',{method:'POST',headers:{Authorization:'Bearer '+token,'content-type':'application/json'},body:JSON.stringify(body)});const j=await r.json();if(!r.ok||!j.ok)throw Error(j.error||'Falha');status.textContent='Configuração salva no servidor ✓';}catch(e){status.textContent='Falha ao salvar: '+(e.message||'erro')}finally{btn.disabled=false}};
  }
+ document.querySelectorAll('[data-admin-reconcile-pix]').forEach(btn=>btn.onclick=async()=>{
+   const id=btn.dataset.adminReconcilePix,old=btn.textContent;btn.disabled=true;btn.textContent='Consultando Mercado Pago...';
+   try{
+     const token=await window.IPAFirebase?.user?.getIdToken();if(!token)throw Error('Faça login como ADM.');
+     const res=await fetch('/api/admin/reconcile-pix',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({paymentId:id}),cache:'no-store'});
+     const data=await res.json();if(!res.ok||!data.ok)throw Error(data.error||'Não foi possível conciliar o PIX.');
+     if(data.state==='paid'||data.state==='already-paid'){
+       if(data.state==='paid')IPAData.updatePayment(id,{status:'Pago',paidAt:data.paidAt,mpPaymentId:data.mpPaymentId,mpStatus:'approved',paymentEnvironment:'production'});
+       toast(data.message||'PIX confirmado.');
+       if(data.state==='paid')render();
+       else {btn.textContent='Já conciliado';btn.disabled=true;}
+     }else{toast(data.message||'PIX ainda não conciliado.');btn.disabled=false;btn.textContent=old}
+   }catch(e){toast('PIX: '+(e.message||'Erro desconhecido'));btn.disabled=false;btn.textContent=old}
+ });
  document.querySelectorAll('[data-admin-remind]').forEach(b=>b.onclick=()=>toast('Lembrete enviado ao cliente'));
  document.querySelectorAll('[data-admin-exit]').forEach(b=>b.onclick=()=>showInitialScenario());
  document.querySelectorAll('[data-admin-invite-trip]').forEach(b=>b.onclick=async()=>{
@@ -3045,7 +3059,7 @@ function adminFinance(){
  <section class="ipa-admin-panel"><div class="ipa-admin-payment-list">${d.payments.map(p=>{
    const c=d.clients.find(x=>x.id===p.clientId);
    const t=d.trips.find(x=>x.id===p.tripId);
-   return `<div><span><b>${p.title}</b><small>${c?.name||'Cliente não vinculado'} · ${t?.name||p.trip||'Viagem'}</small><small>${p.description||''} · vence ${p.dueDate?new Date(p.dueDate+'T12:00:00').toLocaleDateString('pt-BR'):'-'}</small></span><strong>${adminMoney(p.amount)}</strong><em class="${p.status==='Pago'?'ok':'wait'}">${p.status}</em><button data-admin-remind="${p.id}">Lembrar</button></div>`;
+   return `<div><span><b>${p.title}</b><small>${c?.name||'Cliente não vinculado'} · ${t?.name||p.trip||'Viagem'}</small><small>${p.description||''} · vence ${p.dueDate?new Date(p.dueDate+'T12:00:00').toLocaleDateString('pt-BR'):'-'}</small></span><strong>${adminMoney(p.amount)}</strong><em class="${p.status==='Pago'?'ok':'wait'}">${p.status}</em>${p.status!=='Pago'?`<button type="button" class="ipa-reconcile-pix" data-admin-reconcile-pix="${ipaEscape(p.id)}">↻ Verificar PIX</button>`:''}<button data-admin-remind="${p.id}">Lembrar</button></div>`;
  }).join('')||'<p>Nenhuma cobrança criada.</p>'}</div></section>`;
 }
 function adminPartners(){const d=adminData();return `<div class="ipa-admin-head"><div><span class="eyebrow">MONETIZAÇÃO</span><h1>Parceiros</h1><p>Escolha os benefícios ativos.</p></div></div><section class="ipa-admin-panel"><div class="ipa-admin-partners">${d.benefits.map(b=>`<label><div><b>${b.title}</b><small>${b.sponsorLabel} · ${b.partner}</small></div><input type="checkbox" data-admin-benefit="${b.id}" ${b.enabled?'checked':''}></label>`).join('')}</div></section>`}
@@ -3289,10 +3303,6 @@ function ipaEnsureAdminConciergeListener(){
   const nav=document.querySelector('[data-admin-section="concierge"]');
   if(nav){const old=nav.querySelector('.ipa-notification-count');if(old)old.remove();if(ipaConciergePendingCount()){const badge=document.createElement('b');badge.className='ipa-notification-count';badge.textContent=String(ipaConciergePendingCount());nav.appendChild(badge)}}
   ipaRenderAiiPanel();
-  if(adminSection==='concierge'){
-    const content=document.querySelector('.ipa-admin-content');
-    if(content){content.innerHTML=adminConcierge();bind()}
-  }
  },e=>{console.error('Concierge em tempo real',e);toast('Não foi possível atualizar o Concierge: '+(e.message||'erro'))});
 }
 
@@ -3352,7 +3362,8 @@ function ipaRenderAiiPanel(){
  const threads=ipaConciergeAdminRequests;
  const r=threads.find(x=>x.id===ipaAiiThreadId);
  if(!r){pane.innerHTML=`<p class="ipa-aii-hint">Atendimentos recentes</p>${threads.slice(0,35).map(x=>{const c=adminData().clients.find(z=>z.id===x.clientId);return `<button type="button" class="ipa-aii-thread" data-aii-thread="${ipaEscape(x.id)}"><strong>${ipaEscape(c?.name||x.requesterName||'Viajante')}</strong><small>${ipaEscape(x.type||'Pedido')} · ${ipaEscape(x.status||'Enviado')}</small></button>`}).join('')||'<p class="ipa-aii-empty">Nenhum atendimento recebido.</p>'}`;}
- else{pane.innerHTML=`<button class="ipa-aii-back" id="ipaAiiBack" type="button">← Conversas</button><div class="ipa-aii-messages">${ipaConciergeMessagesHtml(r)}</div><form id="ipaAiiSendForm"><label for="ipaAiiText">Responder viajante</label><textarea id="ipaAiiText" rows="2" maxlength="3000" required placeholder="Escreva sua resposta..."></textarea><button class="btn btn-primary" type="submit">Enviar mensagem</button><small id="ipaAiiError" aria-live="polite"></small></form>`;pane.querySelector('.ipa-aii-messages').scrollTop=pane.querySelector('.ipa-aii-messages').scrollHeight;}
+ else{pane.innerHTML=`<button class="ipa-aii-back" id="ipaAiiBack" type="button">← Conversas</button><div class="ipa-aii-messages">${ipaConciergeMessagesHtml(r)}</div><div class="ipa-aii-management"><label>Status do atendimento<select id="ipaAiiStatus">${['Enviado','Em análise','Respondido','Concluído'].map(s=>`<option value="${s}" ${s===(r.status||'Enviado')?'selected':''}>${s}</option>`).join('')}</select></label><label>Nota interna (não enviada ao cliente)<textarea id="ipaAiiNote" rows="2" maxlength="3000">${ipaEscape(r.adminReply||'')}</textarea></label><button type="button" class="btn btn-light" id="ipaAiiSaveStatus">Salvar atendimento</button><small id="ipaAiiSaveError" aria-live="polite"></small></div><form id="ipaAiiSendForm"><label for="ipaAiiText">Responder viajante</label><textarea id="ipaAiiText" rows="2" maxlength="3000" required placeholder="Escreva sua resposta..."></textarea><button class="btn btn-primary" type="submit">Enviar mensagem</button><small id="ipaAiiError" aria-live="polite"></small></form>`;pane.querySelector('.ipa-aii-messages').scrollTop=pane.querySelector('.ipa-aii-messages').scrollHeight;}
+ const saveStatus=pane.querySelector('#ipaAiiSaveStatus');if(saveStatus)saveStatus.onclick=async()=>{saveStatus.disabled=true;const feedback=pane.querySelector('#ipaAiiSaveError');feedback.textContent='Salvando...';try{const fields={status:pane.querySelector('#ipaAiiStatus').value,adminReply:pane.querySelector('#ipaAiiNote').value};await window.IPAFirebase.updateConciergeRequest(r.id,fields);Object.assign(r,fields);feedback.textContent='Atendimento salvo ✓';}catch(e){feedback.textContent='Não foi possível salvar: '+(e.message||'erro')}finally{saveStatus.disabled=false}};
  pane.querySelectorAll('[data-aii-thread]').forEach(b=>b.onclick=()=>{ipaAiiThreadId=b.dataset.aiiThread;ipaRenderAiiPanel()});
  pane.querySelector('#ipaAiiBack')?.addEventListener('click',()=>{ipaAiiThreadId='';ipaRenderAiiPanel()});
  const form=pane.querySelector('#ipaAiiSendForm');if(form)form.onsubmit=async e=>{e.preventDefault();const btn=form.querySelector('button'),input=form.querySelector('#ipaAiiText'),msg=input.value.trim();if(!msg)return;btn.disabled=true;try{await window.IPAFirebase.sendConciergeMessage(ipaAiiThreadId,msg);input.value='';}catch(err){form.querySelector('#ipaAiiError').textContent=err.message||'Não foi possível enviar';}finally{btn.disabled=false}};
@@ -3365,6 +3376,7 @@ function ipaBindAiiWidget(){
 }
 
 function adminIntegratedView(){
+ if(adminSection==='concierge')adminSection='dashboard';
  const service=window.IPAFirebase;
  if(!service?.user) return adminLoginView();
  const views={dashboard:adminDashboard,leads:adminLeads,concierge:adminConcierge,clients:adminClients,trips:adminTrips,places:adminPlaces,hotels:adminHotels,templates:adminTemplates,finance:adminFinance,live:adminLive,partners:adminPartners};
@@ -3373,7 +3385,7 @@ function adminIntegratedView(){
     <div><b>Indo por Aí</b><small>BUSINESS</small></div>
     <div class="firebase-admin-actions">${adminCloudBadge()}<button data-firebase-sync>↻ Sincronizar</button><button data-firebase-logout>Sair</button><button data-admin-exit>← Voltar</button></div>
    </div>
-   <div class="ipa-admin-nav">${[['dashboard','⌂','Dashboard'],['leads','📩','Pedidos'],['concierge','💬','Concierge'],['clients','👤','Clientes'],['trips','✈️','Viagens'],['places','📍','Lugares'],['hotels','🏨','Hospedagens'],['templates','🗺️','Roteiros'],['finance','💳','Financeiro'],['live','🔴','Live'],['partners','☆','Parceiros']].map(([k,i,l])=>`<button data-admin-section="${k}" class="${adminSection===k?'active':''}">${i}<span>${l}</span>${k==='concierge'&&ipaConciergePendingCount()?`<b class="ipa-notification-count" aria-label="${ipaConciergePendingCount()} atendimentos pendentes">${ipaConciergePendingCount()}</b>`:''}${k==='leads'&&(adminData().travelLeads||[]).filter(x=>(x.status||'Novo')==='Novo').length?`<b class="ipa-notification-count">${(adminData().travelLeads||[]).filter(x=>(x.status||'Novo')==='Novo').length}</b>`:''}</button>`).join('')}</div>
+   <div class="ipa-admin-nav">${[['dashboard','⌂','Dashboard'],['leads','📩','Pedidos'],['clients','👤','Clientes'],['trips','✈️','Viagens'],['places','📍','Lugares'],['hotels','🏨','Hospedagens'],['templates','🗺️','Roteiros'],['finance','💳','Financeiro'],['live','🔴','Live'],['partners','☆','Parceiros']].map(([k,i,l])=>`<button data-admin-section="${k}" class="${adminSection===k?'active':''}">${i}<span>${l}</span>${k==='concierge'&&ipaConciergePendingCount()?`<b class="ipa-notification-count" aria-label="${ipaConciergePendingCount()} atendimentos pendentes">${ipaConciergePendingCount()}</b>`:''}${k==='leads'&&(adminData().travelLeads||[]).filter(x=>(x.status||'Novo')==='Novo').length?`<b class="ipa-notification-count">${(adminData().travelLeads||[]).filter(x=>(x.status||'Novo')==='Novo').length}</b>`:''}</button>`).join('')}</div>
    <div class="ipa-admin-content">${(views[adminSection]||adminDashboard)()}</div>
    ${ipaAiiWidgetHtml()}
   </div>`;

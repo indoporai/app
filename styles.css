@@ -1500,3 +1500,10 @@ dialog:has(#routeCatalogPlace) .smart-place-actions button{
 @media(max-width:560px){.ipa-aii-widget{right:12px;bottom:calc(84px + env(safe-area-inset-bottom))}.ipa-aii-panel{height:min(440px,calc(100dvh - 170px))}}
 
 .ipa-payment-email form{display:grid;gap:12px}.ipa-payment-email form>label{display:grid;gap:5px;font-size:13px;font-weight:700}.ipa-payment-email form input:not([type=checkbox]),.ipa-payment-email form textarea{width:100%;box-sizing:border-box;padding:11px;border:1px solid #ccdedf;border-radius:10px;background:#fff;font:inherit}.ipa-payment-email-switch{display:flex!important;gap:9px!important;align-items:center}.ipa-payment-email form small{color:#607e82}.ipa-payment-email form button{justify-self:start}.ipa-payment-email form [role=status]{font-size:12px;color:#075668}
+
+/* Beta 6.30.32 — manage concierge in floating Aí only */
+.ipa-aii-management{display:grid;gap:7px;border:1px solid #dce9e9;background:#f7fbfb;border-radius:12px;padding:10px;margin:10px 0}
+.ipa-aii-management label{display:grid;gap:4px;font-size:12px;font-weight:700;color:#134250}
+.ipa-aii-management select,.ipa-aii-management textarea{width:100%;max-width:100%;box-sizing:border-box;font:inherit;font-size:13px;border:1px solid #d5e1e1;border-radius:9px;background:#fff;padding:8px}
+.ipa-reconcile-pix{background:#e9f7f5;border:1px solid #b7dddb;border-radius:10px;padding:9px 12px;color:#056c75;font-weight:800;cursor:pointer}
+.ipa-reconcile-pix:disabled{opacity:.65;cursor:wait}

@@ -1,0 +1,1 @@
+Beta 6.30.32: conciliação de PIX no webhook e botão Verificar PIX no Financeiro do ADM. Só dá baixa após validar status, método, referência, valor e moeda no Mercado Pago. O Aí agora oferece status e nota interna; aba antiga Concierge removida sem apagar os atendimentos. Testar em staging e produção; credenciais Firestore e webhook necessárias.
