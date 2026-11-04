@@ -1,0 +1,8 @@
+INDO POR AÍ — BETA 6.30.36
+
+1. Removido o quadro “PRÓXIMAS AÇÕES / O que precisa da sua atenção” do Dashboard ADM em app.js e do painel alternativo admin.js.
+2. Substituídos os ícones do PWA (192/512, Apple e favicon) por versões quadradas com o logotipo oficial fornecido pelo usuário, preservando os pixels do desenho e o arquivo original.
+3. Logo oficial também exibido no cabeçalho da tela principal do cliente.
+4. Cache PWA atualizado; concierge Mochilito e todas as demais funções da beta 6.30.35 preservadas.
+
+NOTA: Atualizações do ícone de aplicativos já instalados podem exigir remover o atalho e instalar novamente.

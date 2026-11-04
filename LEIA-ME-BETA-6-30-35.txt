@@ -1,0 +1,5 @@
+Beta 6.30.35 — Mochilito (Concierge Indo por Aí)
+
+Alterado apenas nome e identificação visual do chat flutuante do cliente e do ADM. Fluxos, IDs internos, Firebase, Mercado Pago e integrações preservados. Atualizado cache do PWA para versão 6.30.35.
+
+Observação: arquivos de versões anteriores e Netlify permanecem no pacote por cautela; podem ser tratados em uma limpeza separada, depois de validar as dependências.
