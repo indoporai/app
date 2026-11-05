@@ -1615,3 +1615,18 @@ dialog:has(#routeCatalogPlace) .smart-place-actions button{
  .ipa-transport-leg{margin-left:18px!important;margin-right:0!important}
  .during-personalized-hero::before{width:165px;height:165px;right:-35px;top:7px}
 }
+
+/* Beta 6.30.42 — etapas do roteiro nitidamente separadas */
+.during-place-list{display:flex!important;flex-direction:column!important;gap:0!important;padding:0 2px 16px!important}
+.during-place-list>.during-place-card{width:100%!important;box-sizing:border-box!important;margin:16px 0 0!important;border:2px solid #bdd8dd!important;background:#fff!important;border-radius:24px!important;box-shadow:0 12px 26px rgba(4,54,68,.12)!important;padding:18px!important;overflow:hidden}
+.during-place-list>.during-place-card:first-child{margin-top:10px!important}
+.during-place-card::before{width:7px!important;background:linear-gradient(180deg,#f87921 0%,#0b8290 100%)!important}
+.during-place-card .ipa-during-stop-kicker{background:linear-gradient(105deg,#075667,#0b8290)!important;color:#fff!important;border-radius:13px!important;padding:11px 14px!important;font-size:12px!important;letter-spacing:.1em!important;box-shadow:0 4px 10px rgba(4,54,68,.12)}
+.during-place-card .ipa-during-stop-kicker span{color:#d1f6f5!important;font-weight:700!important}
+.during-place-card .during-place-details{margin-top:6px!important;padding-top:15px!important;border-top:2px solid #e4eff0!important}
+.during-place-card .during-place-title b{font-size:19px!important;color:#063f52!important}
+.during-place-list>.ipa-transport-leg{box-sizing:border-box!important;position:relative!important;margin:12px 14px 4px 14px!important;padding:18px!important;border-radius:18px!important;background:#eaf6f7!important;border:1px dashed #75bac0!important;border-left:5px solid #ff7119!important;box-shadow:none!important}
+.during-place-list>.ipa-transport-leg::before{content:'↓'!important;position:absolute!important;top:-22px!important;left:calc(50% - 15px)!important;width:30px!important;height:28px!important;border-radius:20px!important;color:#fff!important;background:#f87921!important;display:flex!important;align-items:center!important;justify-content:center!important;font-weight:900!important;z-index:2!important}
+.ipa-transport-leg .ipa-between-stops-label{color:#a65a13!important}
+.ipa-direct-maps-link{display:flex!important;align-items:center;justify-content:center;text-align:center;text-decoration:none!important;margin-top:14px!important;min-height:48px}
+@media(max-width:550px){.during-place-list>.during-place-card{margin-top:17px!important;padding:15px!important}.during-place-list>.ipa-transport-leg{margin:16px 6px 7px 12px!important;padding:14px!important}.during-place-card .ipa-during-stop-kicker{padding:10px!important;font-size:11px!important}}

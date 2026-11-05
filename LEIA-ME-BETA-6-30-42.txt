@@ -1,0 +1,6 @@
+BETA 6.30.42 — separação visual de paradas e navegação Google Maps
+
+1. Cards individuais com contorno reforçado, faixa PARADA em azul-petróleo, margem maior e blocos de transporte destacados.
+2. Corrigida pré-abertura de uma aba de Google Maps enquanto GPS aguardava resposta, que poderia gerar tela branca intermediária. Agora o app apresenta um link definitivo após localizar o viajante; um toque abre o Maps sem aba vazia pré-aberta.
+3. A exibição de uma janela com X para voltar é controlada pelo navegador/sistema operacional, especialmente quando o PWA está instalado. Não é possível garantir fechamento automático dessa janela por JavaScript.
+4. Preservados Firebase, pagamentos, Mochilito e identidade original.

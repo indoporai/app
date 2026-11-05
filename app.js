@@ -2875,29 +2875,29 @@ function ipaOpenNavigationForPlace(place,trip){
  const getMode=()=>modalContent.querySelector('input[name="ipa-nav-mode"]:checked')?.value||'transit';
  const routeURL=(mode,origin)=>'https://www.google.com/maps/dir/?api=1&destination='+encodeURIComponent(destination)+'&travelmode='+encodeURIComponent(mode)+(origin?'&origin='+encodeURIComponent(origin):'');
  const openRoute=(mode,useGPS)=>{
-  // Abre o Maps IMEDIATAMENTE com um destino válido: nunca cria guia about:blank.
-  // Quando o GPS responder, atualiza a rota nesta mesma guia (se ainda disponível).
-  // O aplicativo original permanece aberto e conserva dia, rota e posição de rolagem.
+  // Não pré-abre uma janela do Maps enquanto o GPS pede permissão.
+  // Pré-abertura + troca de endereço entre domínios criava uma janela intermediária
+  // em navegadores/PWAs móveis; o usuário acabava vendo uma página branca com X.
+  // O link final fica pronto para um único toque explícito (sem pop-up vazio).
   ipaSaveClientPage();
-  const initialUrl=routeURL(mode,'');
-  const tab=window.open(initialUrl,'_blank');
-  const go=origin=>{
-   const url=routeURL(mode,origin);
-   ipaSaveClientPage();
-   if(tab&&!tab.closed){
-    if(origin){try{tab.location.href=url}catch(e){console.warn('Maps já aberto; ajuste a origem no Maps.',e)}}
-   }else{
-    // Navegação na própria aba só quando o bloqueador impedir uma nova guia.
-    window.location.assign(url);
-   }
-   try{modal.close()}catch(_){}
-  };
-  if(!useGPS||!navigator.geolocation){go('');return;}
   const status=modalContent.querySelector('#ipaNavigationStatus');
+  const launch=origin=>{
+   const url=routeURL(mode,origin);
+   const previous=modalContent.querySelector('#ipaFinalMapsLink');
+   if(previous)previous.remove();
+   const link=document.createElement('a');
+   link.id='ipaFinalMapsLink';link.className='btn btn-primary btn-block ipa-direct-maps-link';
+   link.href=url;link.target='_blank';link.rel='noopener noreferrer external';
+   link.textContent='🗺️ Abrir rota no Google Maps ↗';
+   link.addEventListener('click',()=>{ipaSaveClientPage();try{modal.close()}catch(_){}});
+   if(status){status.textContent=origin?'Localização encontrada! Toque abaixo para abrir a rota diretamente no Google Maps.':'Toque abaixo para abrir a rota. O Google Maps poderá usar sua localização atual.';status.after(link)}
+   else modalContent.appendChild(link);
+  };
+  if(!useGPS||!navigator.geolocation){launch('');return;}
   if(status)status.textContent='📍 Obtendo localização atual com sua autorização...';
   navigator.geolocation.getCurrentPosition(
-   pos=>go(pos.coords.latitude.toFixed(6)+','+pos.coords.longitude.toFixed(6)),
-   ()=>{if(status)status.textContent='Localização não disponível ou não autorizada. O Google Maps permitirá escolher a origem.';go('')},
+   pos=>launch(pos.coords.latitude.toFixed(6)+','+pos.coords.longitude.toFixed(6)),
+   ()=>launch(''),
    {enableHighAccuracy:true,timeout:12000,maximumAge:0}
   );
  };
