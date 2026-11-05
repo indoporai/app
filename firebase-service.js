@@ -486,8 +486,24 @@ async function loadClientExperience(){
     history.replaceState({},document.title,clean.pathname+(clean.searchParams.toString()?("?"+clean.searchParams.toString()):""));
   }catch(e){}
 
+  // O registro remoto é não bloqueante e não impede o viajante de usar o app.
+  void ipaTrackClientSession(client.id);
   notify("ipa-client-experience-ready");
   return cloudData;
+}
+
+// Uma sessão por aba autenticada. Recarregar/trocar de tela não gera outro acesso.
+async function ipaTrackClientSession(clientId){
+  if(!currentUser||currentUser.uid===ADMIN_UID||!clientId)return;
+  try{
+    const key='ipa-client-session-v1';
+    let sessionId=sessionStorage.getItem(key);
+    if(!sessionId){sessionId=crypto.randomUUID();sessionStorage.setItem(key,sessionId)}
+    const token=await currentUser.getIdToken();
+    const r=await fetch('/api/client/access',{method:'POST',headers:{authorization:'Bearer '+token,'content-type':'application/json'},body:JSON.stringify({clientId,sessionId}),cache:'no-store'});
+    const data=await r.json().catch(()=>({}));
+    if(!r.ok||!data.ok)console.warn('Registro de sessão indisponível:',data.error||r.status);
+  }catch(e){console.warn('Não foi possível registrar o acesso:',e?.message||e)}
 }
 
 async function bootstrapAfterLogin(){
@@ -513,6 +529,7 @@ async function bootstrapAfterLogin(){
 onAuthStateChanged(auth,async user=>{
   currentUser=user||null;
   if(!user){
+    try{sessionStorage.removeItem('ipa-client-session-v1')}catch(e){}
     status="signed-out";
     initialized=false;
     notify("ipa-firebase-ready");

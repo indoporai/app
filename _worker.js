@@ -622,10 +622,80 @@ async function ipaClimateDiscover(request,env){
  return new Response(JSON.stringify({ok:true,links,sources,disclaimer:'Links específicos encontrados em catálogos públicos; a disponibilidade e o acesso dependem da plataforma.'}),{headers:{'content-type':'application/json; charset=utf-8','cache-control':'public, max-age=3600, s-maxage=43200','x-content-type-options':'nosniff'}});
 }
 
+// Beta 6.30.38 — monitoramento autenticado de sessões de clientes.
+// Mantido em coleção isolada para não interferir no CRM nem na sincronização de clientes.
+const IPA_ACCESS_ROOT=`https://firestore.googleapis.com/v1/projects/${IPA_FIREBASE_PROJECT}/databases/(default)/documents`;
+function ipaAccessField(f,k){return f?.[k]?.stringValue||'';}
+async function ipaAccessRequest(request,env){
+  let identity;
+  try{identity=await ipaAdminIdentity(request,env)}catch{return json({ok:false,error:'Falha ao validar sessão.'},502)}
+  if(!identity)return json({ok:false,error:'Sessão não autenticada.'},401);
+  if(request.method==='GET'){
+    if(identity.localId!==IPA_ADMIN_UID)return json({ok:false,error:'Apenas o administrador pode consultar acessos.'},403);
+    try{
+      const token=await ipaGoogleServiceToken(env,'https://www.googleapis.com/auth/datastore');
+      let next='',pages=0,stats={};
+      do{
+        const u=IPA_ACCESS_ROOT+'/clientAccessStats?pageSize=300'+(next?'&pageToken='+encodeURIComponent(next):'');
+        const r=await fetch(u,{headers:{Authorization:'Bearer '+token},cache:'no-store'});
+        if(r.status===404)break;
+        const d=await r.json().catch(()=>({}));
+        if(!r.ok)throw Error(d?.error?.message||'Falha ao buscar acessos ('+r.status+').');
+        for(const item of d.documents||[]){
+          const id=decodeURIComponent((item.name||'').split('/').pop()||'');
+          if(!id)continue;
+          stats[id]={count:Number(item.fields?.count?.integerValue||0),lastAccessAt:item.fields?.lastAccessAt?.timestampValue||null};
+        }
+        next=d.nextPageToken||'';
+      }while(next && ++pages<20);
+      return json({ok:true,stats});
+    }catch(e){console.error('Client access stats read failed',e.message);return json({ok:false,error:'Não foi possível consultar os acessos.'},502)}
+  }
+  if(request.method!=='POST')return json({ok:false,error:'Método inválido.'},405);
+  if(identity.localId===IPA_ADMIN_UID)return json({ok:false,error:'Contagem restrita aos viajantes.'},403);
+  let body={};try{body=await request.json()}catch{return json({ok:false,error:'Dados inválidos.'},400)}
+  const clientId=String(body.clientId||'');
+  const sessionId=String(body.sessionId||'');
+  if(!/^[a-zA-Z0-9_-]{3,120}$/.test(clientId)||!/^[a-zA-Z0-9-]{20,80}$/.test(sessionId))return json({ok:false,error:'Identificação de sessão inválida.'},400);
+  try{
+    const token=await ipaGoogleServiceToken(env,'https://www.googleapis.com/auth/datastore');
+    const clientResponse=await fetch(IPA_ACCESS_ROOT+'/clients/'+encodeURIComponent(clientId),{headers:{Authorization:'Bearer '+token},cache:'no-store'});
+    if(!clientResponse.ok)return json({ok:false,error:'Cliente não encontrado ou indisponível.'},clientResponse.status===404?404:502);
+    const clientDoc=await clientResponse.json();const fields=clientDoc.fields||{};
+    const mail=String(identity.email||'').toLowerCase().trim();
+    const registered=ipaAccessField(fields,'email').trim().toLowerCase();
+    const uid=ipaAccessField(fields,'authUid');
+    if(!mail || (uid!==identity.localId && registered!==mail))return json({ok:false,error:'Acesso não corresponde ao cadastro.'},403);
+    // Hash impede caracteres não confiáveis no nome do documento.
+    const raw=new TextEncoder().encode(identity.localId+'|'+sessionId);
+    const digest=new Uint8Array(await crypto.subtle.digest('SHA-256',raw));
+    const sessionKey=[...digest].map(v=>v.toString(16).padStart(2,'0')).join('');
+    const sessionName=`projects/${IPA_FIREBASE_PROJECT}/databases/(default)/documents/clientAccessSessions/${sessionKey}`;
+    const statsName=`projects/${IPA_FIREBASE_PROJECT}/databases/(default)/documents/clientAccessStats/${clientId}`;
+    const writes=[
+      {update:{name:sessionName,fields:{clientId:{stringValue:clientId},uid:{stringValue:identity.localId}}},currentDocument:{exists:false}},
+      {transform:{document:statsName,fieldTransforms:[
+        {fieldPath:'count',increment:{integerValue:'1'}},
+        {fieldPath:'lastAccessAt',setToServerValue:'REQUEST_TIME'}
+      ]}}
+    ];
+    const r=await fetch(`https://firestore.googleapis.com/v1/projects/${IPA_FIREBASE_PROJECT}/databases/(default)/documents:commit`,{method:'POST',headers:{Authorization:'Bearer '+token,'content-type':'application/json'},body:JSON.stringify({writes})});
+    const result=await r.json().catch(()=>({}));
+    if(!r.ok){
+      // Documento da sessão já criado: repetição de carregamento não incrementa.
+      if(r.status===409 || (r.status===400 && ['ALREADY_EXISTS','FAILED_PRECONDITION'].includes(result?.error?.status)))return json({ok:true,alreadyRecorded:true});
+      console.error('Client access session commit failed',r.status,result?.error?.status||'');
+      return json({ok:false,error:'Não foi possível registrar a sessão.'},502);
+    }
+    return json({ok:true,recorded:true});
+  }catch(e){console.error('Client access tracking failed',e.message);return json({ok:false,error:'Erro no registro de acesso.'},502)}
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
 
+    if (url.pathname === "/api/client/access" && (request.method === "POST" || request.method === "GET")) return ipaAccessRequest(request,env);
     if (url.pathname === "/api/admin/payment-email" && (request.method === "GET" || request.method === "POST")) return json({ok:false,error:"A configuração do e-mail é fixa desde a Beta 6.30.33."},410);
     if (url.pathname === "/api/admin/reconcile-pix" && request.method === "POST") return ipaAdminReconcilePix(request,env);
     if (url.pathname === "/api/email/invite" && request.method === "POST") return ipaCustomInvite(request,env);

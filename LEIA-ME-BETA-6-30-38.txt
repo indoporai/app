@@ -1,0 +1,11 @@
+Indo por Aí — Beta 6.30.38 — Acessos dos clientes
+
+- ADM > Clientes: sessões por cliente e último acesso, horário de Brasília, clientes ativos nos últimos 7 dias, botão Atualizar acessos.
+- Captura automática apenas após o cliente autenticado carregar uma viagem publicada; uma vez por aba/sessão.
+- Cloudflare Pages _worker.js: POST /api/client/access protegido pelo ID token Firebase; confirma que o cliente pertence ao usuário antes de gravar.
+- Endpoint GET /api/client/access restrito ao UID ADM.
+- Firestore: clientAccessSessions e clientAccessStats. Serviço Cloudflare com Cloud Datastore User é necessário (já configurado no ambiente).
+- Não altera registros existentes de clients/trips/payments. Os contadores começam em zero.
+- Não modifica PIX, e-mails, identidade visual, Mochilito ou experiências aprovadas.
+- A implantação deve ser testada no Cloudflare com um login real de cliente e conferência no ADM.
+- Acompanhantes com contas vinculadas ao mesmo cadastro contam no titular por clientId.

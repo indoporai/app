@@ -154,6 +154,7 @@ function render(){
  if(state.profile==='client')ipaBindClientAiiWidget();
  ipaUpdateProfileButton();
  if(state.route==='admin'&&state.profile==='admin')ipaEnsureAdminConciergeListener();
+ if(state.route==='admin'&&state.profile==='admin'&&adminSection==='clients')void ipaRefreshAdminAccessStats();
  ipaLastRenderedScreen=screen;
  // Avoid scrolling to the top on every background update.
  // Restoring after layout avoids jumps when content is re-rendered.
@@ -1091,6 +1092,7 @@ function bind(){
   }catch(e){toast('Não foi possível excluir: '+(e.message||'erro'));b.disabled=false;b.textContent='🗑 Excluir'}
  });
  document.querySelectorAll('[data-concierge-save]').forEach(b=>b.onclick=async()=>{const id=b.dataset.conciergeSave,status=document.querySelector('[data-concierge-status="'+id+'"]')?.value,adminReply=document.querySelector('[data-concierge-reply="'+id+'"]')?.value;b.disabled=true;try{await window.IPAFirebase.updateConciergeRequest(id,{status,adminReply});const r=ipaConciergeAdminRequests.find(x=>x.id===id);if(r)Object.assign(r,{status,adminReply});toast('Atendimento salvo no Firebase ✓');render()}catch(e){toast('Falha ao salvar atendimento: '+(e.message||'erro'));b.disabled=false}});
+ document.querySelectorAll('[data-refresh-access-stats]').forEach(b=>b.onclick=()=>{ipaAdminAccessFetchedAt=0;b.disabled=true;ipaRefreshAdminAccessStats(true).finally(()=>{b.disabled=false})});
  document.querySelectorAll('[data-admin-section]').forEach(b=>b.onclick=()=>{adminSection=b.dataset.adminSection;adminTripId=null;state.route='admin';render()});
  document.querySelectorAll('[data-admin-delete-trip]').forEach(b=>b.onclick=async()=>{
    const id=b.dataset.adminDeleteTrip,trip=(adminData().trips||[]).find(t=>t.id===id);
@@ -3037,9 +3039,46 @@ function ipaSelectClientTripAction(clientId,action){
  }
  select.onchange=refresh;refresh();
 }
+// Acessos consultados exclusivamente pelo ADM; nunca incluídos no banco local do viajante.
+let ipaAdminAccessStats={};
+let ipaAdminAccessFetchedAt=0;
+let ipaAdminAccessLoading=false;
+function ipaFormatAccessDate(value){
+ if(!value)return 'Ainda não acessou';
+ const date=new Date(value);
+ if(!Number.isFinite(date.getTime()))return 'Ainda não acessou';
+ return new Intl.DateTimeFormat('pt-BR',{timeZone:'America/Sao_Paulo',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}).format(date)+' (Brasília)';
+}
+async function ipaRefreshAdminAccessStats(force=false){
+ if(ipaAdminAccessLoading || (!force&&Date.now()-ipaAdminAccessFetchedAt<60000))return;
+ if(!window.IPAFirebase?.user||adminSection!=='clients')return;
+ ipaAdminAccessLoading=true;
+ try{
+  const token=await window.IPAFirebase.user.getIdToken();
+  const r=await fetch('/api/client/access',{headers:{authorization:'Bearer '+token},cache:'no-store'});
+  const data=await r.json();
+  if(!r.ok||!data.ok)throw Error(data.error||'Falha na consulta');
+  ipaAdminAccessStats=data.stats||{};
+  ipaAdminAccessFetchedAt=Date.now();
+  if(state.profile==='admin'&&adminSection==='clients'&&state.route==='admin'){
+   document.querySelectorAll('[data-ipa-access-id]').forEach(el=>{
+    const stats=ipaAdminAccessStats[el.dataset.ipaAccessId]||{};
+    const counter=el.querySelector('[data-ipa-access-count]');
+    const when=el.querySelector('[data-ipa-access-last]');
+    if(counter)counter.textContent=String(stats.count||0);
+    if(when)when.textContent=ipaFormatAccessDate(stats.lastAccessAt);
+   });
+   const recent=Object.values(ipaAdminAccessStats).filter(s=>s.lastAccessAt&&Date.now()-Date.parse(s.lastAccessAt)<7*86400000).length;
+   const summary=document.querySelector('[data-ipa-access-recent]');
+   if(summary)summary.textContent=String(recent);
+  }
+ }catch(err){console.warn('Estatísticas de acesso indisponíveis',err?.message||err)}
+ finally{ipaAdminAccessLoading=false}
+}
+
 function adminClients(){
  const d=adminData();
- return `<div class="ipa-admin-head"><div><span class="eyebrow">CRM</span><h1>Clientes</h1><p>Gerencie o cadastro e publique viagens finalizadas.</p></div><div class="lead-actions"><button class="btn btn-primary" data-admin-new-client>+ Novo cliente</button><button class="btn btn-light" data-admin-smart-client-trip>✨ Criar viagem inteligente</button></div></div><div class="ipa-admin-client-grid">${d.clients.map(c=>{const a=ipaAccessUsage(c,d),pending=(c.approvalStatus||'Aprovado')!=='Aprovado',ts=d.trips.filter(t=>t.clientId===c.id),published=ts.some(t=>t.published);return `<article class="ipa-client-card"><div class="ipa-client-card-head"><div class="ipa-admin-avatar">${ipaEscape((c.name||'C').split(' ').map(x=>x[0]).slice(0,2).join(''))}</div><div class="ipa-client-card-identity"><h3>${ipaEscape(c.name||'Cliente')}</h3><p>${ipaEscape(c.email||'Sem e-mail')}</p><p>${ipaEscape(c.phone||'')}</p></div><button class="ipa-client-edit" data-admin-edit-client="${ipaEscape(c.id)}" aria-label="Editar cadastro do cliente">✏️ <span>Editar</span></button></div><div class="ipa-client-tags"><span>${ipaEscape(c.plan||'Explore')}</span><span>${ipaEscape(c.clientType||'Titular')}</span><span class="${pending?'ipa-client-status-pending':'ipa-client-status-ok'}">${pending?'● Pendente':'● Aprovado'}</span></div><div class="ipa-client-trip-status"><span>✈️ ${ts.length} ${ts.length===1?'viagem':'viagens'}</span><span>👤 ${a.used} de ${a.total===Infinity?'∞':a.total} acessos</span></div><div class="ipa-client-actions"><button class="btn btn-light" data-client-open-trips="${ipaEscape(c.id)}">✈️ ${ts.length?'Ver viagens':'Criar viagem'}</button><button class="btn btn-light" data-admin-smart-client-trip="${ipaEscape(c.id)}">✨ Nova viagem</button><button class="btn btn-light" data-client-manage-trip="${ipaEscape(c.id)}">✏️ Editar viagem</button><button class="btn btn-light ipa-client-delete" data-client-delete-trip="${ipaEscape(c.id)}">🗑 Excluir viagem</button></div><button class="btn btn-primary ipa-client-publish" data-client-publish-trip="${ipaEscape(c.id)}">${published?'✉️ Publicar / reenviar aviso':'🚀 Publicar viagem'}</button></article>`}).join('')||'<div class="smart-empty"><b>Nenhum cliente cadastrado.</b></div>'}</div>`;
+ return `<div class="ipa-admin-head"><div><span class="eyebrow">CRM</span><h1>Clientes</h1><p>Gerencie o cadastro e publique viagens finalizadas.</p></div><div class="lead-actions"><button class="btn btn-primary" data-admin-new-client>+ Novo cliente</button><button class="btn btn-light" data-admin-smart-client-trip>✨ Criar viagem inteligente</button></div></div><div class="ipa-admin-access-summary">📊 Clientes ativos nos últimos 7 dias: <b data-ipa-access-recent>${Object.values(ipaAdminAccessStats).filter(s=>s.lastAccessAt&&Date.now()-Date.parse(s.lastAccessAt)<7*86400000).length}</b> <button type="button" class="btn btn-light" data-refresh-access-stats>↻ Atualizar acessos</button></div><div class="ipa-admin-client-grid">${d.clients.map(c=>{const a=ipaAccessUsage(c,d),pending=(c.approvalStatus||'Aprovado')!=='Aprovado',ts=d.trips.filter(t=>t.clientId===c.id),published=ts.some(t=>t.published);return `<article class="ipa-client-card"><div class="ipa-client-card-head"><div class="ipa-admin-avatar">${ipaEscape((c.name||'C').split(' ').map(x=>x[0]).slice(0,2).join(''))}</div><div class="ipa-client-card-identity"><h3>${ipaEscape(c.name||'Cliente')}</h3><p>${ipaEscape(c.email||'Sem e-mail')}</p><p>${ipaEscape(c.phone||'')}</p></div><button class="ipa-client-edit" data-admin-edit-client="${ipaEscape(c.id)}" aria-label="Editar cadastro do cliente">✏️ <span>Editar</span></button></div><div class="ipa-client-tags"><span>${ipaEscape(c.plan||'Explore')}</span><span>${ipaEscape(c.clientType||'Titular')}</span><span class="${pending?'ipa-client-status-pending':'ipa-client-status-ok'}">${pending?'● Pendente':'● Aprovado'}</span></div><div class="ipa-client-trip-status"><span>✈️ ${ts.length} ${ts.length===1?'viagem':'viagens'}</span><span>👤 ${a.used} de ${a.total===Infinity?'∞':a.total} acessos</span></div><div class="ipa-client-access-stats" data-ipa-access-id="${ipaEscape(c.id)}"><span>👁️ <b data-ipa-access-count>${Number(ipaAdminAccessStats[c.id]?.count||0)}</b> sessões</span><span>🕒 Último acesso: <b data-ipa-access-last>${ipaEscape(ipaFormatAccessDate(ipaAdminAccessStats[c.id]?.lastAccessAt))}</b></span></div><div class="ipa-client-actions"><button class="btn btn-light" data-client-open-trips="${ipaEscape(c.id)}">✈️ ${ts.length?'Ver viagens':'Criar viagem'}</button><button class="btn btn-light" data-admin-smart-client-trip="${ipaEscape(c.id)}">✨ Nova viagem</button><button class="btn btn-light" data-client-manage-trip="${ipaEscape(c.id)}">✏️ Editar viagem</button><button class="btn btn-light ipa-client-delete" data-client-delete-trip="${ipaEscape(c.id)}">🗑 Excluir viagem</button></div><button class="btn btn-primary ipa-client-publish" data-client-publish-trip="${ipaEscape(c.id)}">${published?'✉️ Publicar / reenviar aviso':'🚀 Publicar viagem'}</button></article>`}).join('')||'<div class="smart-empty"><b>Nenhum cliente cadastrado.</b></div>'}</div>`;
 }
 
 function adminTrips(){if(adminTripId&&(adminData().trips||[]).some(t=>t.id===adminTripId))return adminTripEditor(adminTripId);return `<div class="ipa-admin-head"><div><span class="eyebrow">EXPERIÊNCIAS</span><h1>Viagens</h1><p>Escolha uma viagem para personalizar o app.</p></div><div class="lead-actions"><button class="btn btn-primary" data-admin-new-trip>+ Nova viagem</button><button class="btn btn-light" data-admin-smart-client-trip>✨ Criação inteligente</button></div></div><section class="ipa-admin-panel">${adminTripList()}</section>`}
