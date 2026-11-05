@@ -1,0 +1,9 @@
+Indo por Aí Beta 6.30.39 — pacote consolidado de melhorias no modo cliente.
+Base: 6.30.38.
+- Concierge flutuante Mochilito sem botão duplicado; conversa principal única por viagem e atalhos com texto editável.
+- Jornada + plano integrados antes do clima.
+- Pagamentos com resumo, próximo vencimento e acesso à cobrança existente.
+- Serviços recomendados com Rentcars, Nomad e Holafly (links públicos, sem parceria comercial).
+- Serviços do pacote: seis atalhos para conversa humana, sem envio automático.
+- Deslocamentos entre paradas; edição pelo ADM por par de locais e link de trajeto Google Maps.
+Observação: informações de transporte digitadas pelo ADM exigem conferência de linhas/horários.

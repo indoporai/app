@@ -988,6 +988,8 @@ function bind(){
  try{ipaApplyInviteBinding()}catch(e){}
  bindCapturedExperience();
  document.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>{state.route=b.dataset.go;render()});
+ document.querySelectorAll('[data-mochilito-service]').forEach(b=>b.onclick=()=>{const x=IPA_MOCHILITO_SERVICES[Number(b.dataset.mochilitoService)];if(x)ipaOpenMochilito(x[2]);});
+ document.querySelectorAll('[data-admin-transport]').forEach(b=>b.onclick=()=>{const parts=b.dataset.adminTransport.split(':');ipaAdminEditTransport(parts[0],Number(parts[1]),Number(parts[2]))});
  document.querySelectorAll('[data-modal]').forEach(b=>b.onclick=()=>showModal(b.dataset.modal));
  document.querySelectorAll('[data-map]').forEach(b=>b.onclick=()=>window.open('https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(b.dataset.map),'_blank'));
  document.querySelectorAll('[data-profile]').forEach(b=>b.onclick=()=>setProfile(b.dataset.profile));
@@ -2172,7 +2174,7 @@ function prepChecklist(section,title){
  if(Object.keys(checked).length)persist();
 
 }
-const IPA_EDITORIAL_SERVICES=[{"name": "C6 Bank", "description": "Conta e serviços financeiros", "url": "https://www.c6bank.com.br/", "icon": "💳"}, {"name": "Decolar", "description": "Passagens e viagens", "url": "https://www.decolar.com/", "icon": "✈️"}, {"name": "Booking.com", "description": "Reservas de hospedagem", "url": "https://www.booking.com/", "icon": "🏨"}, {"name": "Accor", "description": "Hotéis e estadias", "url": "https://all.accor.com/", "icon": "🛎️"}];
+const IPA_EDITORIAL_SERVICES=[{"name": "C6 Bank", "description": "Conta e serviços financeiros", "url": "https://www.c6bank.com.br/", "icon": "💳"}, {"name": "Decolar", "description": "Passagens e viagens", "url": "https://www.decolar.com/", "icon": "✈️"}, {"name": "Booking.com", "description": "Reservas de hospedagem", "url": "https://www.booking.com/", "icon": "🏨"}, {"name": "Accor", "description": "Hotéis e estadias", "url": "https://all.accor.com/", "icon": "🛎️"}, {"name":"Rentcars","description":"Compare opções de aluguel de carros","url":"https://www.rentcars.com/","icon":"🚗"}, {"name":"Nomad","description":"Conta global para viagens","url":"https://www.nomadglobal.com/","icon":"🌎"}, {"name":"Holafly","description":"Internet eSIM para a viagem","url":"https://esim.holafly.com/pt/","icon":"📶"}];
 function ipaEditorialServicesHtml(){return `<section class="section ipa-editorial-services"><div class="section-head"><div><span class="eyebrow">PLANEJE COM FACILIDADE</span><h2>Serviços recomendados</h2></div></div><div class="ipa-editorial-grid">${IPA_EDITORIAL_SERVICES.map(b=>`<a class="ipa-editorial-card" href="${ipaEscape(b.url)}" target="_blank" rel="noopener noreferrer"><span class="ipa-editorial-icon">${b.icon}</span><b>${ipaEscape(b.name)}</b><small>${ipaEscape(b.description)}</small><span class="ipa-editorial-action">Conhecer serviço ↗</span></a>`).join('')}</div><small class="ipa-editorial-disclaimer">Links públicos de terceiros. Não representam parceria comercial ou benefício exclusivo do Indo por Aí.</small></section>`;}
 function benefitsPersonalized(){
  const d=ipaDB();if(!d)return'';
@@ -2819,6 +2821,47 @@ async function ipaHydrateTripWeather(){
  }catch(e){console.warn('Clima da viagem:',e);showError()}
 }
 
+const IPA_MOCHILITO_SERVICES=[
+ ['🏨','Reserva de hotéis','Mochilito, bora encontrar aquele hotel dos sonhos? Quero um cantinho top pra chamar de meu nessa viagem! 🛎️'],
+ ['🚐','Transfer','Fala, Mochilito! Quero chegar no destino sem perrengue. Bora organizar meu transfer? 😎'],
+ ['🚗','Aluguel de carro','Mochilito, partiu pegar a estrada? Me ajuda a encontrar um carrinho pra explorar tudo! 🚙💨'],
+ ['💱','Câmbio','Ei, Mochilito! Bora fazer meu dinheiro viajar comigo? Preciso de uma força com o câmbio! 💸'],
+ ['🎟️','Ingressos para eventos','Mochilito, essa viagem merece uma experiência daquelas! Bora garantir uns ingressos? 🎉'],
+ ['🍽️','Reservas em restaurantes','Mochilito, missão gastronômica ativada! 🍝 Me ajuda a reservar um lugar incrível pra comer?']
+];
+function ipaLegKey(from,to){return [from?.id||from?.placeId||from?.name||'',to?.id||to?.placeId||to?.name||''].map(x=>String(x).trim()).join('::');}
+function ipaTransportURL(from,to,trip,mode='transit'){
+ const place=p=>[p?.address||p?.name,tripDestination(trip),tripCountry(trip)].filter(Boolean).join(', ');
+ return 'https://www.google.com/maps/dir/?api=1&origin='+encodeURIComponent(place(from))+'&destination='+encodeURIComponent(place(to))+'&travelmode='+encodeURIComponent(mode);
+}
+function ipaTransportBetween(trip,from,to){
+ if(!from||!to)return '';
+ const key=ipaLegKey(from,to),leg=trip?.travelLegs?.[key]||{},mode=leg.mode||'transit';
+ const icons={walking:'🚶',transit:'🚆',driving:'🚗',bicycling:'🚲'};
+ return `<div class="ipa-transport-leg"><div class="ipa-transport-title"><span>${icons[mode]||'🧭'}</span><strong>Como chegar ao próximo lugar</strong></div><small>${ipaEscape(from.name||'Saída')} → ${ipaEscape(to.name||'Destino')}</small>${leg.instructions?`<p>${ipaEscape(leg.instructions)}</p>`:'<p>Consulte o trajeto atualizado, linhas e horários antes de sair.</p>'}<button type="button" data-external-route="${ipaEscape(ipaTransportURL(from,to,trip,mode))}">🗺️ Abrir trajeto no Google Maps ↗</button></div>`;
+}
+function ipaAdminEditTransport(tripId,dayNo,fromIndex){
+ const t=adminData().trips.find(x=>String(x.id)===String(tripId)),day=t?.itinerary?.find(d=>Number(d.day)===Number(dayNo));
+ const places=normalizedPlaces(day),from=places[fromIndex],to=places[fromIndex+1];if(!from||!to)return;
+ const key=ipaLegKey(from,to),leg=t.travelLegs?.[key]||{};
+ showModal(`<span class="eyebrow">🚆 DESLOCAMENTO DO ROTEIRO</span><h2>${ipaEscape(from.name)} → ${ipaEscape(to.name)}</h2><p>Informe apenas orientações confirmadas. Se deixar em branco, o cliente poderá consultar o trajeto no Google Maps.</p><label>Meio de transporte<select id="ipaTransportMode" class="v2-concierge-input"><option value="transit">Transporte público (trem / metrô / ônibus)</option><option value="walking">A pé</option><option value="driving">Carro / táxi / transfer</option><option value="bicycling">Bicicleta</option></select></label><label>Orientações ao viajante<textarea id="ipaTransportInstructions" class="rating-text" rows="4" placeholder="Ex.: Pegue o trem da linha X, na estação Y, até a estação Z. Confira horários e bilhetes.">${ipaEscape(leg.instructions||'')}</textarea></label><button id="ipaSaveTransport" type="button" class="btn btn-primary btn-block">Salvar deslocamento</button><small id="ipaTransportStatus" role="status"></small>`);
+ document.querySelector('#ipaTransportMode').value=leg.mode||'transit';
+ document.querySelector('#ipaSaveTransport').onclick=async e=>{const btn=e.currentTarget,mode=document.querySelector('#ipaTransportMode').value,instructions=document.querySelector('#ipaTransportInstructions').value.trim();btn.disabled=true;try{const legs={...(t.travelLegs||{})};legs[key]={mode,instructions};IPAData.updateTrip(tripId,{travelLegs:legs});if(window.IPAFirebase?.user)await window.IPAFirebase.syncNow();modal.close();toast('Deslocamento salvo para o cliente ✓')}catch(err){document.querySelector('#ipaTransportStatus').textContent='Erro ao salvar: '+(err.message||'Falha');btn.disabled=false}};
+}
+function ipaClientPackageServices(){
+ if(!tripModule('concierge'))return '';
+ return `<section class="section ipa-package-services"><div class="section-head"><div><span class="eyebrow">🎒 SERVIÇOS DO SEU PACOTE</span><h2>Como podemos ajudar?</h2><p>Toque em um serviço para conversar com o Mochilito. A equipe confirma a disponibilidade conforme seu plano.</p></div></div><div class="ipa-package-services-grid">${IPA_MOCHILITO_SERVICES.map((x,i)=>`<button type="button" class="ipa-package-service" data-mochilito-service="${i}"><span>${x[0]}</span><b>${ipaEscape(x[1])}</b><small>Conversar com o Mochilito ↗</small></button>`).join('')}</div></section>`;
+}
+function ipaFinanceHighlight(t,d){
+ if(!tripModule('payments'))return '';
+ const list=(d?.payments||[]).filter(p=>!t||p.tripId===t.id||(!p.tripId&&p.trip===t.name));
+ const paid=list.filter(p=>String(p.status||'').toLowerCase()==='pago');
+ const pending=list.filter(p=>String(p.status||'').toLowerCase()!=='pago');
+ const sum=arr=>arr.reduce((v,p)=>v+Number(p.amount||0),0);
+ const upcoming=[...pending].sort((a,b)=>String(a.dueDate||'9999').localeCompare(String(b.dueDate||'9999')))[0];
+ const due=upcoming?.dueDate?new Date(upcoming.dueDate+'T12:00:00').toLocaleDateString('pt-BR'):'a confirmar';
+ return `<section class="section ipa-payments-highlight"><div class="ipa-payments-highlight-header"><div><span class="eyebrow">💳 MINHA VIAGEM</span><h2>Meus pagamentos</h2><small>Acompanhe seu investimento na viagem</small></div><span class="ipa-payments-state ${pending.length?'ipa-payments-pending':'ipa-payments-clear'}">${pending.length?`${pending.length} pendente(s)`:'✓ Em dia'}</span></div><div class="ipa-payments-values"><div><small>Total pago</small><strong>${brl(sum(paid))}</strong></div><div><small>Saldo em aberto</small><strong>${brl(sum(pending))}</strong></div></div>${upcoming?`<button type="button" class="ipa-payment-next" data-payment="${ipaEscape(upcoming.id)}"><span><b>Próxima parcela · ${brl(upcoming.amount)}</b><small>Vencimento: ${ipaEscape(due)}</small></span><strong>💳 Pagar agora →</strong></button>`:'<p class="ipa-payment-all-clear">🎉 Tudo em dia! Você pode consultar seus recibos a qualquer momento.</p>'}<button type="button" class="ipa-payments-all" data-go="payments">Ver todas as parcelas e comprovantes →</button></section>`;
+}
 function beforeView(){
  const d=ipaDB(),t=activeTrip();
  const country=tripCountry(t)||"sua próxima viagem",flag=countryFlag(country),dest=tripDestination(t);
@@ -2832,11 +2875,11 @@ function beforeView(){
  <button class="btn btn-primary btn-block" data-go="trip">Abrir meu roteiro</button>
 </section>
 ${ipaTripSwitchSection()}
+<section class="section ipa-journey-plan"><div class="ipa-journey-plan-inner">${modeCard()}<div class="ipa-journey-plan-footer"><div><span class="eyebrow">SEU PLANO CONTRATADO</span><h3>${ipaEscape(plan)}</h3><p>${ipaEscape(t?.name||'Minha viagem')} · ${ipaEscape(dest)}, ${ipaEscape(country)} ${flag}</p></div><button type="button" class="btn ipa-plan-benefits-button" data-plan-details="true">✨ Ver benefícios</button></div></div></section>
+${ipaFinanceHighlight(t,d)}
 ${tripWeatherSection(t)}
-${modeCard()}
-<section class="section"><div class="v2-plan-card"><div><span class="eyebrow">Seu plano contratado</span><h3>${plan}</h3><p>${t?.name||'Minha viagem'} · ${dest}, ${country} ${flag}</p></div><button class="btn btn-light" data-plan-details="true">Ver benefícios</button></div></section>
 ${tripModule('itinerary')?`<section class="section ipa-before-itinerary"><div class="section-head"><div><span class="eyebrow">Seu roteiro</span><h2>${firstDay?ipaEscape(firstDay.title):'Roteiro em preparação'}</h2></div><span class="chip">${previewDays.length} dias</span></div>${previewDays.length>1?`<div class="day-strip ipa-preview-day-strip" aria-label="Escolha o dia do roteiro">${previewDays.map(x=>`<button type="button" class="day-pill ${Number(x.day)===Number(firstDay?.day)?'active':''}" data-day="${Number(x.day)}" aria-pressed="${Number(x.day)===Number(firstDay?.day)}"><small>Dia</small><strong>${Number(x.day)}</strong></button>`).join('')}</div>`:''}${firstDay?`<div class="client-itinerary-preview">${normalizedPlaces(firstDay).map((p,i)=>`<div><span>${i+1}</span>${ipaPlacePhotoHtml(p,'ipa-preview-thumbnail')}<div><b>${p.name}</b><small>${p.time||p.address||'Programado no roteiro'}</small></div></div>`).join('')}</div>`:'<p>O Indo por Aí está preparando seus dias.</p>'}</section>`:''}
-${tripModule('payments')?`<section class="section"><button class="payment-alert-card" data-go="payments"><div class="payment-alert-icon">💳</div><div><span class="eyebrow">Pagamentos</span><h3>Acompanhe sua viagem</h3><p>${(d?.payments||[]).filter(p=>p.status!=='Pago'&&(!t||p.tripId===t.id||(!p.tripId&&p.trip===t.name))).length} cobrança(s) em aberto</p></div><span>›</span></button></section>`:''}
+
 <section class="section"><div class="section-head"><div><span class="eyebrow">Sua jornada até o embarque</span><h2>Preparação da viagem</h2></div></div>
  <div class="v2-journey">
   ${tripModule('documents')?ipaPrepJourneyCard('documents','🛂','Documentos','Documentos para '+country):''}
@@ -2850,7 +2893,7 @@ ${(ipaDB().recommendations||[]).filter(x=>x.tripId===t.id).length?`<section clas
 ${flightWalletSection(t,d)}
 ${hotelStaySection(t)}
 ${climateSection(t)}
-${(tripModule('preboardingSupport')||tripModule('bookingSupport')||tripModule('exchange')||tripModule('community'))?`<section class="section"><div class="section-head"><div><span class="eyebrow">Serviços do seu pacote</span><h2>Incluídos na sua experiência</h2></div></div><div class="native-service-grid">${tripModule('preboardingSupport')?`<div><span>🧭</span><b>Suporte pré-embarque</b><small>Orientação antes da viagem</small></div>`:''}${tripModule('bookingSupport')?`<div><span>🏨</span><b>Hotel & passagens</b><small>Apoio nas compras e reservas</small></div>`:''}${tripModule('exchange')?`<div><span>💱</span><b>Exchange</b><small>Câmbio disponível no pacote</small></div>`:''}${tripModule('community')?`<div><span>💬</span><b>Comunidade</b><small>Comunicação durante a viagem</small></div>`:''}</div></section>`:''}
+${ipaClientPackageServices()}
 ${benefitsPersonalized()}`}
 
 function ipaFindBookedHotel(st,catalog){
@@ -3248,7 +3291,7 @@ function adminTripEditor(id){
  <section class="ipa-admin-panel"><span class="eyebrow">EXPERIÊNCIA DO CLIENTE</span><h2>O que aparece no app</h2><div class="ipa-admin-module-grid">${Object.entries(labels).map(([k,v])=>`<label class="${t.modules?.[k]?'on':''}"><div><b>${v}</b><small>${t.modules?.[k]?'Visível':'Oculto'}</small></div><input type="checkbox" data-admin-module="${k}" ${t.modules?.[k]?'checked':''}></label>`).join('')}</div></section>
  <section class="ipa-admin-panel"><div class="section-head"><div><span class="eyebrow">ROTEIRO INTELIGENTE</span><h2>Dias, lugares e dicas</h2></div><button class="btn btn-light" data-admin-add-day="${t.id}">+ Adicionar dia</button></div>
  <div class="smart-route-banner"><span>✨</span><div><b>Dica Inteligente</b><small>Cadastre atrações, cafés, restaurantes, lojas e experiências. Use “Adicionar como dica” para recomendações fora do roteiro principal.</small></div></div>
- <div class="ipa-admin-days">${(t.itinerary||[]).sort((a,b)=>a.day-b.day).map(day=>`<div class="admin-day-expanded"><div class="admin-day-title"><strong>${day.day}</strong><span><b>${day.title}</b><small>${day.date||''}</small></span><button class="admin-add-place-btn" data-admin-add-place="${t.id}:${day.day}">+ Lugar / dica</button></div><div class="admin-place-list">${normalizedPlaces(day).map((p,i)=>`<div><span>${i+1}</span><div><b>${p.time?`${p.time} · `:''}${p.category||'📍'} ${p.name}</b><small>${p.address||p.note||''}</small>${p.smartTip?`<em>💡 ${p.smartTip}</em>`:''}</div>${p.mapsUrl?`<button type="button" class="admin-place-map" data-external-route="${ipaEscape(p.mapsUrl)}" aria-label="Abrir ${ipaEscape(p.name)} no Google Maps">↗ Maps</button>`:''}</div>`).join('')||'<small>Nenhum local neste dia.</small>'}</div></div>`).join('')||'<p>Comece adicionando o primeiro dia.</p>'}</div>
+ <div class="ipa-admin-days">${(t.itinerary||[]).sort((a,b)=>a.day-b.day).map(day=>`<div class="admin-day-expanded"><div class="admin-day-title"><strong>${day.day}</strong><span><b>${day.title}</b><small>${day.date||''}</small></span><button class="admin-add-place-btn" data-admin-add-place="${t.id}:${day.day}">+ Lugar / dica</button></div><div class="admin-place-list">${normalizedPlaces(day).map((p,i)=>`<div><span>${i+1}</span><div><b>${p.time?`${p.time} · `:''}${p.category||'📍'} ${p.name}</b><small>${p.address||p.note||''}</small>${p.smartTip?`<em>💡 ${p.smartTip}</em>`:''}</div>${p.mapsUrl?`<button type="button" class="admin-place-map" data-external-route="${ipaEscape(p.mapsUrl)}" aria-label="Abrir ${ipaEscape(p.name)} no Google Maps">↗ Maps</button>`:''}${i<normalizedPlaces(day).length-1?`<button type="button" class="admin-place-map" data-admin-transport="${ipaEscape(t.id)}:${day.day}:${i}">🚆 Deslocamento</button>`:''}</div>`).join('')||'<small>Nenhum local neste dia.</small>'}</div></div>`).join('')||'<p>Comece adicionando o primeiro dia.</p>'}</div>
  <div class="network-tip-list">${(d.recommendations||[]).filter(r=>r.tripId===t.id).map(r=>`<div><span>💡</span><div><b>${r.category||'Dica'} · ${r.name}</b><small>${r.address||''}</small><em>${r.smartTip||'Indo por Aí recomenda'}</em></div></div>`).join('')||'<small>Nenhuma dica extra cadastrada.</small>'}</div></section>
  <section class="ipa-admin-panel"><div class="section-head"><div><span class="eyebrow">✨ ANTES · ENTRE NO CLIMA</span><h2>Conteúdo do destino</h2></div><button class="btn btn-primary" data-admin-generate-climate="${t.id}">${t.climateContent?.length?'🔄 Atualizar conteúdo':'✨ Preparar conteúdo'}</button></div><p>Sugestões disponíveis são provenientes da curadoria cadastrada. A atualização consulta fontes públicas para destinos sem curadoria; os resultados dependem da disponibilidade de referências verificáveis. Conteúdo editado manualmente pelo ADM é preservado. Os ícones dos serviços são exibidos; aqueles com link direto confirmado podem ser abertos. O aplicativo procura links públicos automaticamente; links individuais podem ser editados como alternativa. Disponibilidade pode variar.</p><div class="climate-admin-grid">${climateForTrip(t).map((x,i)=>`<div><span>${x[0]}</span><small>${x[1]}</small><b>${x[2]}</b><p>${x[3]}</p>${ipaStreamButtons(x)}<button class="btn btn-light" data-admin-edit-climate="${t.id}:${i}">✏️ Editar</button></div>`).join('')}</div></section>
  <section class="ipa-admin-panel"><div class="section-head"><div><span class="eyebrow">ANTES · CARTEIRA DA VIAGEM</span><h2>Documentos do cliente</h2></div><button class="btn btn-light" data-admin-document="${t.id}" data-client-id="${t.clientId}">+ Documento</button></div><p>Passagens, hotel, vouchers, seguro, ingressos e transfer. O ADM cadastra e o cliente consulta no Antes.</p><div class="admin-doc-list">${(d.tripDocuments||[]).filter(x=>x.tripId===t.id).map(x=>`<div><span>${x.type==='Passagem aérea'?'✈️':x.type.includes('Hospedagem')?'🏨':x.type.includes('trem')?'🚆':x.type.includes('ônibus')?'🚌':x.type.includes('Ingresso')?'🎟️':x.type.includes('Seguro')?'🛡️':'📄'}</span><div><b>${x.title}</b><small>${[x.date,x.time,x.terminal&&('Terminal '+x.terminal),x.gate&&('Portão '+x.gate)].filter(Boolean).join(' · ')}</small></div>${x.url?`<button data-external-route="${ipaEscape(x.url)}">Abrir</button>`:''}<button type="button" class="btn btn-light doc-delete-btn" data-admin-delete-document="${ipaEscape(x.id)}" data-document-trip="${ipaEscape(t.id)}" aria-label="Excluir documento ${ipaEscape(x.title)}">🗑 Excluir</button></div>`).join('')||'<small>Nenhum documento cadastrado.</small>'}</div></section>
@@ -3358,6 +3401,7 @@ return `<div class="card" style="padding:18px;margin:12px 0"><div style="display
 }
 let ipaClientAiiOpen=false;
 let ipaClientAiiSelected='';
+let ipaClientAiiDraft='';
 let ipaClientAiiStop=null;
 function ipaClientAiiWidgetHtml(){return `<div class="ipa-aii-widget ipa-aii-client" id="ipaClientAii"><button id="ipaClientAiiLaunch" type="button" class="ipa-aii-launch" aria-expanded="${ipaClientAiiOpen?'true':'false'}">🎒 Fale com o Mochilito</button><section id="ipaClientAiiPanel" class="ipa-aii-panel" ${ipaClientAiiOpen?'':'hidden'}><div class="ipa-aii-header"><div><b>🎒 Mochilito | Concierge Indo por Aí</b><small>Seu canal direto com a equipe Indo por Aí</small></div><button id="ipaClientAiiClose" aria-label="Fechar chat">✕</button></div><div id="ipaClientAiiContent" class="ipa-aii-content"></div></section></div>`}
 async function ipaRenderClientAii(){
@@ -3366,16 +3410,26 @@ async function ipaRenderClientAii(){
  if(ipaClientAiiSelected){
    content.innerHTML=`<button class="ipa-aii-back" type="button" id="ipaClientAiiBack">← Atendimentos</button><div class="ipa-aii-messages">Carregando mensagens...</div><form id="ipaClientAiiForm"><label>Mensagem</label><textarea required maxlength="3000" rows="2" placeholder="Como podemos ajudar?"></textarea><button type="submit" class="btn btn-primary">Enviar mensagem</button><small id="ipaClientAiiError" aria-live="polite"></small></form>`;
    content.querySelector('#ipaClientAiiBack').onclick=()=>{ipaClientAiiSelected='';ipaRenderClientAii()};
+   if(ipaClientAiiDraft){content.querySelector('#ipaClientAiiForm textarea').value=ipaClientAiiDraft;ipaClientAiiDraft='';}
    const box=content.querySelector('.ipa-aii-messages');
    ipaClientAiiStop=window.IPAFirebase.listenConciergeRequest(ipaClientAiiSelected,r=>{if(!box.isConnected)return;box.innerHTML=r?ipaConciergeMessagesHtml(r):'Atendimento não encontrado.';box.scrollTop=box.scrollHeight},e=>{if(box.isConnected)box.textContent=e.message||'Erro ao carregar mensagens'});
    content.querySelector('#ipaClientAiiForm').onsubmit=async e=>{e.preventDefault();const form=e.currentTarget,button=form.querySelector('button'),input=form.querySelector('textarea');const msg=input.value.trim();if(!msg)return;button.disabled=true;try{await window.IPAFirebase.sendConciergeMessage(ipaClientAiiSelected,msg);input.value=''}catch(err){form.querySelector('small').textContent=err.message||'Erro ao enviar'}finally{button.disabled=false}};
    return;
  }
  content.innerHTML='<p>Carregando seus atendimentos...</p>';
- try{const list=await window.IPAFirebase.getMyConciergeRequests(trip.id);if(!content.isConnected||ipaClientAiiSelected)return;content.innerHTML=`<p class="ipa-aii-hint">Seu chat com a equipe Indo por Aí</p>${list.map(x=>`<button type="button" class="ipa-aii-thread" data-client-aii-thread="${ipaEscape(x.id)}"><strong>${ipaEscape(x.type||'Atendimento')}</strong><small>${ipaEscape(x.status||'Enviado')}</small></button>`).join('')||'<p class="ipa-aii-empty">Nenhuma conversa iniciada.</p>'}<button id="ipaClientAiiNew" type="button" class="btn btn-primary">+ Novo atendimento</button>`;
+ try{const list=await window.IPAFirebase.getMyConciergeRequests(trip.id);if(!content.isConnected||ipaClientAiiSelected)return;if(list.length){ipaClientAiiSelected=list[0].id;ipaRenderClientAii();return;}
+ content.innerHTML=`<div class="ipa-aii-welcome"><b>Opa, viajante! 🌍✈️ Mochilito na área!</b><p>Por aqui a gente resolve os perrengues e deixa você só com a parte boa da viagem. Qual é a missão de hoje? 😎</p></div><form id="ipaClientAiiFirst"><textarea rows="3" maxlength="3000" required placeholder="Me conta o que você precisa..."></textarea><button type="submit" class="btn btn-primary">Enviar ao Mochilito</button><small role="status"></small></form>`;
+ const first=content.querySelector('#ipaClientAiiFirst');if(ipaClientAiiDraft){first.querySelector('textarea').value=ipaClientAiiDraft;ipaClientAiiDraft='';}
+ first.onsubmit=async e=>{e.preventDefault();const input=first.querySelector('textarea'),btn=first.querySelector('button'),msg=input.value.trim();if(!msg)return;btn.disabled=true;try{const item=await window.IPAFirebase.submitConciergeRequest({tripId:trip.id,clientId:trip.clientId||'',requesterName:ipaClientDisplayName(),type:'Conversa Mochilito',text:msg});IPAData.createConciergeRequest(item);ipaClientAiiSelected=item.id;ipaRenderClientAii()}catch(err){first.querySelector('small').textContent='Não foi possível enviar: '+(err.message||'erro');btn.disabled=false}};
  content.querySelectorAll('[data-client-aii-thread]').forEach(b=>b.onclick=()=>{ipaClientAiiSelected=b.dataset.clientAiiThread;ipaRenderClientAii()});
  content.querySelector('#ipaClientAiiNew').onclick=()=>openConciergeNewRequest(trip);
  }catch(err){if(content.isConnected)content.textContent='Não foi possível consultar o concierge: '+(err.message||'erro')}
+}
+function ipaOpenMochilito(draft=''){
+ ipaClientAiiDraft=String(draft||'');ipaClientAiiOpen=true;
+ const pane=document.querySelector('#ipaClientAiiPanel'),btn=document.querySelector('#ipaClientAiiLaunch');
+ if(!pane||!btn){render();return;}
+ pane.hidden=false;btn.setAttribute('aria-expanded','true');ipaRenderClientAii();
 }
 function ipaBindClientAiiWidget(){
  const btn=document.querySelector('#ipaClientAiiLaunch'),pane=document.querySelector('#ipaClientAiiPanel');if(!btn)return;
@@ -3713,10 +3767,10 @@ function duringView(){
  }));
  const places=[...officialPlaces,...personalPlaces];
  const country=tripCountry(t),flag=countryFlag(country),route=googleMapsRouteUrl(day,t);
- return `<section class="hero during-personalized-hero"><span class="eyebrow">Durante a viagem</span><h1>${tripDestination(t)} ${flag}</h1><p>${t.name} · Dia ${day.day}${day.title?` · ${day.title}`:''}</p><div class="hero-actions">${route?`<button class="btn btn-light" data-external-route="${route}">Abrir rota</button>`:''}${tripModule('concierge')?`<button class="btn btn-light" data-concierge>👑 Concierge</button>`:''}${tripModule('live')?`<button class="btn btn-primary" id="realLiveBtn">🔴 Live</button>`:''}</div></section>
+ return `<section class="hero during-personalized-hero"><span class="eyebrow">Durante a viagem</span><h1>${tripDestination(t)} ${flag}</h1><p>${t.name} · Dia ${day.day}${day.title?` · ${day.title}`:''}</p><div class="hero-actions">${route?`<button class="btn btn-light" data-external-route="${route}">Abrir rota</button>`:''}${tripModule('live')?`<button class="btn btn-primary" id="realLiveBtn">🔴 Live</button>`:''}</div></section>
  ${modeCard()}
  <section class="section ipa-top-day-tabs"><div class="section-head"><h2>Escolha o dia do roteiro</h2></div><div class="day-strip" aria-label="Dias da viagem">${days.map(x=>`<button type="button" class="day-pill ${Number(x.day)===Number(day.day)?'active':''}" data-day="${x.day}" aria-pressed="${Number(x.day)===Number(day.day)}"><small>Dia</small><strong>${x.day}</strong></button>`).join('')}</div></section>
- <section class="section"><div class="section-head"><div><span class="eyebrow">Roteiro real</span><h2>${day.title||`Dia ${day.day}`}</h2></div><span class="chip">${places.length} locais</span></div><div class="during-place-list">${places.map((p,i)=>`<article class="during-place-card ${p.personal?'during-place-personal':''}"><div class="during-place-number">${i+1}</div>${ipaPlacePhotoHtml(p,'ipa-during-thumbnail')}<div class="during-place-main"><small>${p.time||'Horário livre'}</small><div class="during-place-title" data-journey-title="${ipaEscape([t.id,day.day,p.id||i].join(':'))}"><b>${p.name}</b></div></div><div class="during-place-details"><p>${ipaEscape(p.address||'Programado no roteiro')}</p>${p.note?`<div class="ipa-place-client-note"><strong>📝 Observação</strong><span>${ipaEscape(p.note)}</span></div>`:''}${(p.smartTip||p.tip)?`<div class="ipa-place-client-tip"><strong>💡 Dica Indo por Aí</strong><span>${ipaEscape(p.smartTip||p.tip)}</span></div>`:''}${ipaJourneyFeedbackHtml(t.id,day.day,p.id||i,p.name,(p.address||p.name)+', '+country)}</div></article>`).join('')||'<p>Nenhum local cadastrado para este dia.</p>'}</div></section>
+ <section class="section"><div class="section-head"><div><span class="eyebrow">Roteiro real</span><h2>${day.title||`Dia ${day.day}`}</h2></div><span class="chip">${places.length} locais</span></div><div class="during-place-list">${places.map((p,i)=>`<article class="during-place-card ${p.personal?'during-place-personal':''}"><div class="during-place-number">${i+1}</div>${ipaPlacePhotoHtml(p,'ipa-during-thumbnail')}<div class="during-place-main"><small>${p.time||'Horário livre'}</small><div class="during-place-title" data-journey-title="${ipaEscape([t.id,day.day,p.id||i].join(':'))}"><b>${p.name}</b></div></div><div class="during-place-details"><p>${ipaEscape(p.address||'Programado no roteiro')}</p>${p.note?`<div class="ipa-place-client-note"><strong>📝 Observação</strong><span>${ipaEscape(p.note)}</span></div>`:''}${(p.smartTip||p.tip)?`<div class="ipa-place-client-tip"><strong>💡 Dica Indo por Aí</strong><span>${ipaEscape(p.smartTip||p.tip)}</span></div>`:''}${ipaJourneyFeedbackHtml(t.id,day.day,p.id||i,p.name,(p.address||p.name)+', '+country)}</div></article>${i<places.length-1?ipaTransportBetween(t,p,places[i+1]):''}`).join('')||'<p>Nenhum local cadastrado para este dia.</p>'}</div></section>
  <section class="section ipa-real-map-section"><div class="section-head"><div><span class="eyebrow">MAPA DO DIA</span><h2>Seu roteiro no mapa</h2></div><span class="chip">A → B → C${places.length>3?' → D':''}</span></div><div id="ipaRealMap" class="ipa-real-map"><div class="ipa-map-loading">🗺️ Carregando mapa...</div></div><div class="ipa-map-legend"><span><i class="official"></i> Roteiro oficial</span><span><i class="personal"></i> Dica adicionada</span><span><i class="current"></i> Você</span></div></section>
 `;
 }
@@ -3792,7 +3846,7 @@ function afterView(){
  ${tripModule('movie')?capturedExperience():''}
  ${tripModule('passport')?ipaPassportView(t):''}`;
 }
-function modeCard(){return `<section class="section"><div class="card mode-card"><span class="eyebrow">Simular momento da jornada</span><h2>${state.mode==='before'?'Preparando sua viagem':state.mode==='during'?'Vivendo sua viagem':'Reviva suas melhores memórias'}</h2><div class="mode-switch"><button type="button" data-mode="before" class="${state.mode==='before'?'active':''}">Antes</button><button type="button" data-mode="during" class="${state.mode==='during'?'active':''}">Durante</button><button type="button" data-mode="after" class="${state.mode==='after'?'active':''}">Depois</button></div>${state.profile==='client'&&tripModule('concierge')?`<button type="button" class="btn btn-primary btn-block ipa-concierge-access" data-concierge>👑 Solicitar concierge</button>`:''}</div></section>`}
+function modeCard(){return `<section class="section"><div class="card mode-card"><span class="eyebrow">Simular momento da jornada</span><h2>${state.mode==='before'?'Preparando sua viagem':state.mode==='during'?'Vivendo sua viagem':'Reviva suas melhores memórias'}</h2><div class="mode-switch"><button type="button" data-mode="before" class="${state.mode==='before'?'active':''}">Antes</button><button type="button" data-mode="during" class="${state.mode==='during'?'active':''}">Durante</button><button type="button" data-mode="after" class="${state.mode==='after'?'active':''}">Depois</button></div></div></section>`}
 function tripView(){
  const t=activeTrip();
  if(!t)return `<section class="section"><h2>Nenhuma viagem publicada</h2><p>Volte ao ADM e publique uma viagem para este cliente.</p></section>`;
