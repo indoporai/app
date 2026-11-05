@@ -7,3 +7,6 @@ Indo por Aí — Beta 6.30.47 (base 6.30.46)
 
 IMPORTANTE: o navegador/sistema pode conservar o ícone de app já instalado. Isso não pode ser alterado remotamente. Verifique a URL manifest.webmanifest?v=63047 e imagens apontadas no celular. Reinstale só depois de confirmar sincronização dos seus dados.
 - Paleta original e rotas/PIX/Firebase não alterados.
+
+
+Beta 6.30.48: Oculta navegação inferior apenas do ADM; amplia chat Mochilito para cliente e ADM; tenta criar boas-vindas persistente no primeiro login de um cliente sem mensagens prévias. Requer que as regras existentes do Firestore permitam criação de documentos em conciergeRequests pelo viajante autenticado, conforme fluxo de novos pedidos. Nenhum teste real de Firebase foi executado.

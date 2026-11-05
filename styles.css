@@ -1707,3 +1707,18 @@ dialog:has(#routeCatalogPlace) .smart-place-actions button{
 /* Keep the mascot image contained and readable as button/heading icon. */
 .ipa-aii-launch .ipa-mochilito-avatar{width:34px!important;height:38px!important;object-fit:contain!important;flex-shrink:0}
 .ipa-aii-header .ipa-mochilito-avatar{width:28px!important;height:31px!important;object-fit:contain!important}
+
+/* Beta 6.30.48 — larger concierge panels, with room for mobile keyboards. */
+.ipa-aii-widget .ipa-aii-panel{
+  width:min(470px,calc(100vw - 24px));
+  height:min(680px,calc(100dvh - 90px));
+  max-height:calc(100dvh - 90px);
+}
+.ipa-aii-widget .ipa-aii-content{min-height:0;display:flex;flex-direction:column;overflow-y:auto;}
+.ipa-aii-widget .ipa-aii-messages{max-height:none;min-height:110px;flex:1;overflow-y:auto;}
+@media(max-width:560px){
+  .ipa-aii-widget .ipa-aii-panel{width:calc(100vw - 20px);height:min(680px,calc(100dvh - 130px));max-height:calc(100dvh - 130px);}
+  .ipa-aii-widget .ipa-aii-content{padding:15px;}
+}
+/* Hide the client's five-tab bottom navigation while operating as ADM only. */
+body.hidden-nav .bottom-nav{display:none!important;}

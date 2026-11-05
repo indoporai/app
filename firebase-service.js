@@ -561,6 +561,22 @@ onAuthStateChanged(auth,async user=>{
 });
 
 window.IPAFirebase = {
+  async ensureConciergeWelcome({tripId,clientId='',requesterName=''}){
+    if(!currentUser||currentUser.uid===ADMIN_UID||!tripId)return null;
+    // Existing clients keep their conversation untouched and receive no late welcome.
+    const existing=await getDocs(query(collection(firestore,'conciergeRequests'),where('requesterUid','==',currentUser.uid),limit(1)));
+    if(!existing.empty)return null;
+    // Stable per-user document id prevents duplicate welcome threads across reloads/devices.
+    const id='conc-welcome-'+currentUser.uid;
+    const ref=doc(firestore,'conciergeRequests',id);
+    const previous=await getDoc(ref);
+    if(previous.exists())return null;
+    const greeting='Opa, viajante! 🌍✈️ Mochilito na área! Por aqui a gente resolve os perrengues e deixa você só com a parte boa da viagem. Me conta, qual é a missão de hoje? 😎';
+    const when=new Date().toISOString();
+    const item={id,tripId:String(tripId),clientId:String(clientId||''),type:'Boas-vindas Mochilito',text:greeting,requesterUid:currentUser.uid,requesterEmail:currentUser.email||'',requesterName:String(requesterName||currentUser.displayName||currentUser.email?.split('@')[0]||'Viajante').slice(0,120),status:'Respondido',createdAt:when,updatedAt:when,messages:[{sender:'mochilito',text:greeting,createdAt:when}]};
+    await setDoc(ref,item);
+    return item;
+  },
   async submitConciergeRequest(request){
     if(!currentUser || currentUser.uid===ADMIN_UID)throw new Error('Entre com o login do viajante.');
     if(!request?.tripId || !String(request.text||'').trim())throw new Error('Informe a viagem e os detalhes do pedido.');
