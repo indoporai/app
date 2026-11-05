@@ -108,7 +108,7 @@ document.addEventListener('click', event => {
 
 
 setTimeout(()=>document.querySelector('#splash').classList.add('hide'),1800);
-if('serviceWorker' in navigator) navigator.serviceWorker.register('./service-worker.js');
+if('serviceWorker' in navigator) navigator.serviceWorker.register('./service-worker.js?v=63046', {updateViaCache:'none'});
 function money(n){return new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(n)}
 function timeFmt(s){const m=String(Math.floor(s/60)).padStart(2,'0'),sec=String(s%60).padStart(2,'0');return `${m}:${sec}`}
 function setProfile(profile){
@@ -3496,7 +3496,7 @@ let ipaClientAiiOpen=false;
 let ipaClientAiiSelected='';
 let ipaClientAiiDraft='';
 let ipaClientAiiStop=null;
-function ipaClientAiiWidgetHtml(){return `<div class="ipa-aii-widget ipa-aii-client" id="ipaClientAii"><button id="ipaClientAiiLaunch" type="button" class="ipa-aii-launch" aria-expanded="${ipaClientAiiOpen?'true':'false'}"><img class="ipa-mochilito-avatar" src="assets/mochilito-avatar.svg" alt="" aria-hidden="true"> Fale com o Mochilito</button><section id="ipaClientAiiPanel" class="ipa-aii-panel" ${ipaClientAiiOpen?'':'hidden'}><div class="ipa-aii-header"><div><b><img class="ipa-mochilito-avatar" src="assets/mochilito-avatar.svg" alt="" aria-hidden="true"> Mochilito | Concierge Indo por Aí</b><small>Seu canal direto com a equipe Indo por Aí</small></div><button id="ipaClientAiiClose" aria-label="Fechar chat">✕</button></div><div id="ipaClientAiiContent" class="ipa-aii-content"></div></section></div>`}
+function ipaClientAiiWidgetHtml(){return `<div class="ipa-aii-widget ipa-aii-client" id="ipaClientAii"><button id="ipaClientAiiLaunch" type="button" class="ipa-aii-launch" aria-expanded="${ipaClientAiiOpen?'true':'false'}"><img class="ipa-mochilito-avatar" src="assets/mochilito-avatar-6346.png" alt="" aria-hidden="true"> Fale com o Mochilito</button><section id="ipaClientAiiPanel" class="ipa-aii-panel" ${ipaClientAiiOpen?'':'hidden'}><div class="ipa-aii-header"><div><b><img class="ipa-mochilito-avatar" src="assets/mochilito-avatar-6346.png" alt="" aria-hidden="true"> Mochilito | Concierge Indo por Aí</b><small>Seu canal direto com a equipe Indo por Aí</small></div><button id="ipaClientAiiClose" aria-label="Fechar chat">✕</button></div><div id="ipaClientAiiContent" class="ipa-aii-content"></div></section></div>`}
 async function ipaRenderClientAii(){
  const content=document.querySelector('#ipaClientAiiContent'),trip=activeTrip();if(!content||!trip)return;
  if(ipaClientAiiStop){ipaClientAiiStop();ipaClientAiiStop=null}
@@ -3534,7 +3534,7 @@ let ipaAiiOpen=false;
 let ipaAiiThreadId='';
 function ipaAiiWidgetHtml(){
  const n=ipaConciergePendingCount();
- return `<div class="ipa-aii-widget" id="ipaAiiWidget"><button type="button" class="ipa-aii-launch" id="ipaAiiLaunch" aria-expanded="${ipaAiiOpen?'true':'false'}" aria-controls="ipaAiiPanel"><img class="ipa-mochilito-avatar" src="assets/mochilito-avatar.svg" alt="" aria-hidden="true"> Mochilito · Concierge${n?` <b class="ipa-notification-count">${n}</b>`:''}</button><div class="ipa-aii-panel" id="ipaAiiPanel" ${ipaAiiOpen?'':'hidden'}><div class="ipa-aii-header"><div><b><img class="ipa-mochilito-avatar" src="assets/mochilito-avatar.svg" alt="" aria-hidden="true"> Mochilito</b><small>Concierge Indo por Aí · Atendimento humano</small></div><button type="button" id="ipaAiiClose" aria-label="Fechar chat">✕</button></div><div class="ipa-aii-content" id="ipaAiiContent"></div></div></div>`;
+ return `<div class="ipa-aii-widget" id="ipaAiiWidget"><button type="button" class="ipa-aii-launch" id="ipaAiiLaunch" aria-expanded="${ipaAiiOpen?'true':'false'}" aria-controls="ipaAiiPanel"><img class="ipa-mochilito-avatar" src="assets/mochilito-avatar-6346.png" alt="" aria-hidden="true"> Mochilito · Concierge${n?` <b class="ipa-notification-count">${n}</b>`:''}</button><div class="ipa-aii-panel" id="ipaAiiPanel" ${ipaAiiOpen?'':'hidden'}><div class="ipa-aii-header"><div><b><img class="ipa-mochilito-avatar" src="assets/mochilito-avatar-6346.png" alt="" aria-hidden="true"> Mochilito</b><small>Concierge Indo por Aí · Atendimento humano</small></div><button type="button" id="ipaAiiClose" aria-label="Fechar chat">✕</button></div><div class="ipa-aii-content" id="ipaAiiContent"></div></div></div>`;
 }
 function ipaRenderAiiPanel(){
  const pane=document.querySelector('#ipaAiiContent');if(!pane)return;

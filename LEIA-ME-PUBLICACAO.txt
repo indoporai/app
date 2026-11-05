@@ -1,12 +1,9 @@
-Indo por Aí — Beta 6.30.45
+Indo por Aí — Beta 6.30.46
 
-Mudanças:
-- Paleta original azul-petróleo/turquesa/laranja restaurada com base no CSS da 6.30.42.
-- Mantido o motor de rotas por trechos (6.30.44), Omio e recursos anteriores.
-- Marca d’água postal por destino no card Antes e cartão de embarque (ilustrações vetoriais locais); outras cidades usam arte genérica.
-- Mochilito: ícone de viajante com mochila (SVG), fundo azul-petróleo original, chamadas dos serviços na cor original.
-- Ícones PWA refeitos com recorte correto da arte original, versão de cache atualizada.
-- ZIP de publicação sem 32 notas de versão e arquivos exclusivos do Netlify.
+1. Card Durante compacto: removida altura mínima herdada (295px).
+2. Card Antes com tipografia mais ajustada sem perda de informações.
+3. Mochilito: ícone PNG rasterizado para evitar falhas de carregamento SVG.
+4. PWA: ícones com nomes novos, manifesto atualizado e cache do service worker incrementado.
+5. Paleta original restaurada da beta 6.30.42 mantida.
 
-Atenção: versão de teste; comportamento publicado e instalação em celulares exigem testes.
-Para ver novo ícone em atalho existente, pode ser necessário remover e reinstalar o PWA.
+OBS: Android e iOS podem preservar o ícone de uma instalação já existente. Após publicar e confirmar o manifesto atualizado, remova apenas o atalho instalado e instale de novo. A remoção do PWA pode apagar dados armazenados localmente; confirme sincronização antes.

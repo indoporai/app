@@ -1658,3 +1658,33 @@ dialog:has(#routeCatalogPlace) .smart-place-actions button{
 .ipa-aii-header{background:#075668!important}
 .ipa-aii-launch .ipa-mochilito-avatar{width:31px;height:31px}
 .ipa-aii-header .ipa-mochilito-avatar{width:25px;height:25px}
+
+
+/* Beta 6.30.46 — compact client hero; retain original Indo por Ai teal palette. */
+.view .hero.during-personalized-hero{
+  min-height:0!important;
+  height:auto!important;
+  padding:19px 21px 20px!important;
+  border-radius:24px!important;
+}
+.view .hero.during-personalized-hero h1{
+  font-size:clamp(1.65rem,5.8vw,2.05rem)!important;
+  line-height:1.12!important;
+  margin:8px 0 7px!important;
+  max-width:none;
+}
+.view .hero.during-personalized-hero p{margin:0!important;line-height:1.35!important;max-width:100%}
+.view .hero.during-personalized-hero .hero-actions{margin-top:13px!important;gap:9px}
+.view .hero.during-personalized-hero .hero-actions .btn{padding:10px 15px!important}
+.view .hero.during-personalized-hero::before{width:140px;height:140px;right:5px;top:8px}
+.view .hero.during-personalized-hero::after{width:190px;height:190px;right:-60px;bottom:-110px}
+@media(max-width:480px){
+ .view .hero.during-personalized-hero{padding:17px 18px!important}
+ .view .hero.during-personalized-hero h1{font-size:clamp(1.55rem,6.5vw,1.9rem)!important}
+}
+/* Optional compact before-travel banner, without removing its stats or action. */
+.v2-hero.v2-before-hero{padding:20px!important}
+.v2-before-hero h1{font-size:clamp(1.8rem,6.2vw,2.3rem)!important;line-height:1.13!important}
+/* PNG backpack traveler icon: robust across Cloudflare and installed app contexts. */
+.ipa-mochilito-avatar{object-fit:contain!important;display:inline-block!important;vertical-align:middle!important}
+.ipa-aii-header b{display:flex!important;align-items:center!important;gap:8px;flex-wrap:wrap}
