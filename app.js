@@ -23,6 +23,14 @@ function ipaRestoreClientPage(){
  }catch(e){return false}
 }
 window.addEventListener('pagehide',ipaSaveClientPage);
+// Alguns navegadores móveis restauram a janela do PWA sem recompor seu conteúdo.
+// Recria somente a tela vazia; evita sobrescrever a navegação e os dados normais.
+window.addEventListener('pageshow',()=>{
+ if(state.profile==='client'&&state.scenarioChosen&&view&&!view.children.length){
+  ipaRestoreClientPage();render();
+ }
+});
+
 const savedPhotos=JSON.parse(localStorage.getItem('ipa_beta06_photos')||'[]');
 const savedProfile=localStorage.getItem('ipa_beta06_profile')||'client';
 const state={route:'today',mode:'during',profile:savedProfile,scenarioChosen:false,leadStage:'new',tripDay:1,steps:12480,shareLocation:false,live:false,liveSeconds:0,liveTimer:null,liveViewers:23,reactions:14,photos:savedPhotos,messages:[
@@ -2847,7 +2855,7 @@ function ipaTransportBetween(trip,from,to){
  if(!from||!to)return '';
  const key=ipaLegKey(from,to),leg=trip?.travelLegs?.[key]||{},mode=leg.mode||'transit';
  const icons={walking:'🚶',transit:'🚆',driving:'🚗',bicycling:'🚲'};
- return `<div class="ipa-transport-leg"><div class="ipa-transport-title"><span>${icons[mode]||'🧭'}</span><strong>Como chegar ao próximo lugar</strong></div><small>${ipaEscape(from.name||'Saída')} → ${ipaEscape(to.name||'Destino')}</small>${leg.instructions?`<p>${ipaEscape(leg.instructions)}</p>`:'<p>Consulte o trajeto atualizado, linhas e horários antes de sair.</p>'}<button type="button" data-external-route="${ipaEscape(ipaTransportURL(from,to,trip,mode))}">🗺️ Abrir trajeto no Google Maps ↗</button></div>`;
+ return `<div class="ipa-transport-leg"><span class="ipa-between-stops-label">TRAJETO ENTRE AS PARADAS</span><div class="ipa-transport-title"><span>${icons[mode]||'🧭'}</span><strong>Como chegar ao próximo lugar</strong></div><small>${ipaEscape(from.name||'Saída')} → ${ipaEscape(to.name||'Destino')}</small>${leg.instructions?`<p>${ipaEscape(leg.instructions)}</p>`:'<p>Consulte o trajeto atualizado, linhas e horários antes de sair.</p>'}<button type="button" data-external-route="${ipaEscape(ipaTransportURL(from,to,trip,mode))}">🗺️ Abrir trajeto no Google Maps ↗</button></div>`;
 }
 // Beta 6.30.40 — navegação sob demanda a partir da localização real do viajante.
 // Não persistimos coordenadas, nem solicitamos GPS antes de uma ação explícita.
@@ -2867,13 +2875,21 @@ function ipaOpenNavigationForPlace(place,trip){
  const getMode=()=>modalContent.querySelector('input[name="ipa-nav-mode"]:checked')?.value||'transit';
  const routeURL=(mode,origin)=>'https://www.google.com/maps/dir/?api=1&destination='+encodeURIComponent(destination)+'&travelmode='+encodeURIComponent(mode)+(origin?'&origin='+encodeURIComponent(origin):'');
  const openRoute=(mode,useGPS)=>{
-  // A guia é criada na interação do usuário para não ser bloqueada após o GPS assíncrono.
-  const tab=window.open('about:blank','_blank');
+  // Abre o Maps IMEDIATAMENTE com um destino válido: nunca cria guia about:blank.
+  // Quando o GPS responder, atualiza a rota nesta mesma guia (se ainda disponível).
+  // O aplicativo original permanece aberto e conserva dia, rota e posição de rolagem.
+  ipaSaveClientPage();
+  const initialUrl=routeURL(mode,'');
+  const tab=window.open(initialUrl,'_blank');
   const go=origin=>{
    const url=routeURL(mode,origin);
    ipaSaveClientPage();
-   if(tab&&!tab.closed){tab.opener=null;tab.location.replace(url)}
-   else window.location.assign(url);
+   if(tab&&!tab.closed){
+    if(origin){try{tab.location.href=url}catch(e){console.warn('Maps já aberto; ajuste a origem no Maps.',e)}}
+   }else{
+    // Navegação na própria aba só quando o bloqueador impedir uma nova guia.
+    window.location.assign(url);
+   }
    try{modal.close()}catch(_){}
   };
   if(!useGPS||!navigator.geolocation){go('');return;}
@@ -3818,7 +3834,7 @@ function duringView(){
  return `<section class="hero during-personalized-hero"><span class="eyebrow">Durante a viagem</span><h1>${tripDestination(t)} ${flag}</h1><p>${t.name} · Dia ${day.day}${day.title?` · ${day.title}`:''}</p><div class="hero-actions">${route?`<button class="btn btn-light" data-external-route="${route}">Abrir rota</button>`:''}${tripModule('live')?`<button class="btn btn-primary" id="realLiveBtn">🔴 Live</button>`:''}</div></section>
  ${modeCard()}
  <section class="section ipa-top-day-tabs"><div class="section-head"><h2>Escolha o dia do roteiro</h2></div><div class="day-strip" aria-label="Dias da viagem">${days.map(x=>`<button type="button" class="day-pill ${Number(x.day)===Number(day.day)?'active':''}" data-day="${x.day}" aria-pressed="${Number(x.day)===Number(day.day)}"><small>Dia</small><strong>${x.day}</strong></button>`).join('')}</div></section>
- <section class="section"><div class="section-head"><div><span class="eyebrow">Roteiro real</span><h2>${day.title||`Dia ${day.day}`}</h2></div><span class="chip">${places.length} locais</span></div><div class="during-place-list">${places.map((p,i)=>`<article class="during-place-card ${p.personal?'during-place-personal':''}"><div class="during-place-number">${i+1}</div>${ipaPlacePhotoHtml(p,'ipa-during-thumbnail')}<div class="during-place-main"><small>${p.time||'Horário livre'}</small><div class="during-place-title" data-journey-title="${ipaEscape([t.id,day.day,p.id||i].join(':'))}"><b>${p.name}</b></div></div><div class="during-place-details"><p>${ipaEscape(p.address||'Programado no roteiro')}</p>${p.note?`<div class="ipa-place-client-note"><strong>📝 Observação</strong><span>${ipaEscape(p.note)}</span></div>`:''}${(p.smartTip||p.tip)?`<div class="ipa-place-client-tip"><strong>💡 Dica Indo por Aí</strong><span>${ipaEscape(p.smartTip||p.tip)}</span></div>`:''}${ipaJourneyFeedbackHtml(t.id,day.day,p.id||i,p.name,(p.address||p.name)+', '+country)}<button type="button" class="ipa-navigate-place" data-ipa-navigate-place="${i}">📍 Ir até este lugar</button></div></article>${i<places.length-1?ipaTransportBetween(t,p,places[i+1]):''}`).join('')||'<p>Nenhum local cadastrado para este dia.</p>'}</div></section>
+ <section class="section"><div class="section-head"><div><span class="eyebrow">Roteiro real</span><h2>${day.title||`Dia ${day.day}`}</h2></div><span class="chip">${places.length} locais</span></div><div class="during-place-list">${places.map((p,i)=>`<article class="during-place-card ${p.personal?'during-place-personal':''}"><div class="ipa-during-stop-kicker">📍 PARADA ${String(i+1).padStart(2,'0')} <span>· ${ipaEscape(p.time||'Horário livre')}</span></div><div class="during-place-number">${i+1}</div>${ipaPlacePhotoHtml(p,'ipa-during-thumbnail')}<div class="during-place-main"><small>${p.time||'Horário livre'}</small><div class="during-place-title" data-journey-title="${ipaEscape([t.id,day.day,p.id||i].join(':'))}"><b>${p.name}</b></div></div><div class="during-place-details"><p>${ipaEscape(p.address||'Programado no roteiro')}</p>${p.note?`<div class="ipa-place-client-note"><strong>📝 Observação</strong><span>${ipaEscape(p.note)}</span></div>`:''}${(p.smartTip||p.tip)?`<div class="ipa-place-client-tip"><strong>💡 Dica Indo por Aí</strong><span>${ipaEscape(p.smartTip||p.tip)}</span></div>`:''}${ipaJourneyFeedbackHtml(t.id,day.day,p.id||i,p.name,(p.address||p.name)+', '+country)}<button type="button" class="ipa-navigate-place" data-ipa-navigate-place="${i}">📍 Ir até este lugar</button></div></article>${i<places.length-1?ipaTransportBetween(t,p,places[i+1]):''}`).join('')||'<p>Nenhum local cadastrado para este dia.</p>'}</div></section>
  <section class="section ipa-real-map-section"><div class="section-head"><div><span class="eyebrow">MAPA DO DIA</span><h2>Seu roteiro no mapa</h2></div><span class="chip">A → B → C${places.length>3?' → D':''}</span></div><div id="ipaRealMap" class="ipa-real-map"><div class="ipa-map-loading">🗺️ Carregando mapa...</div></div><div class="ipa-map-legend"><span><i class="official"></i> Roteiro oficial</span><span><i class="personal"></i> Dica adicionada</span><span><i class="current"></i> Você</span></div></section>
 `;
 }

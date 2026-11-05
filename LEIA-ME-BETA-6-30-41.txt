@@ -1,0 +1,9 @@
+Indo por Aí — Beta 6.30.41
+Base: Beta 6.30.40
+
+1. Corrigido o risco de aba em branco ao navegar ao Maps: abre URL funcional imediatamente, sem about:blank. O GPS autorizado atualiza a origem na guia aberta. O app permanece na guia original.
+2. Novos fundos decorativos com avião vetorial branco translúcido, preservando identidade Indo por Aí.
+3. Paradas do roteiro com cabeçalhos numerados, espaços e cards diferenciados; trajetos destacados entre paradas.
+4. Atualizado versionamento de recursos e cache PWA.
+
+Verificação local: sintaxe JS, consistência de referências e integridade do ZIP. Testar Android/iOS e modo PWA instalado.
