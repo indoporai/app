@@ -183,22 +183,67 @@ async function ipaPaymentEmailSettings(request,env){
   return json({ok:true,settings:{enabled,subject,message,replyTo}});
  }catch(e){return json({ok:false,error:'Configuração não salva: '+(e.message||'falha')},502)}
 }
-async function ipaSendPaymentConfirmation(payment,env){
- if(!env.RESEND_API_KEY||!env.MERCADO_PAGO_WEBHOOK_SECRET)return {skipped:'Sem configuração segura de envio'};
- if(String(payment?.status||'').toLowerCase()!=='approved')return {skipped:'Pagamento não aprovado'};
- const email=String(payment?.payer?.email||'').trim().toLowerCase();
- if(!validEmail(email))return {skipped:'Sem e-mail de pagador'};
- const config={enabled:true,subject:'✈️ Pagamento confirmado — Indo por Aí',message:'Olá!\n\nRecebemos seu pagamento no valor de {valor}, identificado pela transação {pagamento}.\n\nObrigado por viajar com o Indo por Aí! 💙\nEquipe Indo por Aí',replyTo:'financeiro@indoporaicomagente.com'};
- const id=String(payment.id||'').trim();if(!/^\d+$/.test(id))return {skipped:'ID inválido'};
- const amount=new Intl.NumberFormat('pt-BR',{style:'currency',currency:payment.currency_id||'BRL'}).format(Number(payment.transaction_amount||0));
- const safe=ipaEmailEscape;
- const text=String(config.message).replace(/\{valor\}/gi,amount).replace(/\{pagamento\}/gi,id);
- const html=`<!doctype html><html lang="pt-BR"><meta charset="UTF-8"><body style="font-family:Arial,sans-serif;background:#f5f9fa;padding:24px"><div style="background:white;max-width:580px;margin:auto;padding:24px;border-radius:18px;border:1px solid #e1eded"><h1 style="color:#075668">✈️ Indo por Aí</h1><h2>${safe(config.subject)}</h2><p style="white-space:pre-line;line-height:1.7">${safe(text)}</p><p><b>Valor recebido:</b> ${safe(amount)}<br><b>Pagamento:</b> ${safe(id)}</p><p>Equipe Indo por Aí 💙</p></div></body></html>`;
- const payload={from:'Indo por Aí <acesso@indoporaicomagente.com>',to:[email],subject:config.subject,html};
- if(config.replyTo)payload.reply_to=config.replyTo;
- const response=await fetch('https://api.resend.com/emails',{method:'POST',headers:{Authorization:'Bearer '+env.RESEND_API_KEY,'content-type':'application/json','Idempotency-Key':'ipa-payment-'+id},body:JSON.stringify(payload)});
- if(!response.ok){console.error('payment receipt rejected',response.status);return {error:'Resend rejeitou o envio: '+response.status}}
- return {sent:true};
+// Beta 6.30.49 — comprovante: estado persistente, idempotência e reenvio controlado.
+// Nunca liberar confirmação por solicitação do navegador sem verificar o pagamento na API do MP.
+async function ipaReceiptPatch(env,id,changes,expectedUpdateTime){
+  const token=await ipaGoogleServiceToken(env,'https://www.googleapis.com/auth/datastore');
+  const url=new URL(IPA_PAYMENTS_FS+'/'+encodeURIComponent(id));
+  for(const key of Object.keys(changes))url.searchParams.append('updateMask.fieldPaths',key);
+  if(expectedUpdateTime)url.searchParams.set('currentDocument.updateTime',expectedUpdateTime);
+  const fields={};
+  for(const [key,value] of Object.entries(changes))fields[key]=typeof value==='boolean'?{booleanValue:value}:{stringValue:String(value??'')};
+  const res=await fetch(url.toString(),{method:'PATCH',headers:{Authorization:'Bearer '+token,'content-type':'application/json'},body:JSON.stringify({fields})});
+  if(!res.ok)throw new Error('Firestore ao registrar status do e-mail: '+res.status);
+  return res.json();
+}
+async function ipaReceiptRecipient(env,fields,payment){
+  const clientId=ipaPaymentString(fields,'clientId');
+  if(/^[a-zA-Z0-9_-]{3,120}$/.test(clientId)){
+    try{
+      const token=await ipaGoogleServiceToken(env,'https://www.googleapis.com/auth/datastore');
+      const res=await fetch('https://firestore.googleapis.com/v1/projects/indo-por-ai-app/databases/(default)/documents/clients/'+encodeURIComponent(clientId),{headers:{Authorization:'Bearer '+token},cache:'no-store'});
+      if(res.ok){const doc=await res.json();const email=ipaPaymentString(doc.fields||{},'email').trim().toLowerCase();if(validEmail(email))return {email,name:ipaPaymentString(doc.fields||{},'name')};}
+    }catch(e){console.warn('Receipt: lookup cliente indisponível',String(e?.message||''));}
+  }
+  for(const email of [ipaPaymentString(fields,'payerEmail'),payment?.payer?.email]){
+    if(validEmail(email))return {email:String(email).trim().toLowerCase(),name:ipaPaymentString(fields,'clientName')};
+  }
+  return {email:'',name:''};
+}
+async function ipaEnsurePixReceipt(env,payment,documentId){
+  const mpId=String(payment?.id||'');
+  if(payment?.status!=='approved'||payment?.payment_method_id!=='pix'||!/^[0-9]+$/.test(mpId))return {state:'skipped',message:'Sem PIX aprovado'};
+  const {doc}=await ipaReadPaymentDoc(env,documentId);
+  const f=doc.fields||{};
+  if(ipaPaymentString(f,'status')!=='Pago'||ipaPaymentString(f,'mpPaymentId')!==mpId)return {state:'skipped',message:'Cobrança ainda não conciliada'};
+  const existing=ipaPaymentString(f,'receiptEmailStatus');
+  if(existing==='sent')return {state:'sent',alreadySent:true,message:'Agradecimento já enviado',recipient:ipaPaymentString(f,'receiptEmailRecipient')};
+  const last=Date.parse(ipaPaymentString(f,'receiptEmailLastAttemptAt'));
+  if(existing==='sending')return {state:'sending',message:'Envio em andamento ou confirmação pendente. Confira no Resend antes de solicitar novo envio.'};
+  const now=new Date().toISOString();
+  // Compare-and-set impede o webhook e o botão ADM de enviarem em paralelo.
+  try{await ipaReceiptPatch(env,documentId,{receiptEmailStatus:'sending',receiptEmailLastAttemptAt:now,receiptEmailError:''},doc.updateTime)}
+  catch(e){if(/Firestore ao registrar status do e-mail: (409|412)/.test(e.message))return {state:'sending',message:'Outra verificação está processando este pagamento.'};throw e}
+  try{
+    if(!env.RESEND_API_KEY)throw Error('RESEND_API_KEY não configurada no Cloudflare Pages Production.');
+    const recipient=await ipaReceiptRecipient(env,f,payment);
+    if(!recipient.email)throw Error('Cliente sem e-mail válido no cadastro e no Mercado Pago.');
+    const amount=new Intl.NumberFormat('pt-BR',{style:'currency',currency:payment.currency_id||'BRL'}).format(Number(payment.transaction_amount||0));
+    const name=recipient.name?recipient.name.split(/\s+/)[0]:'viajante';
+    const title='✈️ Pagamento recebido — Indo por Aí';
+    const html=`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"></head><body style="margin:0;padding:24px;background:#f4f9fa;font-family:Arial,sans-serif;color:#193c49"><div style="max-width:580px;margin:auto;padding:28px;background:#fff;border-radius:18px;border:1px solid #dcebee"><h1 style="color:#075668">✈️ Indo por Aí</h1><h2>${ipaEmailEscape(title)}</h2><p>Oi, ${ipaEmailEscape(name)}! 💙</p><p>Seu pagamento foi confirmado! Mais uma etapa concluída para a sua próxima aventura. Obrigado por viajar com a gente!</p><p style="padding:14px;background:#eff7f8;border-radius:10px"><strong>Valor recebido:</strong> ${ipaEmailEscape(amount)}<br><strong>Transação Mercado Pago:</strong> ${ipaEmailEscape(mpId)}</p><p>Até a próxima descoberta! 🌍<br>Equipe Indo por Aí</p></div></body></html>`;
+    const r=await fetch('https://api.resend.com/emails',{method:'POST',headers:{Authorization:'Bearer '+env.RESEND_API_KEY,'content-type':'application/json','Idempotency-Key':'ipa-payment-'+mpId},body:JSON.stringify({from:'Indo por Aí <acesso@indoporaicomagente.com>',to:[recipient.email],reply_to:'financeiro@indoporaicomagente.com',subject:title,html})});
+    const data=await r.json().catch(()=>({}));
+    if(!r.ok)throw Error('Resend '+r.status+': '+String(data?.message||data?.error||'envio rejeitado').slice(0,160));
+    try{await ipaReceiptPatch(env,documentId,{receiptEmailStatus:'sent',receiptEmailSentAt:new Date().toISOString(),receiptEmailRecipient:recipient.email,receiptEmailResendId:String(data?.id||''),receiptEmailError:''})}
+    catch(e){console.error('CRITICAL: receipt accepted but ledger status update failed',documentId,mpId,e.message);return {state:'sending',message:'Resend aceitou a mensagem; registro de confirmação pendente. Confira no Resend antes de tentar novamente.'}}
+    return {state:'sent',recipient:recipient.email,message:'Agradecimento aceito pelo Resend'};
+  }catch(e){
+    const reason=String(e?.message||'Falha no envio').slice(0,240);
+    console.error('PIX receipt delivery failed',documentId,reason);
+    try{await ipaReceiptPatch(env,documentId,{receiptEmailStatus:'failed',receiptEmailError:reason})}catch(x){console.error('Receipt failure status not persisted',x.message)}
+    return {state:'failed',message:reason};
+  }
 }
 
 // Beta 6.30.32 — server-side payment reconciliation (no client-side approval).
@@ -275,8 +320,8 @@ async function ipaAdminReconcilePix(request,env){
     }else{payment=await ipaFindPaymentByReference(env,id);}
     if(!payment)return json({ok:true,state:'not-found',message:'Nenhum PIX aprovado encontrado para esta referência. Se foi transferência direta, concilie manualmente após confirmar o comprovante.'});
     const outcome=await ipaReconcileApprovedPayment(env,payment);
-    if(outcome.state==='paid'){
-      try{outcome.receipt=await ipaSendPaymentConfirmation(payment,env)}catch(e){outcome.receipt={error:'E-mail não enviado; baixa já registrada.'};console.error('Email reconciliation',e)}
+    if(outcome.state==='paid'||outcome.state==='already-paid'){
+      outcome.receipt=await ipaEnsurePixReceipt(env,payment,id);
     }
     return json({ok:true,...outcome});
   }catch(e){console.error('PIX reconciliation rejected',e?.message);return json({ok:false,error:e.message||'Falha na conciliação. Nenhuma baixa foi feita.'},409)}
@@ -297,8 +342,8 @@ async function mercadoPagoWebhook(request,url,env){
       if(String(result.body?.status||'').toLowerCase()==='approved' && result.body?.payment_method_id==='pix'){
         try{
           reconciliation=await ipaReconcileApprovedPayment(env,result.body);
-          if(reconciliation.state==='paid'){
-            try{receipt=await ipaSendPaymentConfirmation(result.body,env)}catch(e){console.error('Receipt failed after ledger',e);receipt={error:'E-mail pendente'}}
+          if(reconciliation.state==='paid'||reconciliation.state==='already-paid'){
+            receipt=await ipaEnsurePixReceipt(env,result.body,reconciliation.paymentId);
           }
         }catch(e){console.error('PIX webhook conciliation',e);return json({ok:false,error:'Conciliação pendente; notificação deve ser repetida.'},503)}
       }

@@ -1226,11 +1226,13 @@ function bind(){
      const data=await res.json();if(!res.ok||!data.ok)throw Error(data.error||'Não foi possível conciliar o PIX.');
      if(data.state==='paid'||data.state==='already-paid'){
        if(data.state==='paid')IPAData.updatePayment(id,{status:'Pago',paidAt:data.paidAt,mpPaymentId:data.mpPaymentId,mpStatus:'approved',paymentEnvironment:'production'});
-       toast(data.message||'PIX confirmado.');
-       if(data.state==='paid')render();
-       else {btn.textContent='Já conciliado';btn.disabled=true;}
+       const emailState=data.receipt?.state;
+       if(emailState==='sent')toast(data.receipt.alreadySent?'PIX confirmado. Agradecimento já enviado.':'PIX confirmado! Agradecimento enviado ao Resend.');
+       else if(emailState==='failed')toast('PIX confirmado. E-mail pendente: '+(data.receipt.message||'falha no envio'));
+       else toast((data.message||'PIX confirmado.')+' · E-mail: '+(data.receipt?.message||'não verificado'));
+       render();
      }else{toast(data.message||'PIX ainda não conciliado.');btn.disabled=false;btn.textContent=old}
-   }catch(e){toast('PIX: '+(e.message||'Erro desconhecido')+'. Nenhuma baixa foi realizada.');btn.disabled=false;btn.textContent=old}
+   }catch(e){toast('PIX: '+(e.message||'Erro desconhecido')+'. Confira o status antes de tentar novamente.');btn.disabled=false;btn.textContent=old}
  });
  document.querySelectorAll('[data-admin-remind]').forEach(b=>b.onclick=()=>toast('Lembrete enviado ao cliente'));
  document.querySelectorAll('[data-admin-exit]').forEach(b=>b.onclick=()=>showInitialScenario());
@@ -3227,7 +3229,7 @@ function adminFinance(){
  <section class="ipa-admin-panel"><div class="ipa-admin-payment-list">${d.payments.map(p=>{
    const c=d.clients.find(x=>x.id===p.clientId);
    const t=d.trips.find(x=>x.id===p.tripId);
-   return `<div><span><b>${p.title}</b><small>${c?.name||'Cliente não vinculado'} · ${t?.name||p.trip||'Viagem'}</small><small>${p.description||''} · vence ${p.dueDate?new Date(p.dueDate+'T12:00:00').toLocaleDateString('pt-BR'):'-'}</small></span><strong>${adminMoney(p.amount)}</strong><em class="${p.status==='Pago'?'ok':'wait'}">${p.status}</em>${p.status!=='Pago'?`<button type="button" class="ipa-reconcile-pix" data-admin-reconcile-pix="${ipaEscape(p.id)}">↻ Verificar PIX</button>`:''}<button data-admin-remind="${p.id}">Lembrar</button></div>`;
+   return `<div><span><b>${p.title}</b><small>${c?.name||'Cliente não vinculado'} · ${t?.name||p.trip||'Viagem'}</small><small>${p.description||''} · vence ${p.dueDate?new Date(p.dueDate+'T12:00:00').toLocaleDateString('pt-BR'):'-'}</small></span><strong>${adminMoney(p.amount)}</strong><em class="${p.status==='Pago'?'ok':'wait'}">${p.status}</em>${p.status!=='Pago'?`<button type="button" class="ipa-reconcile-pix" data-admin-reconcile-pix="${ipaEscape(p.id)}">↻ Verificar PIX</button>`:(p.mpPaymentId?`<button type="button" class="ipa-reconcile-pix" data-admin-reconcile-pix="${ipaEscape(p.id)}">✉️ Verificar agradecimento</button>`:'')}<button data-admin-remind="${p.id}">Lembrar</button></div>`;
  }).join('')||'<p>Nenhuma cobrança criada.</p>'}</div></section>`;
 }
 function adminPartners(){const d=adminData();return `<div class="ipa-admin-head"><div><span class="eyebrow">SERVIÇOS</span><h1>Serviços recomendados</h1><p>Links oficiais de referência — sem vínculo comercial declarado.</p></div></div>${ipaEditorialServicesHtml()}<section class="ipa-admin-panel"><h3>Benefícios cadastrados anteriormente</h3><div class="ipa-admin-partners">${d.benefits.map(b=>`<label><div><b>${b.title}</b><small>${b.sponsorLabel} · ${b.partner}</small></div><input type="checkbox" data-admin-benefit="${b.id}" ${b.enabled?'checked':''}></label>`).join('')}</div></section>`}
