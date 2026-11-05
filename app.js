@@ -2792,13 +2792,23 @@ function climateSection(t){
  if(!cards.length)return `<section class="section climate-section"><div class="section-head"><div><span class="eyebrow">✨ ENTRE NO CLIMA</span><h2>${ipaEscape(dest)}</h2></div></div><p>Estamos preparando recomendações culturais verificadas para este destino.</p></section>`;
  return `<section class="section climate-section"><div class="section-head"><div><span class="eyebrow">✨ ENTRE NO CLIMA</span><h2>${dest} começa antes do embarque</h2></div></div><div class="climate-grid">${cards.map((x,i)=>`<article data-ipa-climate-card="1" data-ipa-climate-type="${ipaEscape(x[1])}" data-ipa-climate-title="${ipaEscape(x[2])}" data-ipa-climate-destination="${ipaEscape(dest)}" data-ipa-climate-url="${ipaEscape(x[4]||'')}"><span>${x[0]}</span><small>${x[1]}</small><b>${x[2]}</b><p>${x[3]}</p><div class="ipa-climate-actions">${ipaStreamButtons(x)}</div>${x[4]&&!ipaClimateProviderFromUrl(x[4])?`<button data-external-route="${ipaEscape(x[4])}">Abrir sugestão ↗</button>`:i===4?`<button data-climate-explore="${encodeURIComponent(x[2])}">📍 Ver no Explorar</button>`:''}</article>`).join('')}</div></section>`;
 }
+function ipaPostcardAsset(destination){
+ const x=String(destination||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+ if(/sao paulo|sampa/.test(x))return 'assets/postcard-sao-paulo.svg';
+ if(/paris|franca/.test(x))return 'assets/postcard-paris.svg';
+ if(/londres|london|inglaterra/.test(x))return 'assets/postcard-londres.svg';
+ if(/roma|rome|italia/.test(x))return 'assets/postcard-roma.svg';
+ if(/lisboa|lisbon|portugal/.test(x))return 'assets/postcard-lisboa.svg';
+ return 'assets/postcard-generic.svg';
+}
+function ipaPostcardStyle(city){return `style="--ipa-city-art:url('${ipaPostcardAsset(city)}')"`;}
 function flightWalletSection(t,d){
  const flight=t?.flight||{};
  const docs=(d?.tripDocuments||[]).filter(x=>x.tripId===t?.id&&x.type==='Passagem aérea');
  if(!Object.keys(flight).length&&!docs.length)return "";
  const f=Object.keys(flight).length?flight:(docs[0]||{});
  return `<section class="section"><div class="section-head"><div><span class="eyebrow">✈️ SEU VOO</span><h2>Cartão de embarque inteligente</h2></div><span class="chip green">Dados do ADM</span></div>
- <div class="smart-flight-card"><div class="flight-top"><div><small>${f.airline||'Companhia'}</small><b>${f.flightNumber||f.title||'Voo'}</b></div><strong>${f.date?new Date(f.date+'T12:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'}):'--/--'}</strong></div>
+ <div class="smart-flight-card ipa-flight-postcard" ${ipaPostcardStyle(f.destination||tripDestination(t))}><div class="flight-top"><div><small>${f.airline||'Companhia'}</small><b>${f.flightNumber||f.title||'Voo'}</b></div><strong>${f.date?new Date(f.date+'T12:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'}):'--/--'}</strong></div>
  <div class="flight-route"><div><small>ORIGEM</small><b>${f.origin||'---'}</b></div><span>✈</span><div><small>DESTINO</small><b>${f.destination||tripDestination(t)}</b></div></div>
  <div class="flight-details"><div><small>HORÁRIO</small><b>${f.time||'--:--'}</b></div><div><small>TERMINAL</small><b>${f.terminal||'-'}</b></div><div><small>PORTÃO</small><b>${f.gate||'-'}</b></div><div><small>ASSENTO</small><b>${f.seat||'-'}</b></div></div>
  ${f.notes?`<p>${f.notes}</p>`:''}</div></section>`;
@@ -2953,7 +2963,7 @@ function beforeView(){
  const plan=t?.plan||d?.client?.plan||"Explore";
  const previewDays=[...(t?.itinerary||[])].sort((a,b)=>Number(a.day)-Number(b.day));
  const firstDay=previewDays.find(x=>Number(x.day)===Number(state.tripDay))||previewDays[0];
- return `<section class="v2-hero v2-before-hero">
+ return `<section class="v2-hero v2-before-hero ipa-destination-postcard" ${ipaPostcardStyle(dest)}>
  <div class="v2-hero-top"><div><span class="eyebrow">Antes da viagem</span><h1>${dest} já está esperando por você. ${flag}</h1><p>${t?.published?'Sua experiência personalizada está publicada.':'Sua viagem está em preparação.'}</p></div><span class="v2-weather">✈️ ${country}</span></div>
  <div class="v2-countdown"><div><strong>${t?.startDate?new Date(t.startDate+'T12:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'}):'--/--'}</strong><small>embarque</small></div><div><strong>${t?.itinerary?.length||0}</strong><small>dias de roteiro</small></div><div><strong>${plan}</strong><small>plano</small></div></div>
  <button class="btn btn-primary btn-block" data-go="trip">Abrir meu roteiro</button>
@@ -3486,7 +3496,7 @@ let ipaClientAiiOpen=false;
 let ipaClientAiiSelected='';
 let ipaClientAiiDraft='';
 let ipaClientAiiStop=null;
-function ipaClientAiiWidgetHtml(){return `<div class="ipa-aii-widget ipa-aii-client" id="ipaClientAii"><button id="ipaClientAiiLaunch" type="button" class="ipa-aii-launch" aria-expanded="${ipaClientAiiOpen?'true':'false'}">🎒 Fale com o Mochilito</button><section id="ipaClientAiiPanel" class="ipa-aii-panel" ${ipaClientAiiOpen?'':'hidden'}><div class="ipa-aii-header"><div><b>🎒 Mochilito | Concierge Indo por Aí</b><small>Seu canal direto com a equipe Indo por Aí</small></div><button id="ipaClientAiiClose" aria-label="Fechar chat">✕</button></div><div id="ipaClientAiiContent" class="ipa-aii-content"></div></section></div>`}
+function ipaClientAiiWidgetHtml(){return `<div class="ipa-aii-widget ipa-aii-client" id="ipaClientAii"><button id="ipaClientAiiLaunch" type="button" class="ipa-aii-launch" aria-expanded="${ipaClientAiiOpen?'true':'false'}"><img class="ipa-mochilito-avatar" src="assets/mochilito-avatar.svg" alt="" aria-hidden="true"> Fale com o Mochilito</button><section id="ipaClientAiiPanel" class="ipa-aii-panel" ${ipaClientAiiOpen?'':'hidden'}><div class="ipa-aii-header"><div><b><img class="ipa-mochilito-avatar" src="assets/mochilito-avatar.svg" alt="" aria-hidden="true"> Mochilito | Concierge Indo por Aí</b><small>Seu canal direto com a equipe Indo por Aí</small></div><button id="ipaClientAiiClose" aria-label="Fechar chat">✕</button></div><div id="ipaClientAiiContent" class="ipa-aii-content"></div></section></div>`}
 async function ipaRenderClientAii(){
  const content=document.querySelector('#ipaClientAiiContent'),trip=activeTrip();if(!content||!trip)return;
  if(ipaClientAiiStop){ipaClientAiiStop();ipaClientAiiStop=null}
@@ -3524,7 +3534,7 @@ let ipaAiiOpen=false;
 let ipaAiiThreadId='';
 function ipaAiiWidgetHtml(){
  const n=ipaConciergePendingCount();
- return `<div class="ipa-aii-widget" id="ipaAiiWidget"><button type="button" class="ipa-aii-launch" id="ipaAiiLaunch" aria-expanded="${ipaAiiOpen?'true':'false'}" aria-controls="ipaAiiPanel">🎒 Mochilito · Concierge${n?` <b class="ipa-notification-count">${n}</b>`:''}</button><div class="ipa-aii-panel" id="ipaAiiPanel" ${ipaAiiOpen?'':'hidden'}><div class="ipa-aii-header"><div><b>🎒 Mochilito</b><small>Concierge Indo por Aí · Atendimento humano</small></div><button type="button" id="ipaAiiClose" aria-label="Fechar chat">✕</button></div><div class="ipa-aii-content" id="ipaAiiContent"></div></div></div>`;
+ return `<div class="ipa-aii-widget" id="ipaAiiWidget"><button type="button" class="ipa-aii-launch" id="ipaAiiLaunch" aria-expanded="${ipaAiiOpen?'true':'false'}" aria-controls="ipaAiiPanel"><img class="ipa-mochilito-avatar" src="assets/mochilito-avatar.svg" alt="" aria-hidden="true"> Mochilito · Concierge${n?` <b class="ipa-notification-count">${n}</b>`:''}</button><div class="ipa-aii-panel" id="ipaAiiPanel" ${ipaAiiOpen?'':'hidden'}><div class="ipa-aii-header"><div><b><img class="ipa-mochilito-avatar" src="assets/mochilito-avatar.svg" alt="" aria-hidden="true"> Mochilito</b><small>Concierge Indo por Aí · Atendimento humano</small></div><button type="button" id="ipaAiiClose" aria-label="Fechar chat">✕</button></div><div class="ipa-aii-content" id="ipaAiiContent"></div></div></div>`;
 }
 function ipaRenderAiiPanel(){
  const pane=document.querySelector('#ipaAiiContent');if(!pane)return;
