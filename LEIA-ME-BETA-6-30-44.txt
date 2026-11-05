@@ -1,0 +1,8 @@
+INDO POR AÍ — BETA 6.30.44
+Base 6.30.43.
+1. Identidade visual uniforme: branco/azul-marinho/azul vivo/laranja na interface cliente e ADM, preservando layouts e módulos existentes.
+2. Omio em Serviços Recomendados, link público sem alegação de parceria.
+3. Explorar: rotas longas divididas em trechos de até cinco paradas (máximo de três pontos intermediários), com continuidade entre trechos e todas as atrações preservadas; mesma lógica no Durante e em Minha viagem. O Google Maps não permite garantir todas as paradas de roteiros longos em uma única rota no navegador móvel.
+4. Título do aplicativo sem texto de versão. Novos ícones PNG derivados do logo oficial original, com ícone maskable para Android, Apple Touch Icon para iOS e cache/versionamento atualizados.
+Ícones previamente instalados no celular podem ficar em cache pelo sistema: remover o atalho antigo e reinstalar o PWA.
+Valide depois de publicar, incluindo uma rota com 7+ lugares e instalação em dispositivo real.

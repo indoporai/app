@@ -1,20 +1,21 @@
-const CACHE = "indo-por-ai-v2-beta-6-30-43-budget-edit";
+const CACHE = "indo-por-ai-v2-beta-6-30-44-budget-edit";
 const CORE = [
   "./",
   "index.html",
-  "styles.css?v=v2-beta-6-30-43",
-  "app.js?v=v2-beta-6-30-43",
-  "data-service.js?v=v2-beta-6-30-43",
-  "firebase-service.js?v=v2-beta-6-30-43",
+  "styles.css?v=v2-beta-6-30-44",
+  "app.js?v=v2-beta-6-30-44",
+  "data-service.js?v=v2-beta-6-30-44",
+  "firebase-service.js?v=v2-beta-6-30-44",
   "admin.html",
-  "admin.js?v=v2-beta-6-30-43",
+  "admin.js?v=v2-beta-6-30-44",
   "admin.css",
-  "manifest.webmanifest?v=63043",
-  "pwa-install.js?v=v2-beta-6-30-43",
+  "manifest.webmanifest?v=63044",
+  "pwa-install.js?v=v2-beta-6-30-44",
   "assets/apple-touch-icon.png",
   "assets/icon-192.png",
   "assets/icon-512.png",
   "assets/logo-oficial-cliente.png",
+  "assets/icon-maskable-512.png",
 ];
 self.addEventListener("install", event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(CORE)).then(() => self.skipWaiting()));

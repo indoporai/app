@@ -154,3 +154,11 @@
 .country-dashboard .country-scroll-list::-webkit-scrollbar{width:8px}
 .country-dashboard .country-scroll-list::-webkit-scrollbar-thumb{background:#82bdc1;border-radius:10px}
 .country-dashboard .country-scroll-list::-webkit-scrollbar-track{background:#eef6f6;border-radius:10px}
+
+/* Beta 6.30.44 — marca unificada no painel administrativo */
+:root{--navy:#0A2359;--navy2:#1267A9;--teal:#1267A9;--orange:#FF7017;--cream:#FFFFFF;--ink:#0A2359;--line:#dce7f4}
+body{background:#f5f9ff}
+.business-top h1,.panel-head h2,.business-main h2{color:#0A2359}
+.business-layout .sidebar{background:#0A2359}
+.business-layout .nav.active{background:#1267A9}
+.business-layout button:focus-visible{outline:3px solid #FF7017;outline-offset:2px}
