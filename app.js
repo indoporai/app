@@ -2198,9 +2198,7 @@ function benefitsPersonalized(){
  const active=d.benefits.filter(x=>x.enabled);
  return `${ipaEditorialServicesHtml()}<section class="section"><div class="section-head"><div><span class="eyebrow">Personalizado para você</span><h2>Benefícios exclusivos</h2></div><span class="chip">${active.length} ativos</span></div><div class="benefit-market">${active.map(b=>`<button class="benefit-market-card" data-benefit-id="${b.id}"><div><span class="eyebrow">${b.sponsorLabel}</span><h3>${b.title}</h3><p>${b.partner}</p></div><span>›</span></button>`).join('')}</div></section>`;
 }
-function nextRecommended(){
- return `<section class="section"><div class="next-recommended"><div class="next-recommended-icon">✨</div><div><span class="eyebrow">Seu próximo passo</span><h3>Prepare o câmbio da viagem</h3><p>Documentos e hotel estão confirmados. O check-in abre em 3 dias; enquanto isso, deixe seu saldo em euro preparado.</p></div><button class="btn btn-primary" data-prep-section="exchange">Ver Exchange</button></div></section>`;
-}
+function nextRecommended(){ return ""; }
 
 function visitReview(id){
  const d=ipaDB();return d?.visitReviews?.[id]||{visited:false,stars:0,note:""};
@@ -2949,7 +2947,6 @@ ${tripModule('itinerary')?`<section class="section ipa-before-itinerary"><div cl
   ${tripModule('documents')?ipaPrepJourneyCard('documents','🛂','Documentos','Documentos para '+country):''}
   ${tripModule('checkin')?ipaPrepJourneyCard('checkin','☑️','Check-in','Preparação para o embarque'):''}
   ${tripModule('luggage')?ipaPrepJourneyCard('luggage','🧳','Mala inteligente','Itens recomendados para '+country):''}
-  ${tripModule('exchange')?`<button class="v2-journey-step" data-no-save-feedback data-prep-section="exchange"><span>💱</span><div><b>Indo por Aí Exchange</b><small>Oferta personalizada</small></div></button>`:''}
  </div>
 </section>
 ${(ipaDB().tripDocuments||[]).filter(x=>x.tripId===t.id).length?`<section class="section"><div class="section-head"><div><span class="eyebrow">CARTEIRA DA VIAGEM</span><h2>Seus documentos</h2></div></div><div class="travel-wallet">${(ipaDB().tripDocuments||[]).filter(x=>x.tripId===t.id).map(x=>`<div><span>${x.type==='Passagem aérea'?'✈️':x.type.includes('Hospedagem')?'🏨':x.type.includes('trem')?'🚆':x.type.includes('ônibus')?'🚌':x.type.includes('Ingresso')?'🎟️':x.type.includes('Seguro')?'🛡️':'📄'}</span><div><b>${x.title}</b><small>${[x.date,x.time,x.terminal&&('Terminal '+x.terminal),x.gate&&('Portão '+x.gate),x.locator&&('Localizador '+x.locator)].filter(Boolean).join(' · ')}</small></div>${x.url?`<button data-external-route="${x.url}">Abrir</button>`:''}</div>`).join('')}</div></section>`:''}

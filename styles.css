@@ -1630,3 +1630,51 @@ dialog:has(#routeCatalogPlace) .smart-place-actions button{
 .ipa-transport-leg .ipa-between-stops-label{color:#a65a13!important}
 .ipa-direct-maps-link{display:flex!important;align-items:center;justify-content:center;text-align:center;text-decoration:none!important;margin-top:14px!important;min-height:48px}
 @media(max-width:550px){.during-place-list>.during-place-card{margin-top:17px!important;padding:15px!important}.during-place-list>.ipa-transport-leg{margin:16px 6px 7px 12px!important;padding:14px!important}.during-place-card .ipa-during-stop-kicker{padding:10px!important;font-size:11px!important}}
+
+
+/* Beta 6.30.43 — identidade editorial Indo por Aí: branco, marinho, azul e laranja.
+   Aplicação gradual nas telas do cliente, sem modificar ADM / regras de negócio. */
+:root{--ipa-editorial-navy:#091f58;--ipa-editorial-blue:#0b78c3;--ipa-editorial-orange:#ff7017;--ipa-editorial-paper:#fff}
+.app-shell{background:#fff}
+.app-shell .view{background:linear-gradient(180deg,#fff 0%,#fff 78%,#f5faff 100%)}
+.app-shell .section-head h2{color:#0a2359}
+.app-shell .section-head .eyebrow{color:#1769ac}
+.app-shell .btn-primary{background:#ff7017;color:#fff;box-shadow:0 9px 20px rgba(255,112,23,.23)}
+.app-shell .btn-primary:hover,.app-shell .ipa-navigate-place:hover{filter:brightness(.95)}
+.app-shell button:focus-visible,.app-shell a:focus-visible{outline:3px solid #f98231;outline-offset:3px}
+/* Compactar cabeçalho DURANTE sem esconder informações ou botões. */
+.app-shell .during-personalized-hero{min-height:0!important;padding:19px 20px 20px!important;border-radius:24px!important;background:linear-gradient(112deg,#08245e 0%,#1265a7 74%,#2089c3 120%)!important;box-shadow:0 10px 25px rgba(8,36,94,.16)!important}
+.app-shell .during-personalized-hero h1{font-size:clamp(1.65rem,6vw,2.12rem)!important;line-height:1.13!important;margin:8px 0 6px!important;max-width:100%!important}
+.app-shell .during-personalized-hero p{font-size:13px!important;line-height:1.35!important;max-width:100%!important}
+.app-shell .during-personalized-hero .hero-actions{margin-top:13px!important;gap:9px!important}
+.app-shell .during-personalized-hero .hero-actions .btn{padding:10px 15px!important;border-radius:13px!important;font-size:14px!important}
+.app-shell .during-personalized-hero::before{right:7px!important;top:8px!important;width:128px!important;height:128px!important;opacity:.15!important}
+.app-shell .during-personalized-hero::after{right:-80px!important;bottom:-110px!important;width:200px!important;height:200px!important;border-width:25px!important}
+/* Cards de serviços: linguagem dos posts, leve e com ação laranja. */
+.app-shell .ipa-package-service{background:#fff!important;border:1.5px solid #d3e5f5!important;border-top:4px solid #147bcc!important;box-shadow:0 8px 18px rgba(9,31,88,.06)!important;color:#0a2359!important}
+.app-shell .ipa-package-service:nth-child(3n+2){background:#f4f9ff!important}
+.app-shell .ipa-package-service small{color:#e5650e!important}
+.app-shell .ipa-package-service:hover{border-color:#ff7017!important;transform:translateY(-1px)}
+.app-shell .ipa-editorial-card{border-color:#d5e5f4!important;box-shadow:0 7px 18px rgba(9,31,88,.055)!important}
+/* Roteiro: legibilidade, cores de marca e separação das paradas intacta. */
+.app-shell .during-place-list>.during-place-card{border-color:#c5d9eb!important;box-shadow:0 10px 24px rgba(9,31,88,.09)!important}
+.app-shell .during-place-card::before{background:linear-gradient(180deg,#ff7017,#126fb5)!important}
+.app-shell .during-place-card .ipa-during-stop-kicker{background:linear-gradient(105deg,#0a2359,#1267a9)!important;color:#fff!important}
+.app-shell .during-place-card .during-place-title b{color:#0a2359!important}
+.app-shell .ipa-navigate-place{background:#ff7017!important;box-shadow:0 8px 16px rgba(255,112,23,.18)!important}
+.app-shell .during-place-list>.ipa-transport-leg{background:#f3f8ff!important;border:1px dashed #91b9d9!important;border-left:5px solid #ff7017!important}
+.app-shell .ipa-transport-leg .ipa-transport-title strong{color:#0a2359!important}
+/* Trajeto: botão claramente clicável, com área de toque e seta. */
+.app-shell .ipa-transport-leg button[data-external-route]{display:flex!important;justify-content:center!important;align-items:center!important;text-align:center!important;width:100%!important;min-height:50px!important;margin-top:13px!important;padding:12px 16px!important;border:0!important;border-radius:13px!important;background:#ff7017!important;color:white!important;font-size:14px!important;font-weight:900!important;box-shadow:0 8px 17px rgba(255,112,23,.2)!important;cursor:pointer!important}
+.app-shell .ipa-transport-leg button[data-external-route]:hover{background:#eb610b!important}
+/* Financeiro e jornada: atualização visual restrita, sem alterar fluxo financeiro. */
+.app-shell .ipa-payments-highlight{border:1.5px solid #d2e4f5!important;box-shadow:0 12px 24px rgba(9,31,88,.08)!important}
+.app-shell .ipa-payments-highlight h2{color:#0a2359!important}
+.app-shell .ipa-payments-values>div{background:#f0f7ff!important}
+.app-shell .ipa-payments-values strong{color:#0a2359!important}
+.app-shell .ipa-payments-all{background:#0a2359!important}
+.app-shell .ipa-journey-plan{background:linear-gradient(115deg,#08245e,#1167a5)!important;box-shadow:0 12px 24px rgba(9,31,88,.12)!important}
+.app-shell .ipa-journey-plan .mode-switch button{background:#296fa7!important}
+.app-shell .ipa-journey-plan .mode-switch button.active{background:#fff!important;color:#0a2359!important}
+.app-shell .ipa-plan-benefits-button{background:#ff7017!important}
+@media(max-width:450px){.app-shell .during-personalized-hero{padding:17px!important}.app-shell .during-personalized-hero h1{font-size:1.72rem!important}.app-shell .ipa-transport-leg button[data-external-route]{font-size:13px!important;padding:11px!important}}

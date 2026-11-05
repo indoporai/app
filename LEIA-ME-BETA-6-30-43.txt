@@ -1,0 +1,8 @@
+INDO POR AÍ — BETA 6.30.43
+Base: 6.30.42.
+- Trajeto no Google Maps: botão laranja destacado e área de toque maior.
+- Removido atalho do Indo por Aí Exchange da jornada do cliente; continuam intactos os módulos financeiros/câmbio e os recursos do ADM.
+- Hero Durante mais compacto, preservando o título, o dia, Abrir rota e Live.
+- Padronização visual inicial conforme os posts: fundo branco, azul-marinho, azul vivo e laranja nos títulos, cards de serviço, roteiro, jornada e pagamentos.
+- Não foram modificados Firebase, Mercado Pago, webhooks, autenticação, logo original ou histórico do Mochilito.
+- Validar após publicar no Cloudflare em celular real.
