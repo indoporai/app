@@ -13,7 +13,7 @@
     wrap.hidden = true;
     wrap.innerHTML = `
       <div class="ipa-install-card" role="region" aria-label="Instalar Indo por Aí">
-        <img src="assets/icon-192-6346.png" alt="" class="ipa-install-icon">
+        <img src="assets/icon-192-6347.png" alt="" class="ipa-install-icon">
         <div class="ipa-install-copy"><strong>Instale o Indo por Aí</strong><span id="ipaInstallText">Tenha o app na tela inicial do celular.</span></div>
         <button type="button" id="ipaInstallBtn" class="ipa-install-primary">Instalar</button>
         <button type="button" id="ipaInstallClose" class="ipa-install-close" aria-label="Fechar">×</button>

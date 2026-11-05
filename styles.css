@@ -1688,3 +1688,22 @@ dialog:has(#routeCatalogPlace) .smart-place-actions button{
 /* PNG backpack traveler icon: robust across Cloudflare and installed app contexts. */
 .ipa-mochilito-avatar{object-fit:contain!important;display:inline-block!important;vertical-align:middle!important}
 .ipa-aii-header b{display:flex!important;align-items:center!important;gap:8px;flex-wrap:wrap}
+
+
+/* Beta 6.30.47: visible city postcard instead of near-invisible white line art. */
+.view .v2-hero.v2-before-hero.ipa-destination-postcard,
+.v2-hero.v2-before-hero.ipa-destination-postcard{position:relative;isolation:isolate;overflow:hidden;background:linear-gradient(135deg,#0c8288,#43b6af 65%,#e7a452)!important}
+.v2-hero.v2-before-hero.ipa-destination-postcard::after,
+.smart-flight-card.ipa-flight-postcard::after{
+ content:""!important;position:absolute;inset:0;display:block;
+ background-image:linear-gradient(90deg,rgba(7,93,105,.94) 0%,rgba(10,111,120,.79) 42%,rgba(6,94,109,.28) 100%),var(--ipa-city-art)!important;
+ background-size:cover,cover!important;background-position:center,right center!important;background-repeat:no-repeat!important;
+ opacity:1!important;transform:none!important;pointer-events:none!important;z-index:0!important;
+}
+.v2-hero.v2-before-hero.ipa-destination-postcard>*,
+.smart-flight-card.ipa-flight-postcard>*{position:relative;z-index:2}
+.v2-before-hero.ipa-destination-postcard .v2-hero-top,.v2-before-hero.ipa-destination-postcard .v2-countdown{position:relative;z-index:2}
+.smart-flight-card.ipa-flight-postcard::after{background-image:linear-gradient(90deg,rgba(3,84,95,.94),rgba(4,106,117,.79) 54%,rgba(3,95,106,.36)),var(--ipa-city-art)!important}
+/* Keep the mascot image contained and readable as button/heading icon. */
+.ipa-aii-launch .ipa-mochilito-avatar{width:34px!important;height:38px!important;object-fit:contain!important;flex-shrink:0}
+.ipa-aii-header .ipa-mochilito-avatar{width:28px!important;height:31px!important;object-fit:contain!important}

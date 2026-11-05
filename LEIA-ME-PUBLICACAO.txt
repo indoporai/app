@@ -1,9 +1,9 @@
-Indo por Aí — Beta 6.30.46
+Indo por Aí — Beta 6.30.47 (base 6.30.46)
 
-1. Card Durante compacto: removida altura mínima herdada (295px).
-2. Card Antes com tipografia mais ajustada sem perda de informações.
-3. Mochilito: ícone PNG rasterizado para evitar falhas de carregamento SVG.
-4. PWA: ícones com nomes novos, manifesto atualizado e cache do service worker incrementado.
-5. Paleta original restaurada da beta 6.30.42 mantida.
+- Card Antes: cartão-postal colorido de destino em marca d’água visível com degradê escuro para legibilidade. Artes locais de São Paulo, Paris, Londres, Roma e Lisboa; fallback genérico.
+- Cartão de embarque: mesmo fundo de destino, com paleta azul-petróleo original.
+- Mochilito: PNG embutido no app.js para eliminar erro de caminho/rede/cache na imagem do chat.
+- Ícone instalável: mantendo arte oficial intacta, atualiza manifesto com nomes novos e fornece também caminhos convencionais favicon.ico e apple-touch-icon.png, com cache atualizado.
 
-OBS: Android e iOS podem preservar o ícone de uma instalação já existente. Após publicar e confirmar o manifesto atualizado, remova apenas o atalho instalado e instale de novo. A remoção do PWA pode apagar dados armazenados localmente; confirme sincronização antes.
+IMPORTANTE: o navegador/sistema pode conservar o ícone de app já instalado. Isso não pode ser alterado remotamente. Verifique a URL manifest.webmanifest?v=63047 e imagens apontadas no celular. Reinstale só depois de confirmar sincronização dos seus dados.
+- Paleta original e rotas/PIX/Firebase não alterados.
