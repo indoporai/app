@@ -1488,6 +1488,15 @@ function bind(){
  };
  document.querySelectorAll('[data-firebase-logout]').forEach(b=>b.onclick=async()=>{await window.IPAFirebase.logout();render()});
  document.querySelectorAll('[data-firebase-sync]').forEach(b=>b.onclick=async()=>{toast('Sincronizando com Firebase...');try{await window.IPAFirebase.syncNow();toast('Firebase sincronizado')}catch(e){toast(e.message||'Erro ao sincronizar')}});
+ document.querySelectorAll('[data-ipa-navigate-place]').forEach(b=>b.onclick=()=>{
+  const t=activeTrip();if(!t)return;
+  const day=(t.itinerary||[]).find(d=>Number(d.day)===Number(state.tripDay))||(t.itinerary||[])[0];
+  if(!day)return;
+  const official=normalizedPlaces(day);
+  const personal=ipaGetPersonalRoute(t,day.day).map((p,i)=>({id:p.id||`personal-${i}`,name:p.name||'Descoberta',address:p.address||'',lat:p.lat??p.latitude,lng:p.lng??p.longitude}));
+  const place=[...official,...personal][Number(b.dataset.ipaNavigatePlace)];
+  if(place)ipaOpenNavigationForPlace(place,t);
+ });
  document.querySelectorAll('[data-external-route]').forEach(b=>b.onclick=()=>{
   const url=b.dataset.externalRoute;
   if(!url)return;
@@ -2840,6 +2849,45 @@ function ipaTransportBetween(trip,from,to){
  const icons={walking:'🚶',transit:'🚆',driving:'🚗',bicycling:'🚲'};
  return `<div class="ipa-transport-leg"><div class="ipa-transport-title"><span>${icons[mode]||'🧭'}</span><strong>Como chegar ao próximo lugar</strong></div><small>${ipaEscape(from.name||'Saída')} → ${ipaEscape(to.name||'Destino')}</small>${leg.instructions?`<p>${ipaEscape(leg.instructions)}</p>`:'<p>Consulte o trajeto atualizado, linhas e horários antes de sair.</p>'}<button type="button" data-external-route="${ipaEscape(ipaTransportURL(from,to,trip,mode))}">🗺️ Abrir trajeto no Google Maps ↗</button></div>`;
 }
+// Beta 6.30.40 — navegação sob demanda a partir da localização real do viajante.
+// Não persistimos coordenadas, nem solicitamos GPS antes de uma ação explícita.
+function ipaDestinationForMaps(place,trip){
+ const latitude=Number(place?.lat??place?.latitude),longitude=Number(place?.lng??place?.longitude);
+ if(Number.isFinite(latitude)&&Number.isFinite(longitude)&&latitude>=-90&&latitude<=90&&longitude>=-180&&longitude<=180&&
+    (place?.lat!==undefined||place?.latitude!==undefined)&&(place?.lng!==undefined||place?.longitude!==undefined)){
+  return latitude+','+longitude;
+ }
+ return [place?.address||place?.name,tripDestination(trip),tripCountry(trip)].filter(Boolean).join(', ');
+}
+function ipaOpenNavigationForPlace(place,trip){
+ if(!place)return;
+ const destination=ipaDestinationForMaps(place,trip);
+ const modes=[['walking','🚶','A pé'],['transit','🚆','Transporte público'],['driving','🚗','Carro'],['bicycling','🚲','Bicicleta']];
+ showModal(`<span class="eyebrow">📍 NAVEGAÇÃO</span><h2>Ir até ${ipaEscape(place.name||'este lugar')}</h2><p>Escolha como deseja ir. Vamos pedir sua localização <strong>apenas quando você tocar em Traçar rota</strong>. Ela não será salva no aplicativo.</p><div class="ipa-navigation-mode-grid">${modes.map((m,i)=>`<label class="ipa-navigation-mode"><input type="radio" name="ipa-nav-mode" value="${m[0]}" ${i===1?'checked':''}><span>${m[1]} ${m[2]}</span></label>`).join('')}</div><button id="ipaRouteFromGPS" class="btn btn-primary btn-block" type="button">📍 Traçar rota da minha localização</button><button id="ipaRouteWithoutGPS" class="btn btn-light btn-block" type="button">Abrir Maps sem usar meu GPS neste app</button><small id="ipaNavigationStatus" role="status" class="ipa-navigation-status">O Google Maps mostrará as opções atuais de trajeto e transporte, quando disponíveis.</small>`);
+ const getMode=()=>modalContent.querySelector('input[name="ipa-nav-mode"]:checked')?.value||'transit';
+ const routeURL=(mode,origin)=>'https://www.google.com/maps/dir/?api=1&destination='+encodeURIComponent(destination)+'&travelmode='+encodeURIComponent(mode)+(origin?'&origin='+encodeURIComponent(origin):'');
+ const openRoute=(mode,useGPS)=>{
+  // A guia é criada na interação do usuário para não ser bloqueada após o GPS assíncrono.
+  const tab=window.open('about:blank','_blank');
+  const go=origin=>{
+   const url=routeURL(mode,origin);
+   ipaSaveClientPage();
+   if(tab&&!tab.closed){tab.opener=null;tab.location.replace(url)}
+   else window.location.assign(url);
+   try{modal.close()}catch(_){}
+  };
+  if(!useGPS||!navigator.geolocation){go('');return;}
+  const status=modalContent.querySelector('#ipaNavigationStatus');
+  if(status)status.textContent='📍 Obtendo localização atual com sua autorização...';
+  navigator.geolocation.getCurrentPosition(
+   pos=>go(pos.coords.latitude.toFixed(6)+','+pos.coords.longitude.toFixed(6)),
+   ()=>{if(status)status.textContent='Localização não disponível ou não autorizada. O Google Maps permitirá escolher a origem.';go('')},
+   {enableHighAccuracy:true,timeout:12000,maximumAge:0}
+  );
+ };
+ modalContent.querySelector('#ipaRouteFromGPS').onclick=()=>openRoute(getMode(),true);
+ modalContent.querySelector('#ipaRouteWithoutGPS').onclick=()=>openRoute(getMode(),false);
+}
 function ipaAdminEditTransport(tripId,dayNo,fromIndex){
  const t=adminData().trips.find(x=>String(x.id)===String(tripId)),day=t?.itinerary?.find(d=>Number(d.day)===Number(dayNo));
  const places=normalizedPlaces(day),from=places[fromIndex],to=places[fromIndex+1];if(!from||!to)return;
@@ -3770,7 +3818,7 @@ function duringView(){
  return `<section class="hero during-personalized-hero"><span class="eyebrow">Durante a viagem</span><h1>${tripDestination(t)} ${flag}</h1><p>${t.name} · Dia ${day.day}${day.title?` · ${day.title}`:''}</p><div class="hero-actions">${route?`<button class="btn btn-light" data-external-route="${route}">Abrir rota</button>`:''}${tripModule('live')?`<button class="btn btn-primary" id="realLiveBtn">🔴 Live</button>`:''}</div></section>
  ${modeCard()}
  <section class="section ipa-top-day-tabs"><div class="section-head"><h2>Escolha o dia do roteiro</h2></div><div class="day-strip" aria-label="Dias da viagem">${days.map(x=>`<button type="button" class="day-pill ${Number(x.day)===Number(day.day)?'active':''}" data-day="${x.day}" aria-pressed="${Number(x.day)===Number(day.day)}"><small>Dia</small><strong>${x.day}</strong></button>`).join('')}</div></section>
- <section class="section"><div class="section-head"><div><span class="eyebrow">Roteiro real</span><h2>${day.title||`Dia ${day.day}`}</h2></div><span class="chip">${places.length} locais</span></div><div class="during-place-list">${places.map((p,i)=>`<article class="during-place-card ${p.personal?'during-place-personal':''}"><div class="during-place-number">${i+1}</div>${ipaPlacePhotoHtml(p,'ipa-during-thumbnail')}<div class="during-place-main"><small>${p.time||'Horário livre'}</small><div class="during-place-title" data-journey-title="${ipaEscape([t.id,day.day,p.id||i].join(':'))}"><b>${p.name}</b></div></div><div class="during-place-details"><p>${ipaEscape(p.address||'Programado no roteiro')}</p>${p.note?`<div class="ipa-place-client-note"><strong>📝 Observação</strong><span>${ipaEscape(p.note)}</span></div>`:''}${(p.smartTip||p.tip)?`<div class="ipa-place-client-tip"><strong>💡 Dica Indo por Aí</strong><span>${ipaEscape(p.smartTip||p.tip)}</span></div>`:''}${ipaJourneyFeedbackHtml(t.id,day.day,p.id||i,p.name,(p.address||p.name)+', '+country)}</div></article>${i<places.length-1?ipaTransportBetween(t,p,places[i+1]):''}`).join('')||'<p>Nenhum local cadastrado para este dia.</p>'}</div></section>
+ <section class="section"><div class="section-head"><div><span class="eyebrow">Roteiro real</span><h2>${day.title||`Dia ${day.day}`}</h2></div><span class="chip">${places.length} locais</span></div><div class="during-place-list">${places.map((p,i)=>`<article class="during-place-card ${p.personal?'during-place-personal':''}"><div class="during-place-number">${i+1}</div>${ipaPlacePhotoHtml(p,'ipa-during-thumbnail')}<div class="during-place-main"><small>${p.time||'Horário livre'}</small><div class="during-place-title" data-journey-title="${ipaEscape([t.id,day.day,p.id||i].join(':'))}"><b>${p.name}</b></div></div><div class="during-place-details"><p>${ipaEscape(p.address||'Programado no roteiro')}</p>${p.note?`<div class="ipa-place-client-note"><strong>📝 Observação</strong><span>${ipaEscape(p.note)}</span></div>`:''}${(p.smartTip||p.tip)?`<div class="ipa-place-client-tip"><strong>💡 Dica Indo por Aí</strong><span>${ipaEscape(p.smartTip||p.tip)}</span></div>`:''}${ipaJourneyFeedbackHtml(t.id,day.day,p.id||i,p.name,(p.address||p.name)+', '+country)}<button type="button" class="ipa-navigate-place" data-ipa-navigate-place="${i}">📍 Ir até este lugar</button></div></article>${i<places.length-1?ipaTransportBetween(t,p,places[i+1]):''}`).join('')||'<p>Nenhum local cadastrado para este dia.</p>'}</div></section>
  <section class="section ipa-real-map-section"><div class="section-head"><div><span class="eyebrow">MAPA DO DIA</span><h2>Seu roteiro no mapa</h2></div><span class="chip">A → B → C${places.length>3?' → D':''}</span></div><div id="ipaRealMap" class="ipa-real-map"><div class="ipa-map-loading">🗺️ Carregando mapa...</div></div><div class="ipa-map-legend"><span><i class="official"></i> Roteiro oficial</span><span><i class="personal"></i> Dica adicionada</span><span><i class="current"></i> Você</span></div></section>
 `;
 }

@@ -1,0 +1,9 @@
+Indo por Aí — Beta 6.30.40
+Base: beta 6.30.39
+MELHORIA: em Durante → Hoje, cada lugar possui “📍 Ir até este lugar”.
+O cliente escolhe caminhada, transporte público, carro ou bicicleta, e pode autorizar GPS sob demanda.
+A origem é sua posição atual, com destino pelo cadastro do lugar e abertura no Google Maps.
+Se GPS estiver indisponível ou negado, abre Maps sem origem fixa.
+Não registra coordenadas no Firebase. As orientações ADM entre paradas permanecem intactas.
+Os tempos, itinerários e linhas são definidos pelo Google Maps, não inventados pelo app.
+Teste no celular via HTTPS (permissão de localização), e confira que o logo e os fluxos do cliente/ADM permanecem intactos.
