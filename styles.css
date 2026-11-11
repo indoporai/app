@@ -1722,3 +1722,10 @@ dialog:has(#routeCatalogPlace) .smart-place-actions button{
 }
 /* Hide the client's five-tab bottom navigation while operating as ADM only. */
 body.hidden-nav .bottom-nav{display:none!important;}
+
+/* Beta 6.30.50: Prévia segura de viagem pelo ADM */
+.ipa-preview-admin-bar{position:sticky;top:0;z-index:110;display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 16px;padding:11px 15px;background:#075667;color:white;border-radius:15px;box-shadow:0 5px 20px #07566733;font-size:13px}
+.ipa-preview-admin-bar strong{font-size:14px}.ipa-preview-admin-bar small{display:block;color:#c9ebec;margin-top:2px}
+.ipa-preview-admin-bar button{border:0;border-radius:9px;background:#ff7a19;color:#fff;cursor:pointer;padding:11px 14px;font-weight:800;white-space:nowrap}
+.ipa-admin-client-preview #ipaClientAii,.ipa-admin-client-preview .ipa-aii-client{display:none!important}
+@media(max-width:550px){.ipa-preview-admin-bar{align-items:flex-start;flex-direction:column}.ipa-preview-admin-bar button{width:100%}}

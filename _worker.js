@@ -136,7 +136,19 @@ async function getPixStatus(url, env) {
   if(!paymentId)return json({ok:false,error:"paymentId obrigatório."},400);
   const result=await mercadoPagoFetch(env,`/v1/payments/${encodeURIComponent(paymentId)}`,{method:"GET"});
   if(!result.ok)return result.response;
-  return json({ok:true,environment:"production",...extractPixPayment(result.body)});
+  // Mesma regra do webhook: a transição para Pago é validada no Mercado Pago
+  // e registrada no Firestore ANTES de tentar o agradecimento pelo Resend.
+  // Uma consulta de status não pode aprovar pagamentos por conta própria.
+  let emailReceipt=null;
+  if(result.body?.status==='approved'&&result.body?.payment_method_id==='pix'){
+    try{
+      const outcome=await ipaReconcileApprovedPayment(env,result.body);
+      if((outcome.state==='paid'||outcome.state==='already-paid')&&outcome.paymentId){
+        emailReceipt=await ipaEnsurePixReceipt(env,result.body,outcome.paymentId);
+      }
+    }catch(e){console.error('PIX status: conciliação/agradecimento pendente',String(e?.message||e));}
+  }
+  return json({ok:true,environment:"production",...extractPixPayment(result.body),receipt:emailReceipt});
 }
 
 async function verifyMpWebhook(request,url,env){

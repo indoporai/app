@@ -1,13 +1,9 @@
-Indo por Aí — Beta 6.30.49 (base 6.30.48)
+Indo por Aí — Beta 6.30.50
 
-Correção: confirmação de pagamento PIX aciona agradecimento no webhook e na conciliação manual, inclusive quando a cobrança já está paga. O Financeiro mostra Verificar agradecimento para cobrança PIX paga com mpPaymentId.
+Base: Beta 6.30.49.
+1) Ver como cliente: prévia na própria sessão autenticada do administrador, sem login de viajante. Barra fixa para voltar ao ADM. Prévia somente leitura; desabilitadas ações financeiras, chat e escrita.
+2) PIX: webhook e conciliação ADM continuam enviando automaticamente após transição confirmada para Pago. Consulta de status de PIX aprovado também tenta reconciliação segura no backend, sem exigir ação do ADM. O agradecimento é idempotente por pagamento Mercado Pago, e o estado de envio é registrado em payments no Firestore.
 
-Estados persistidos no documento payments: receiptEmailStatus (sending/sent/failed), receiptEmailLastAttemptAt, receiptEmailSentAt, receiptEmailRecipient, receiptEmailResendId, receiptEmailError.
-
-Segurança: somente ADM autenticado aciona reconciliação; Mercado Pago é sempre verificado no servidor; baixa nunca é revertida por falha do Resend. Proteção contra concorrência usando updateTime do Firestore e idempotency key do Resend por ID Mercado Pago.
-
-Teste sem novo PIX: ADM -> Financeiro -> cobrança Pago com ID Mercado Pago -> Verificar agradecimento. Verificar status em Resend Sending e campos do documento payments no Firestore.
-
-ATENÇÃO: clientes podem não possuir e-mail cadastrado; nesse caso o resultado fica failed e a operação pode ser repetida depois de corrigir o cadastro. Em casos de falha de persistência após aceite do Resend, confira no Resend antes de qualquer reenvio.
-
-Nenhum envio real foi executado neste ambiente.
+ATENÇÃO: o webhook do Mercado Pago deve estar configurado e enviando notificações de pagamento. Falha de e-mail não altera status Pago.
+Teste: login ADM, Viagens > Ver como cliente, troque Antes/Durante/Depois e dias, tente uma ação que modifique dados (deve bloquear), Voltar ao ADM (sem login). Confira que a prévia não contabiliza acesso do cliente.
+Valide a aprovação de um PIX verdadeiro via Mercado Pago e confira a mensagem no Resend. Não é necessário gerar nova cobrança só para verificar o comportamento anterior.

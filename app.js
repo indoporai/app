@@ -31,6 +31,38 @@ window.addEventListener('pageshow',()=>{
  }
 });
 
+// Beta 6.30.50 — Prévia administrativa autenticada, sem trocar o login Firebase.
+const IPA_PREVIEW_ADMIN_UID='5dlGX6JlrUQHyjFWSHB9Dye0r1E3';
+let ipaPreviewPreviousSelection=null;
+function ipaAdminPreviewAuthenticated(){
+ return state.previewFromAdmin===true && window.IPAFirebase?.user?.uid===IPA_PREVIEW_ADMIN_UID;
+}
+function ipaEndAdminPreview(){
+ if(!ipaAdminPreviewAuthenticated())return;
+ state.previewFromAdmin=false;
+ state.profile='admin';state.route='admin';state.mode='before';state.scenarioChosen=true;
+ try{
+   if(ipaPreviewPreviousSelection?.tripId===null)localStorage.removeItem('ipa-active-trip-id');
+   else if(ipaPreviewPreviousSelection?.tripId!==undefined)localStorage.setItem('ipa-active-trip-id',ipaPreviewPreviousSelection.tripId);
+   if(ipaPreviewPreviousSelection?.clientId===null)localStorage.removeItem('ipa-active-client-id');
+   else if(ipaPreviewPreviousSelection?.clientId!==undefined)localStorage.setItem('ipa-active-client-id',ipaPreviewPreviousSelection.clientId);
+   localStorage.removeItem('ipa-preview-trip-id');
+ }catch(e){}
+ ipaPreviewPreviousSelection=null;
+ document.body.classList.remove('ipa-admin-client-preview');
+ document.body.classList.add('hidden-nav');render();
+}
+// Bloqueia alterações, pagamentos, fotos e mensagens sem interferir com troca de dias e navegação.
+document.addEventListener('click',function(event){
+ if(!ipaAdminPreviewAuthenticated())return;
+ const target=event.target.closest('button,a,input,label,[role="button"]');
+ if(!target||target.closest('#ipaPreviewAdminBar'))return;
+ if(target.closest('.nav-item,[data-route],[data-mode],[data-day],[data-client-trip-select]'))return;
+ event.preventDefault();event.stopImmediatePropagation();
+ toast('Prévia somente leitura. Volte ao ADM para realizar alterações.');
+},true);
+document.addEventListener('submit',function(event){if(ipaAdminPreviewAuthenticated()){event.preventDefault();event.stopImmediatePropagation()}},true);
+
 const savedPhotos=JSON.parse(localStorage.getItem('ipa_beta06_photos')||'[]');
 const savedProfile=localStorage.getItem('ipa_beta06_profile')||'client';
 const state={route:'today',mode:'during',profile:savedProfile,scenarioChosen:false,leadStage:'new',tripDay:1,steps:12480,shareLocation:false,live:false,liveSeconds:0,liveTimer:null,liveViewers:23,reactions:14,photos:savedPhotos,messages:[
@@ -90,7 +122,7 @@ document.addEventListener('click', event => {
    event.preventDefault();
    const action=accountAction.dataset.accountAction;
    if(action==='payments'){ modal.close(); state.route='payments'; render(); return; }
-   if(action==='admin'){ modal.close(); localStorage.removeItem('ipa-preview-trip-id'); state.profile='admin'; state.route='admin'; document.body.classList.add('hidden-nav'); render(); return; }
+   if(action==='admin'){ modal.close(); if(ipaAdminPreviewAuthenticated()){ipaEndAdminPreview();return;} localStorage.removeItem('ipa-preview-trip-id'); state.profile='admin'; state.route='admin'; document.body.classList.add('hidden-nav'); render(); return; }
    if(action==='profile'){ modal.close(); openProfileChooser(); return; }
  }
  const templateSave = event.target.closest('#saveTemplate');
@@ -108,7 +140,7 @@ document.addEventListener('click', event => {
 
 
 setTimeout(()=>document.querySelector('#splash').classList.add('hide'),1800);
-if('serviceWorker' in navigator) navigator.serviceWorker.register('./service-worker.js?v=63047', {updateViaCache:'none'});
+if('serviceWorker' in navigator) navigator.serviceWorker.register('./service-worker.js?v=63050', {updateViaCache:'none'});
 function money(n){return new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(n)}
 function timeFmt(s){const m=String(Math.floor(s/60)).padStart(2,'0'),sec=String(s%60).padStart(2,'0');return `${m}:${sec}`}
 function setProfile(profile){
@@ -127,9 +159,10 @@ function setProfile(profile){
 }
 function ipaIsClientAuthenticated(){
  const u=window.IPAFirebase?.user;
- return !!(u && u.uid!=='5dlGX6JlrUQHyjFWSHB9Dye0r1E3');
+ return !!(u && (u.uid!=='5dlGX6JlrUQHyjFWSHB9Dye0r1E3'||ipaAdminPreviewAuthenticated()));
 }
 function ipaClientDisplayName(){
+ if(ipaAdminPreviewAuthenticated()){const d=ipaDB();const c=(d?.clients||[]).find(x=>x.id===localStorage.getItem('ipa-active-client-id'));if(c?.name)return c.name;}
  const d=ipaDB(); const u=window.IPAFirebase?.user;
  const email=String(u?.email||'').toLowerCase();
  const c=(d?.clients||[]).find(x=>x.authUid===u?.uid||String(x.email||'').toLowerCase()===email)||d?.client||{};
@@ -137,7 +170,7 @@ function ipaClientDisplayName(){
 }
 function ipaUpdateProfileButton(){
  const b=document.querySelector('#profileBtn'); if(!b)return;
- if(state.profile!=='client'||!ipaIsClientAuthenticated()){b.hidden=true;b.textContent='';return;}
+ if(state.profile!=='client'||!ipaIsClientAuthenticated()||ipaAdminPreviewAuthenticated()){b.hidden=true;b.textContent='';return;}
  const name=ipaClientDisplayName();
  const initials=String(name).trim().split(/\s+/).filter(Boolean).slice(0,2).map(x=>x[0]).join('').toUpperCase()||'👤';
  b.hidden=false;b.innerHTML=`${ipaEscape(initials)}<span></span>`;b.setAttribute('aria-label',`Perfil de ${name}`);
@@ -146,7 +179,7 @@ function ipaUpdateProfileButton(){
 // checklist actions, day selection, etc.). Reset only on real navigation.
 let ipaLastRenderedScreen=null;
 function render(){
- if(state.profile==='client' && state.scenarioChosen && !ipaIsClientAuthenticated()){
+ if(state.profile==='client' && state.scenarioChosen && !ipaIsClientAuthenticated() && !ipaAdminPreviewAuthenticated()){
    ipaUpdateProfileButton(); showClientLogin(); return;
  }
  const screen=state.profile+':'+state.route;
@@ -154,12 +187,18 @@ function render(){
  const previousY=Math.max(0,window.scrollY||document.documentElement.scrollTop||0);
  topTitle.textContent=titles[state.route]||'Indo por Aí';
  view.innerHTML=routes[state.route]();
- if(state.profile==='client'&&ipaIsClientAuthenticated()&&activeTrip()?.id) view.insertAdjacentHTML('beforeend',ipaClientAiiWidgetHtml());
+ if(state.profile==='client'&&ipaIsClientAuthenticated()&&!ipaAdminPreviewAuthenticated()&&activeTrip()?.id) view.insertAdjacentHTML('beforeend',ipaClientAiiWidgetHtml());
  document.querySelectorAll('.nav-item').forEach(b=>b.classList.toggle('active',b.dataset.route===state.route));
  document.body.classList.toggle('hidden-nav',state.profile==='prospect'||state.profile==='admin');
  bind();
  if(state.route==='admin'&&state.profile==='admin')ipaBindAiiWidget();
- if(state.profile==='client'){ipaBindClientAiiWidget();void ipaEnsureMochilitoWelcome();}
+ if(state.profile==='client'&&!ipaAdminPreviewAuthenticated()){ipaBindClientAiiWidget();void ipaEnsureMochilitoWelcome();}
+ if(ipaAdminPreviewAuthenticated()){
+  document.body.classList.add('ipa-admin-client-preview');
+  const trip=activeTrip();
+  view.insertAdjacentHTML('afterbegin',`<div id="ipaPreviewAdminBar" class="ipa-preview-admin-bar"><span>👁 <strong>Visualização do cliente</strong> · ${ipaEscape(trip?.name||'Viagem')} <small>Somente leitura · sessão ADM preservada</small></span><button type="button" id="ipaReturnAdmin">← Voltar ao ADM</button></div>`);
+  document.querySelector('#ipaReturnAdmin').onclick=ipaEndAdminPreview;
+ }
  ipaUpdateProfileButton();
  if(state.route==='admin'&&state.profile==='admin')ipaEnsureAdminConciergeListener();
  if(state.route==='admin'&&state.profile==='admin'&&adminSection==='clients')void ipaRefreshAdminAccessStats();
@@ -1138,6 +1177,8 @@ function bind(){
    if(!trip){toast('Viagem não encontrada no ADM');return;}
    if(trip.clientId!==clientId){toast('Esta viagem não está vinculada ao cliente selecionado');return;}
 
+   if(window.IPAFirebase?.user?.uid!==IPA_PREVIEW_ADMIN_UID){toast('Faça login como administrador antes de visualizar.');return;}
+   if(!ipaPreviewPreviousSelection){ipaPreviewPreviousSelection={tripId:localStorage.getItem('ipa-active-trip-id'),clientId:localStorage.getItem('ipa-active-client-id')};}
    // Fonte de verdade da prévia: a própria viagem aberta no editor.
    localStorage.setItem('ipa-active-trip-id',tripId);
    localStorage.setItem('ipa-active-client-id',clientId);
@@ -1992,7 +2033,7 @@ let adminTripId='trip-portugal-2026';
 function ipaDB(){return window.IPAData?IPAData.getAll():null}
 function ipaClientTrips(){
  const d=ipaDB()||{};
- const clientId=d.activeClientId||localStorage.getItem('ipa-active-client-id')||'';
+ const clientId=state.previewFromAdmin===true?(localStorage.getItem('ipa-active-client-id')||''):(d.activeClientId||localStorage.getItem('ipa-active-client-id')||'');
  if(state.previewFromAdmin===true){
   return (d.trips||[]).filter(t=>t.clientId===clientId);
  }
@@ -3503,7 +3544,7 @@ let ipaClientAiiStop=null;
 const ipaMochilitoWelcomeChecks=new Set();
 async function ipaEnsureMochilitoWelcome(){
   const api=window.IPAFirebase,trip=activeTrip(),uid=api?.user?.uid;
-  if(state.profile!=='client'||!ipaIsClientAuthenticated()||!trip?.id||!uid||!api.ensureConciergeWelcome)return;
+  if(ipaAdminPreviewAuthenticated()||state.profile!=='client'||!ipaIsClientAuthenticated()||!trip?.id||!uid||!api.ensureConciergeWelcome)return;
   const key=String(uid);
   if(ipaMochilitoWelcomeChecks.has(key))return;
   ipaMochilitoWelcomeChecks.add(key);
@@ -4381,6 +4422,7 @@ function openAdmin(){const services=[['Passagem',4630,5290],['Hotel',3420,4180],
 function toast(msg){const el=document.createElement('div');el.className='toast';el.textContent=msg;document.body.appendChild(el);setTimeout(()=>el.remove(),2200)}
 
 window.addEventListener('ipa-client-experience-ready',()=>{
+ if(ipaAdminPreviewAuthenticated())return;
  const fb=window.IPAFirebase;
  if(fb?.user && fb.user.uid!=='5dlGX6JlrUQHyjFWSHB9Dye0r1E3'){
    if(fb.status==='client-no-profile' || fb.status==='client-no-trip' || fb.status==='client-load-error' || fb.status==='error'){
@@ -4400,6 +4442,7 @@ window.addEventListener('ipa-client-experience-ready',()=>{
  }
 });
 window.addEventListener('ipa-admin-login-success',()=>{
+  if(ipaAdminPreviewAuthenticated())return;
   state.profile='admin';
   state.route='admin';
   state.scenarioChosen=true;
