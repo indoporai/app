@@ -1046,6 +1046,18 @@ window.IPAFirebase = {
     if(!snap.exists()||JSON.stringify(snap.data().climateContent||[])!==JSON.stringify(climateContent))throw new Error('Curadoria não confirmada no Firebase.');
     return true;
   },
+  // Persistência pontual MultiPaís, sem reescrever roteiro, pagamentos ou conteúdo legado.
+  async saveTripCountryClimateConfirmed(tripId,climateByCountry){
+    if(!currentUser || currentUser.uid!==ADMIN_UID)throw new Error('Entre com a conta ADM autorizada.');
+    if(!tripId || !climateByCountry || typeof climateByCountry!=='object')throw new Error('Conteúdo por país inválido.');
+    const cleaned=JSON.parse(JSON.stringify(climateByCountry));
+    const tripRef=doc(firestore,'trips',String(tripId));
+    await setDoc(tripRef,{climateByCountry:cleaned,updatedAt:serverTimestamp()},{merge:true});
+    const snap=await getDocFromServer(tripRef);
+    if(!snap.exists() || JSON.stringify(snap.data().climateByCountry||{})!==JSON.stringify(cleaned))
+      throw new Error('Os conteúdos por país não foram confirmados no Firebase.');
+    return true;
+  },
   async syncNow(){
     if(!currentUser) throw new Error("Faça login primeiro.");
     return syncAll(window.IPAData?.getAll?.());

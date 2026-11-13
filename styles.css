@@ -1729,3 +1729,11 @@ body.hidden-nav .bottom-nav{display:none!important;}
 .ipa-preview-admin-bar button{border:0;border-radius:9px;background:#ff7a19;color:#fff;cursor:pointer;padding:11px 14px;font-weight:800;white-space:nowrap}
 .ipa-admin-client-preview #ipaClientAii,.ipa-admin-client-preview .ipa-aii-client{display:none!important}
 @media(max-width:550px){.ipa-preview-admin-bar{align-items:flex-start;flex-direction:column}.ipa-preview-admin-bar button{width:100%}}
+
+/* Beta 6.30.51 — MultiPaís, sem alterar a paleta original */
+.ipa-country-picker{margin:12px 0 20px;padding:20px;border:1px solid #c9e1e1;border-radius:22px;background:linear-gradient(125deg,#f1fafa,#fff);box-shadow:0 8px 22px rgba(8,76,85,.07)}
+.ipa-country-picker-intro h3{margin:4px 0 5px;color:#075667;font-size:21px}.ipa-country-picker-intro p{font-size:13px;color:#557075;margin:0 0 15px}
+.ipa-country-picker-options{display:flex;flex-wrap:wrap;gap:10px}.ipa-country-option{background:white;color:#075667;border:2px solid #b4d5d7;border-radius:14px;padding:10px 15px;display:inline-flex;align-items:center;gap:9px;cursor:pointer;min-height:52px}
+.ipa-country-option span{font-size:25px}.ipa-country-option strong{font-size:14px}.ipa-country-option.active{color:white;background:#075667;border-color:#075667;box-shadow:0 6px 15px rgba(7,86,103,.22)}.ipa-country-option:focus-visible{outline:3px solid #ff7a19;outline-offset:3px}
+.ipa-country-picker-admin{margin:12px 0 18px}.ipa-country-picker-admin .ipa-country-picker-intro h3{font-size:18px}
+@media(max-width:560px){.ipa-country-picker{padding:14px}.ipa-country-option{padding:9px 11px;min-height:46px}.ipa-country-option strong{font-size:13px}}
