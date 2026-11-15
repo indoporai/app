@@ -1,0 +1,5 @@
+Beta 6.30.53 MultiPaís 2.1
+- Painel de país por destino no ADM com atalhos para Roteiro, Voos, Hotéis, Documentos, Entre no clima.
+- Conteúdo de Dublin adicionado à curadoria local, para evitar depender exclusivamente da busca externa.
+- Viagens de um país e fluxo financeiro sem mudanças.
+- Teste em ambiente publicado e revisão de dados legados são necessários.
