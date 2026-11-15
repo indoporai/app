@@ -1737,3 +1737,10 @@ body.hidden-nav .bottom-nav{display:none!important;}
 .ipa-country-option span{font-size:25px}.ipa-country-option strong{font-size:14px}.ipa-country-option.active{color:white;background:#075667;border-color:#075667;box-shadow:0 6px 15px rgba(7,86,103,.22)}.ipa-country-option:focus-visible{outline:3px solid #ff7a19;outline-offset:3px}
 .ipa-country-picker-admin{margin:12px 0 18px}.ipa-country-picker-admin .ipa-country-picker-intro h3{font-size:18px}
 @media(max-width:560px){.ipa-country-picker{padding:14px}.ipa-country-option{padding:9px 11px;min-height:46px}.ipa-country-option strong{font-size:13px}}
+/* Beta 6.30.52 — MultiPaís 2.0, sem alterar a paleta original */
+.ipa-country-context-note{margin:12px 20px 0;padding:12px 16px;border:1px solid #bbe0e4;border-left:4px solid #0a7e89;border-radius:14px;background:#f0faf9;color:#075667;font-size:14px;line-height:1.5}
+.ipa-country-context-note small{display:block;margin-top:4px;color:#60787c}
+.ipa-admin-country-workspace{border:2px solid #9ed3d7;background:linear-gradient(135deg,#f2fbfa,#fff)}
+.ipa-admin-day-country,.ipa-doc-country-label select,.ipa-stay-country-label select{border:1px solid #b8d3d7;border-radius:10px;padding:8px 10px;background:#fff;color:#075667;font:inherit;max-width:100%}
+.ipa-doc-country-label,.ipa-stay-country-label{display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:700;color:#075667}
+@media(max-width:700px){.ipa-country-context-note{margin:10px 12px}.ipa-admin-day-country{width:100%;margin-top:6px}}

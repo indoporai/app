@@ -1,0 +1,25 @@
+INDO POR AÍ — BETA 6.30.52 MULTIPAÍS 2.0
+
+Base: Beta 6.30.51. Preserve backup da versão publicada antes de substituir arquivos.
+
+O QUE MUDA
+- Cliente: Marrocos, Irlanda etc. filtram os dias do roteiro, hotéis, passagens, documentos, recomendações e memórias identificáveis por país.
+- 'Toda a viagem' reúne o itinerário completo.
+- ADM: seletor de país na edição da viagem, com formulários e listagens de roteiro, voo, hospedagens, documentos e Entre no clima.
+- ADM: novos dias e documentos recebem campo 'País'; antigos dias, hospedagens e documentos sem país inequívoco podem ser classificados na tela de edição.
+- Financeiro, acompanhantes, grupo e Mochilito continuam na viagem principal.
+- Um país só: fluxo existente sem seletor.
+
+IMPORTANTE: DADOS LEGADOS
+Dias antigos sem cidade, data, país ou stageId não são atribuídos arbitrariamente a um país. Eles aparecem para classificação no ADM, e na opção 'Toda a viagem'. O mesmo vale para documentos sem país, cidade ou data identificáveis. Isso evita mostrar dados do Marrocos na Irlanda.
+Passagem entre países pode ser cadastrada como documento do destino ou classificada como 'Geral / compartilhado'.
+
+TESTE RECOMENDADO (ROSA)
+1) No ADM, faça backup da viagem da Rosa antes da publicação.
+2) Verifique que as etapas 'Marrocos' e 'Irlanda' têm países, cidades e datas corretos.
+3) Selecione Marrocos, classifique dias, hospedagens e documentos, e confira o voo.
+4) Selecione Irlanda, atribua dias de Dublin, inclua/associe hotel, documentos e voo.
+5) No cliente, alterne Marrocos / Irlanda / Toda a viagem e confira principalmente carteira de documentos e roteiro.
+6) Teste uma viagem antiga de país único e confirme que ela abre normalmente.
+
+VALIDAÇÃO: sintaxe JS e testes unitários de isolamento lógico foram executados. Integração em produção com Firebase e todos os tipos de registro ainda exige teste real.
