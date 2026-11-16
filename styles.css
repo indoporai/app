@@ -1756,3 +1756,8 @@ body.hidden-nav .bottom-nav{display:none!important;}
 .ipa-country-workspace-tile:hover,.ipa-country-workspace-tile:focus-visible{border-color:#ff741d;box-shadow:0 5px 15px #07566715}
 .ipa-country-unclassified{margin:15px 0 0;padding:12px;border-radius:10px;background:#fff3e8;color:#8a4210;font-size:13px}
 @media(max-width:560px){.ipa-country-workspace-tiles{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* Beta 6.30.54 — resumo MultiPaís somente no Depois. */
+.ipa-entire-trip-summary {border:1px solid rgba(7,86,103,.17);background:linear-gradient(135deg,#f4fbfa,#ffffff);border-radius:22px;padding:22px!important;}
+.ipa-trip-all-cities{display:flex;gap:9px;flex-wrap:wrap;align-items:center;color:#075667;font-size:.91rem;font-weight:700;}
+.ipa-trip-all-cities span{display:inline-flex;align-items:center;}

@@ -1,0 +1,7 @@
+Indo por Aí — Beta 6.30.54 (base 6.30.53)
+1. O seletor de países no cliente exibe apenas países individuais (sem Toda a viagem).
+2. O clima é consultado para a cidade e datas da etapa do país selecionado, e não para a etapa global.
+3. O Depois/álbum é a visão consolidada de todos os países e memórias. O passaporte no Depois também utiliza a viagem completa.
+4. Viagens de um único país continuam com comportamento anterior.
+5. Sem alterações em Firebase, pagamentos, Mochilito ou registros existentes.
+6. Verificações estáticas não substituem testes no Cloudflare e em aparelho real.

@@ -2252,7 +2252,7 @@ function ipaSelectedCountry(t){
  const countries=ipaTripCountries(t);
  if(!countries.length)return '';
  let stored='';try{stored=localStorage.getItem(ipaCountryClimateKey(t))||''}catch(e){}
- return stored===IPA_ALL_COUNTRIES&&countries.length>1?IPA_ALL_COUNTRIES:(countries.find(c=>ipaNormText(c)===ipaNormText(stored))||countries[0]);
+ return countries.find(c=>ipaNormText(c)===ipaNormText(stored))||countries[0];
 }
 function ipaCountryClimateTrip(t,country){
  const stage=tripStages(t).find(st=>ipaNormText(st.country)===ipaNormText(country))||tripStages(t)[0];
@@ -2275,7 +2275,7 @@ function ipaCountrySelectorHtml(t,admin=false){
  if(countries.length<2)return '';
  const selected=admin?ipaAdminCountry(t):ipaSelectedCountry(t);
  const attr=admin?'data-ipa-admin-country':'data-ipa-client-country';
- return `<section class="ipa-country-picker ${admin?'ipa-country-picker-admin':''}" aria-label="Países desta viagem"><div class="ipa-country-picker-intro"><span class="eyebrow">🌍 INDO POR AÍ MULTIPAÍS</span><h3>${admin?'Personalize cada país':'Qual país vamos explorar?'}</h3><p>${admin?'Selecione o país para cadastrar seu roteiro, voo, hotel, documentos e Entre no clima.':'Escolha o destino. Roteiro, voos, hotéis e documentos serão filtrados por país; financeiro, grupo e Mochilito continuam compartilhados.'}</p></div><div class="ipa-country-picker-options">${countries.map(c=>`<button type="button" class="ipa-country-option ${ipaNormText(c)===ipaNormText(selected)?'active':''}" ${attr}="${ipaEscape(c)}" aria-pressed="${ipaNormText(c)===ipaNormText(selected)}"><span>${countryFlag(c)}</span><strong>${ipaEscape(c)}</strong></button>`).join('')}${admin?'':`<button type="button" class="ipa-country-option ${selected===IPA_ALL_COUNTRIES?'active':''}" ${attr}="${IPA_ALL_COUNTRIES}" aria-pressed="${selected===IPA_ALL_COUNTRIES}"><span>🌍</span><strong>Toda a viagem</strong></button>`}</div></section>`;
+ return `<section class="ipa-country-picker ${admin?'ipa-country-picker-admin':''}" aria-label="Países desta viagem"><div class="ipa-country-picker-intro"><span class="eyebrow">🌍 INDO POR AÍ MULTIPAÍS</span><h3>${admin?'Personalize cada país':'Qual país vamos explorar?'}</h3><p>${admin?'Selecione o país para cadastrar seu roteiro, voo, hotel, documentos e Entre no clima.':'Escolha o destino. Roteiro, voos, hotéis e documentos serão filtrados por país; financeiro, grupo e Mochilito continuam compartilhados.'}</p></div><div class="ipa-country-picker-options">${countries.map(c=>`<button type="button" class="ipa-country-option ${ipaNormText(c)===ipaNormText(selected)?'active':''}" ${attr}="${ipaEscape(c)}" aria-pressed="${ipaNormText(c)===ipaNormText(selected)}"><span>${countryFlag(c)}</span><strong>${ipaEscape(c)}</strong></button>`).join('')}</div></section>`;
 }
 function tripDestinationLegacy(t){return String(t?.destination||t?.name||"Seu destino").split(",")[0].trim()}
 function activeTripStage(t,date=new Date()){const stages=tripStages(t);const ymd=date.toISOString().slice(0,10);return stages.find(x=>x.startDate&&x.endDate&&ymd>=x.startDate&&ymd<=x.endDate)||stages.find(x=>x.startDate&&ymd<x.startDate)||stages[stages.length-1]}
@@ -3040,10 +3040,19 @@ function ipaWeatherDaily(data){
  const d=data?.daily||{};return (d.time||[]).map((date,i)=>({date,max:d.temperature_2m_max?.[i],min:d.temperature_2m_min?.[i],rain:d.precipitation_sum?.[i]||0,sun:d.sunshine_duration?.[i],code:d.weather_code?.[i]})).filter(x=>Number.isFinite(x.max)&&Number.isFinite(x.min));
 }
 async function ipaHydrateTripWeather(){
- const box=document.querySelector('[data-trip-weather]'),t=activeTrip();if(!box||!t?.startDate)return;
- const ws=activeTripStage(t),destination=ws?.destination||tripDestination(t),country=ws?.country||tripCountry(t)||'',start=ws?.startDate||t.startDate,end=ws?.endDate||t.endDate||t.startDate;
+ const box=document.querySelector('[data-trip-weather]'),originalTrip=activeTrip();
+ if(!box||!originalTrip)return;
+ const selected=ipaContextCountry(originalTrip);
+ // A etapa para o clima vem do país escolhido, nunca da etapa ativa global.
+ // Viagens de um único país continuam usando a lógica anterior.
+ const t=selected?ipaCountryProjectedTrip(originalTrip):originalTrip;
+ const selectedStages=selected?tripStages(originalTrip).filter(st=>ipaSameCountry(st.country,selected)):[];
+ const today=new Date().toISOString().slice(0,10);
+ const ws=selected?(selectedStages.find(st=>st.startDate&&st.endDate&&today>=st.startDate&&today<=st.endDate)||selectedStages[0]):activeTripStage(t);
+ const destination=ws?.destination||t.destination||tripDestination(t),country=ws?.country||t.country||tripCountry(t)||'',start=ws?.startDate||t.startDate,end=ws?.endDate||t.endDate||t.startDate;
+ if(!start||!destination)return;
  const key=[destination,country,start,end].join('|');
- const stillCurrent=()=>box.isConnected&&activeTrip()?.id===t.id;
+ const stillCurrent=()=>box.isConnected&&activeTrip()?.id===originalTrip.id&&ipaContextCountry(activeTrip())===selected;
  const showError=()=>{if(stillCurrent())box.innerHTML=`<div class="section-head"><div><span class="eyebrow">🌦️ CLIMA DA SUA VIAGEM</span><h2>Clima de ${ipaEscape(destination)}</h2><p>Não foi possível consultar dados meteorológicos agora. Tente novamente mais tarde.</p></div></div><button class="btn btn-light" data-weather-retry>Tentar novamente</button>`;const retry=box.querySelector('[data-weather-retry]');if(retry)retry.onclick=()=>{ipaWeatherCache.delete(key);ipaHydrateTripWeather()}};
  try{
   let data=ipaWeatherCache.get(key);
@@ -4168,8 +4177,8 @@ function ipaPassportView(t){
 function afterView(){
  const t=activeTrip();if(!t)return `<section class="section"><h2>Viagem não encontrada</h2></section>`;
  const days=(t.itinerary||[]).sort((a,b)=>Number(a.day)-Number(b.day));
- const country=ipaContextCountry(t)||tripCountry(t),flag=country===IPA_ALL_COUNTRIES?'🌍':countryFlag(country);
- const memories=(ipaDB().memories||[]).filter(m=>m.tripId===t.id&&ipaRecordInCountry(t,m));
+ const countries=ipaTripCountries(t),country=countries.join(' · ')||tripCountry(t),flag=countries.length>1?'🌍':countryFlag(country);
+ const memories=(ipaDB().memories||[]).filter(m=>m.tripId===t.id);
  const prompts=[
   ['🥂','Hora do brinde','Registre o brinde da viagem'],
   ['👨‍👩‍👧','Nossa turma','Uma foto de quem está vivendo isso com você'],
@@ -4178,13 +4187,13 @@ function afterView(){
   ['😂','Momento espontâneo','Aquela foto que ninguém planejou'],
   ['❤️','Meu momento favorito','Escolha uma lembrança especial']
  ];
- return `${ipaCountrySelectorHtml(t)}${ipaCountryStatusHtml(t)}<section class="hero after-personalized-hero"><span class="eyebrow">Memórias · sendo criadas agora</span><h1>${t.name} ${flag}</h1><p>Você não precisa esperar a viagem acabar. Fotos, vídeos, checks e avaliações já começam a construir sua história.</p><div class="hero-actions"><button class="btn btn-primary" id="addPhoto">+ Foto ou vídeo</button></div></section>
+ return `${countries.length>1?`<section class="section ipa-entire-trip-summary"><div class="section-head"><div><span class="eyebrow">🌍 MINHA VIAGEM COMPLETA</span><h2>Todos os destinos, uma só história</h2><p>${countries.map(c=>countryFlag(c)+' '+ipaEscape(c)).join(' · ')}</p></div></div><div class="ipa-trip-all-cities">${tripStages(t).map(st=>`<span>${ipaEscape(st.destination||'Destino')}</span>`).join('<span aria-hidden="true">→</span>')}</div></section>`:''}<section class="hero after-personalized-hero"><span class="eyebrow">Memórias · sendo criadas agora</span><h1>${t.name} ${flag}</h1><p>Você não precisa esperar a viagem acabar. Fotos, vídeos, checks e avaliações já começam a construir sua história.</p><div class="hero-actions"><button class="btn btn-primary" id="addPhoto">+ Foto ou vídeo</button></div></section>
  ${modeCard()}
  <section class="section"><div class="section-head"><div><span class="eyebrow">Inspirações</span><h2>Que memória vamos guardar?</h2></div></div><div class="memory-prompt-grid">${prompts.map(p=>`<button data-memory-prompt="${p[1]}"><span>${p[0]}</span><b>${p[1]}</b><small>${p[2]}</small></button>`).join('')}</div></section>
  <section class="section"><div class="section-head"><div><span class="eyebrow">Sua história</span><h2>${memories.length?`${memories.length} memórias adicionadas`:'Comece seu álbum agora'}</h2></div></div><div class="live-memory-grid">${memories.map(m=>m.type==='video'?`<div class="live-memory"><video src="${m.src}" controls playsinline></video><b>${m.prompt||'Vídeo da viagem'}</b></div>`:`<div class="live-memory"><img src="${m.src}" alt="${m.prompt||'Memória'}"><b>${m.prompt||'Foto da viagem'}</b></div>`).join('')||`<div class="empty-memory"><span>✨</span><h3>Sua primeira memória está esperando</h3><p>Escolha uma sugestão acima ou envie uma foto/vídeo.</p></div>`}</div></section>
  <section class="section"><div class="after-stats-grid"><div><strong>${days.length}</strong><small>dias</small></div><div><strong>${days.flatMap(d=>normalizedPlaces(d)).length}</strong><small>lugares</small></div><div><strong>${memories.filter(m=>m.type==='image').length}</strong><small>fotos</small></div><div><strong>${memories.filter(m=>m.type==='video').length}</strong><small>vídeos</small></div></div></section>
  ${tripModule('movie')?capturedExperience():''}
- ${tripModule('passport')?ipaPassportView(ipaCountryProjectedTrip(t)):''}`;
+ ${tripModule('passport')?ipaPassportView(t):''}`;
 }
 function modeCard(){return `<section class="section"><div class="card mode-card"><span class="eyebrow">Simular momento da jornada</span><h2>${state.mode==='before'?'Preparando sua viagem':state.mode==='during'?'Vivendo sua viagem':'Reviva suas melhores memórias'}</h2><div class="mode-switch"><button type="button" data-mode="before" class="${state.mode==='before'?'active':''}">Antes</button><button type="button" data-mode="during" class="${state.mode==='during'?'active':''}">Durante</button><button type="button" data-mode="after" class="${state.mode==='after'?'active':''}">Depois</button></div></div></section>`}
 function tripView(){
@@ -4346,7 +4355,7 @@ function bindCapturedExperience(){
 
 function memoriesView(){
  const t=activeTrip();if(!t)return `<section class="section"><h2>Viagem não encontrada</h2></section>`;
- const days=(t.itinerary||[]).sort((a,b)=>Number(a.day)-Number(b.day)),country=tripCountry(t),flag=countryFlag(country);
+ const days=(t.itinerary||[]).sort((a,b)=>Number(a.day)-Number(b.day)),countries=ipaTripCountries(t),country=countries.join(' · ')||tripCountry(t),flag=countries.length>1?'🌍':countryFlag(country);
  const memories=(ipaDB().memories||[]).filter(m=>m.tripId===t.id);
  const memorySyncWarning=window.ipaMemoryCloudLoadError ? `<div class="ipa-memory-sync-alert" role="status">☁️ A sincronização das memórias ainda não foi confirmada. Suas fotos deste aparelho continuam visíveis abaixo, e o aplicativo tentará sincronizar automaticamente.</div>` : "";
  const jp=ipaDB().journeyPlaces||{};
