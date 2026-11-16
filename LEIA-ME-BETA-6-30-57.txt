@@ -1,0 +1,5 @@
+INDO POR AÍ 6.30.57 — FREE + EXPERIÊNCIAS POR AÍ
+
+Free: 1 país, 1 cidade, até 3 dias; solicitação via fluxo de pedido existente, com aprovação manual pelo ADM. Não há autoativação de conta nem cobrança automática. Controle de limite no cadastro de viagem/dias do ADM; roteiros existentes não são convertidos. Mochilito Free: demonstração, sem campo de mensagem; planos pagos preservados.
+Experiências: ADM > Experiências; salvar/editar/ocultar/excluir; catálogo central persistido em settings/main do Firebase; cliente usa API pública /api/public/experiences com retorno apenas dos campos autorizados. Solicitação Free via WhatsApp; planos pagos abrem Mochilito. Não há reserva/pagamento automático nem vínculo oficial a operadores.
+Verificar IAM, política Firestore e endpoint Cloudflare antes do lançamento. Testar Free, Signature, criação ADM, gravação e abertura de links.

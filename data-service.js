@@ -1,5 +1,12 @@
 
+const IPA_FREE_MAX_DAYS=3;
+function ipaFreeGuard(trip){
+ if(String(trip?.plan||'').toLowerCase()!=='free')return;
+ if((trip.stages||[]).length>1 || new Set((trip.stages||[]).map(x=>String(x.country||'').trim().toLowerCase()).filter(Boolean)).size>1)throw new Error('Free: somente um país e uma cidade.');
+ if((trip.itinerary||[]).length>IPA_FREE_MAX_DAYS)throw new Error('Free: limite de três dias de roteiro.');
+}
 const IPA_PLAN_PRESETS = {
+  Free:{itinerary:true,documents:true,luggage:true,checkin:true,preboardingSupport:true,bookingSupport:true,exchange:false,concierge:false,payments:false,community:true,live:true,album:true,movie:true,passport:true,groupManagement:false},
   Explore:{
     itinerary:true, documents:false, luggage:false, checkin:false,
     preboardingSupport:false, bookingSupport:false, exchange:false, concierge:false,
@@ -32,7 +39,9 @@ function ipaPlanModules(plan){
 const IPA_DEFAULT_DATA = {
   instagramFollowers:26000,
   client:{id:"",name:"",plan:"",trip:""},
+  experiences:[],
   plans:{
+    Free:["Uma cidade em um país","Até três dias de roteiro","Mapas, GPS e Explorar","Entre no Clima e Spotify","Álbum e memórias","Mochilito demonstrativo"],
     Explore:["Roteiros configurados","Acesso ao app","Diário da viagem","Álbum e filme","Passaporte e selos","Comunidade Indo por Aí"],
     Signature:["Tudo do Explore","Suporte pré-embarque","Compra de passagens","Reserva de hotéis","Planejamento personalizado","Benefícios exclusivos"],
     Elite:["Tudo do Signature","Concierge durante a viagem","Suporte em tempo real","Experiências premium","Live e grupo","Acesso full à plataforma"],
@@ -89,6 +98,7 @@ window.IPAData={
  getAll(){return readData()},
  reset(){writeData(clone(IPA_DEFAULT_DATA))},
  updateClient(p){const d=readData();d.client={...d.client,...p};writeData(d)},
+ saveExperiences(items){const d=readData();d.experiences=(items||[]).map(x=>({...x}));writeData(d);},
  setInstagramFollowers(count){const d=readData();d.instagramFollowers=Math.max(0,Math.floor(Number(count)||0));writeData(d);},
  setBenefit(id,en){const d=readData();const b=d.benefits.find(x=>x.id===id);if(b)b.enabled=en;writeData(d)},
  updateExchange(p){const d=readData();d.exchange={...d.exchange,...p};writeData(d)},
@@ -115,10 +125,10 @@ window.IPAData={
  updatePayment(id,patch){const d=readData();const p=d.payments.find(x=>x.id===id);if(p)Object.assign(p,patch);writeData(d);return p},
  createClient(client){const d=readData();client.id=client.id||("cli-"+Date.now());client.status=client.status||"Ativo";d.clients=d.clients||[];d.clients.push(client);writeData(d);return client},
  updateClientById(id,patch){const d=readData();const c=(d.clients||[]).find(x=>x.id===id);if(c)Object.assign(c,patch);writeData(d);return c},
- createTrip(trip){const d=readData();trip.id=trip.id||("trip-"+Date.now());trip.status=trip.status||"Em preparação";trip.published=false;trip.country=trip.country||"";trip.plan=trip.plan||"Explore";trip.modules=trip.modules||ipaPlanModules(trip.plan);trip.itinerary=trip.itinerary||[];trip.stages=Array.isArray(trip.stages)?trip.stages:[];if(!trip.stages.length&&trip.destination){trip.stages=[{id:"stage-"+Date.now(),destination:trip.destination,country:trip.country||"",startDate:trip.startDate||"",endDate:trip.endDate||"",order:1}]};d.trips=d.trips||[];d.trips.push(trip);writeData(d);return trip},
- applyPlanPreset(id,plan){const d=readData();const t=(d.trips||[]).find(x=>x.id===id);if(!t)return null;t.plan=plan;t.modules=ipaPlanModules(plan);writeData(d);return t},
+ createTrip(trip){const d=readData();ipaFreeGuard(trip);if(trip.plan==='Free'&&(d.trips||[]).some(x=>x.clientId===trip.clientId&&x.plan==='Free'))throw new Error('Este cliente já possui uma viagem Free.');trip.id=trip.id||("trip-"+Date.now());trip.status=trip.status||"Em preparação";trip.published=false;trip.country=trip.country||"";trip.plan=trip.plan||"Explore";trip.modules=trip.modules||ipaPlanModules(trip.plan);trip.itinerary=trip.itinerary||[];trip.stages=Array.isArray(trip.stages)?trip.stages:[];if(!trip.stages.length&&trip.destination){trip.stages=[{id:"stage-"+Date.now(),destination:trip.destination,country:trip.country||"",startDate:trip.startDate||"",endDate:trip.endDate||"",order:1}]};d.trips=d.trips||[];d.trips.push(trip);writeData(d);return trip},
+ applyPlanPreset(id,plan){const d=readData();const t=(d.trips||[]).find(x=>x.id===id);if(!t)return null;ipaFreeGuard({...t,plan});if(plan==='Free'&&(d.trips||[]).some(x=>x.id!==id&&x.clientId===t.clientId&&x.plan==='Free'))throw new Error('Este cliente já possui uma viagem Free.');t.plan=plan;t.modules=ipaPlanModules(plan);writeData(d);return t},
  removeTrip(id){const d=readData();d.trips=(d.trips||[]).filter(t=>t.id!==id);writeData(d);return true},
- updateTrip(id,patch){const d=readData();const t=(d.trips||[]).find(x=>x.id===id);if(t)Object.assign(t,patch);writeData(d);return t},
+ updateTrip(id,patch){const d=readData();const t=(d.trips||[]).find(x=>x.id===id);if(t){ipaFreeGuard({...t,...patch});Object.assign(t,patch);}writeData(d);return t},
  toggleTripModule(tripId,module,enabled){const d=readData();const t=(d.trips||[]).find(x=>x.id===tripId);if(t){t.modules=t.modules||{};t.modules[module]=enabled}writeData(d);return t},
  publishTrip(id,published=true){return this.updateTrip(id,{published,status:published?"Publicado":"Em preparação"})},
  applyTemplate(tripId,templateId){const d=readData();const t=(d.trips||[]).find(x=>x.id===tripId);const tpl=(d.itineraryTemplates||[]).find(x=>x.id===templateId);if(t&&tpl){t.templateId=templateId;t.itinerary=t.itinerary?.length?t.itinerary:[
@@ -126,7 +136,7 @@ window.IPAData={
    {day:2,title:"Centro histórico",places:["Principais atrações","Experiência local"]},
    {day:3,title:"Gastronomia e cultura",places:["Mercado local","Restaurante recomendado"]}
  ]}writeData(d);return t},
- addItineraryDay(tripId,dayData){const d=readData();const t=(d.trips||[]).find(x=>x.id===tripId);if(!t)return null;t.itinerary=t.itinerary||[];const next=Math.max(0,...t.itinerary.map(x=>Number(x.day)||0))+1;t.itinerary.push({day:dayData.day||next,title:dayData.title||("Dia "+next),date:dayData.date||"",country:dayData.country||"",places:[]});writeData(d);return t},
+ addItineraryDay(tripId,dayData){const d=readData();const t=(d.trips||[]).find(x=>x.id===tripId);if(!t)return null;if(t.plan==='Free'&&(t.itinerary||[]).length>=3)throw new Error('Free: o roteiro permite somente três dias.');t.itinerary=t.itinerary||[];const next=Math.max(0,...t.itinerary.map(x=>Number(x.day)||0))+1;t.itinerary.push({day:dayData.day||next,title:dayData.title||("Dia "+next),date:dayData.date||"",country:dayData.country||"",places:[]});writeData(d);return t},
  addItineraryPlace(tripId,dayNumber,place){const d=readData();const t=(d.trips||[]).find(x=>x.id===tripId);if(!t)return null;t.itinerary=t.itinerary||[];let day=t.itinerary.find(x=>Number(x.day)===Number(dayNumber));if(!day){day={day:Number(dayNumber),title:"Dia "+dayNumber,date:"",places:[]};t.itinerary.push(day)}day.places=day.places||[];day.places.push({...place,id:place.id&&String(place.id).startsWith('place-')?place.id:("place-"+Date.now()+"-"+Math.random().toString(36).slice(2,6)),name:place.name||"Novo local",address:place.address||"",time:place.time||"",note:place.note||"",placeId:place.placeId||"",mapsUrl:place.mapsUrl||"",category:place.category||"Atração",smartTip:place.smartTip||place.tip||"",networkRecommended:!!place.networkRecommended});writeData(d);return t},
  createItineraryTemplate(template){const d=readData();template.id=template.id||("tpl-"+Date.now());template.days=Number(template.days)||1;template.itinerary=template.itinerary||[];d.itineraryTemplates=d.itineraryTemplates||[];d.itineraryTemplates.push(template);writeData(d);return template},
  markPaymentPaid(id){const d=readData();const p=d.payments.find(x=>x.id===id);if(p){p.status="Pago";p.paidAt=new Date().toISOString().slice(0,10)}writeData(d);return p},

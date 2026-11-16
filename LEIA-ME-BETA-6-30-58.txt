@@ -1,0 +1,7 @@
+INDO POR AÍ — Beta 6.30.58 — EXPERÊNCIAS NO ROTEIRO
+
+ADM > Experiências: duração em horas/minutos e horário sugerido opcional.
+Cliente > Antes/Durante > Experiências: "Adicionar ao meu roteiro" escolhe dia do mesmo país e cidade; evita duplicatas; usa a camada de rota pessoal existente (localStorage). O roteiro oficial não muda, a reserva não é efetuada.
+"Quero reservar essa experiência" mantém o comportamento anterior: atendimento pelo Mochilito nos planos pagos e WhatsApp no Free.
+IMPORTANTE: como a rota pessoal preexistente, as adições são armazenadas no dispositivo/navegador local, ainda não sincronizadas entre dispositivos no Firebase. Não confundir com a publicação oficial do ADM.
+Testes recomendados: salvar experiência no ADM, abrir cliente correspondente, adicionar ao dia; recarregar, verificar persistência, remoção e bloqueio de duplicidade; países diferentes; Free máximo de 3 dias.

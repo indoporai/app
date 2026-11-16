@@ -1792,3 +1792,19 @@ body.hidden-nav .bottom-nav{display:none!important;}
 .ipa-travel-together-item{display:flex;justify-content:space-between;gap:14px;align-items:center;border:1px solid #e1eeee;padding:13px;border-radius:14px;margin-bottom:8px}
 .ipa-travel-together-item>div{display:flex;flex-direction:column;gap:3px}
 .ipa-travel-together-item small{color:#657f82}
+
+/* Beta 6.30.57 — Experiências e Free, sem alterar paleta original */
+.ipa-experiences-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px}
+.ipa-experience-card{background:#fff;border:1px solid #d6e5e6;border-radius:18px;overflow:hidden;box-shadow:0 6px 20px rgba(0,50,65,.08)}
+.ipa-experience-card>img,.ipa-experience-placeholder{display:block;width:100%;height:150px;object-fit:cover;background:linear-gradient(135deg,#075667,#29a3aa);color:#fff}
+.ipa-experience-placeholder{display:flex;align-items:center;justify-content:center;font-size:38px}
+.ipa-experience-body{padding:14px;display:grid;gap:9px}
+.ipa-experience-body h3{margin:0;color:#075667}.ipa-experience-body p{margin:0;font-size:14px;line-height:1.5}.ipa-experience-body small{color:#536b71}
+.ipa-free-sales{border:2px solid #0b8793!important}.ipa-experiences-admin{display:grid;gap:12px}
+
+/* Beta 6.30.58 — experiência adicionada à rota pessoal */
+.ipa-experience-body .btn{margin-top:9px;min-height:43px}
+.ipa-experience-disclaimer{display:block;font-size:12px;opacity:.78;line-height:1.4;margin-top:7px}
+.ipa-experience-time-fields{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.ipa-experience-time-fields input{width:76px;min-width:65px}
+.ipa-experience-time-fields span{font-size:13px;color:#075667}

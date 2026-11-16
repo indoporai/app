@@ -762,6 +762,23 @@ export default {
         return json({instagramFollowers:Number.isInteger(count)&&count>=0&&count<=999999999?count:26000});
       }catch(e){console.warn('Community count fallback',String(e?.message||e));return json({instagramFollowers:26000});}
     }
+    if (url.pathname === "/api/public/experiences" && request.method === "GET") {
+      try {
+        const access=await ipaGoogleServiceToken(env,"https://www.googleapis.com/auth/datastore");
+        const resp=await fetch(`https://firestore.googleapis.com/v1/projects/${IPA_FIREBASE_PROJECT}/databases/(default)/documents/settings/main`,{headers:{Authorization:'Bearer '+access},cache:'no-store'});
+        if(!resp.ok)return json({ok:false,experiences:[]},503);
+        const doc=await resp.json();
+        const field=doc.fields?.experiences?.arrayValue?.values||[];
+        const value=v=>v?.stringValue??(v?.booleanValue===true?true:v?.booleanValue===false?false:null);
+        const list=field.map(x=>{const z=x.mapValue?.fields||{};return {
+          id:String(value(z.id)||'').slice(0,80),title:String(value(z.title)||'').slice(0,140),
+          country:String(value(z.country)||'').slice(0,80),city:String(value(z.city)||'').slice(0,80),
+          description:String(value(z.description)||'').slice(0,700),duration:String(value(z.duration)||'').slice(0,70),durationMinutes:Math.max(0,Math.min(2880,Number(z.durationMinutes?.integerValue||0)||0)),suggestedTime:String(value(z.suggestedTime)||'').slice(0,5),
+          price:String(value(z.price)||'').slice(0,70),photoUrl:String(value(z.photoUrl)||'').slice(0,1000),active:value(z.active)!==false
+        }}).filter(x=>x.active&&x.id&&x.title);
+        return json({ok:true,experiences:list});
+      }catch(e){console.error('Experiências indisponíveis',e?.message);return json({ok:false,experiences:[]},503)}
+    }
     if (url.pathname === "/api/client/access" && (request.method === "POST" || request.method === "GET")) return ipaAccessRequest(request,env);
     if (url.pathname === "/api/admin/payment-email" && (request.method === "GET" || request.method === "POST")) return json({ok:false,error:"A configuração do e-mail é fixa desde a Beta 6.30.33."},410);
     if (url.pathname === "/api/admin/reconcile-pix" && request.method === "POST") return ipaAdminReconcilePix(request,env);

@@ -107,6 +107,7 @@ async function pullAll(){
     conciergeRequests,
     placeCatalog,
     hotelCatalog:Array.isArray(settings.hotelCatalog)?settings.hotelCatalog:[],
+    experiences:Array.isArray(settings.experiences)?settings.experiences:[],
     travelLeads
   };
 
@@ -174,6 +175,7 @@ async function syncAll(data){
       visitReviews:data.visitReviews||{},
       ratings:data.ratings||{},
       hotelCatalog:Array.isArray(data.hotelCatalog)?data.hotelCatalog:[],
+      experiences:Array.isArray(data.experiences)?data.experiences:[],
       instagramFollowers:Number.isFinite(Number(data.instagramFollowers))?Number(data.instagramFollowers):26000,
       updatedAt:serverTimestamp()
     },{merge:true});
@@ -561,9 +563,16 @@ onAuthStateChanged(auth,async user=>{
   await bootstrapAfterLogin();
 });
 
+function ipaIsCurrentFreeTrip(tripId){
+ const data=window.IPAData?.getAll?.();
+ return (data?.trips||[]).some(t=>String(t.id)===String(tripId)&&t.plan==='Free');
+}
+function ipaIsCurrentFreeConcierge(){
+ const data=window.IPAData?.getAll?.();return (data?.trips||[]).some(t=>t.plan==='Free'&&String(t.id)===String(data.activeTripId||''));
+}
 window.IPAFirebase = {
   async ensureConciergeWelcome({tripId,clientId='',requesterName=''}){
-    if(!currentUser||currentUser.uid===ADMIN_UID||!tripId)return null;
+    if(!currentUser||currentUser.uid===ADMIN_UID||!tripId||ipaIsCurrentFreeTrip(tripId))return null;
     // Existing clients keep their conversation untouched and receive no late welcome.
     const existing=await getDocs(query(collection(firestore,'conciergeRequests'),where('requesterUid','==',currentUser.uid),limit(1)));
     if(!existing.empty)return null;
@@ -580,6 +589,7 @@ window.IPAFirebase = {
   },
   async submitConciergeRequest(request){
     if(!currentUser || currentUser.uid===ADMIN_UID)throw new Error('Entre com o login do viajante.');
+    if(ipaIsCurrentFreeTrip(request?.tripId))throw new Error('O Mochilito Free é demonstrativo. Conheça o Signature para conversar com a equipe.');
     if(!request?.tripId || !String(request.text||'').trim())throw new Error('Informe a viagem e os detalhes do pedido.');
     const item={id:'conc-'+currentUser.uid+'-'+Date.now(),tripId:String(request.tripId),clientId:String(request.clientId||''),type:String(request.type||'Outro').slice(0,80),text:String(request.text).trim().slice(0,3000),requesterUid:currentUser.uid,requesterEmail:currentUser.email||'',requesterName:String(request.requesterName||currentUser.displayName||currentUser.email?.split('@')[0]||'Viajante').slice(0,120),status:'Enviado',createdAt:new Date().toISOString(),messages:[{sender:'client',text:String(request.text).trim().slice(0,3000),createdAt:new Date().toISOString()}]};
     await setDoc(doc(firestore,'conciergeRequests',item.id),item);
@@ -623,6 +633,7 @@ window.IPAFirebase = {
     const snap=await getDoc(ref);if(!snap.exists())throw new Error('Atendimento não encontrado.');
     const item=snap.data();
     if(currentUser.uid!==ADMIN_UID && item.requesterUid!==currentUser.uid)throw new Error('Sem acesso a este atendimento.');
+    if(currentUser.uid!==ADMIN_UID&&ipaIsCurrentFreeTrip(item.tripId))throw new Error('O Mochilito Free é demonstrativo.');
     const sender=currentUser.uid===ADMIN_UID?'admin':'client';
     await updateDoc(ref,{messages:arrayUnion({sender,text:clean.slice(0,3000),createdAt:new Date().toISOString(),uid:currentUser.uid}),status:sender==='admin'?'Respondido':'Em análise',updatedAt:new Date().toISOString()});
   },
