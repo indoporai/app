@@ -3833,7 +3833,7 @@ function ipaPlannerForm(plan=''){
  const chosen=plan||ipaProspectPlan||'';
  return `<span class="eyebrow">QUERO VIAJAR</span><h2>Conte como você quer viajar</h2><p>Suas respostas serão enviadas ao Indo por Aí. Nossa curadoria prepara a sugestão internamente e entra em contato com você.</p>
  ${chosen?`<div class="prospect-plan-picked"><span>Plano escolhido</span><b>${ipaEscape(chosen)}</b></div>`:''}
- <div class="planner-grid"><label>Seu nome<input id="plannerName" class="v2-concierge-input" placeholder="Como podemos te chamar?"></label><label>WhatsApp<input id="plannerPhone" class="v2-concierge-input" placeholder="(11) 99999-9999"></label><label>E-mail <small>opcional</small><input id="plannerEmail" type="email" class="v2-concierge-input" placeholder="voce@email.com"></label><label>Quantas cidades você quer visitar?<select id="plannerCityCount" class="v2-concierge-input">${Array.from({length:8},(_,i)=>`<option value="${i+1}">${i+1} ${i===0?'cidade':'cidades'}</option>`).join('')}</select></label><label>Duração total da viagem (dias)<input id="plannerDays" type="number" min="1" max="90" value="4" class="v2-concierge-input"></label><div class="ipa-planner-cities" id="plannerCities" aria-live="polite"></div><label>Adultos<input id="plannerAdults" type="number" min="1" value="2" class="v2-concierge-input"></label><label>Crianças<input id="plannerChildren" type="number" min="0" value="0" class="v2-concierge-input"></label></div>
+ <div class="planner-grid"><label>Seu nome<input id="plannerName" class="v2-concierge-input" placeholder="Como podemos te chamar?"></label><label>WhatsApp<input id="plannerPhone" class="v2-concierge-input" placeholder="(11) 99999-9999"></label><label>E-mail <small>opcional</small><input id="plannerEmail" type="email" class="v2-concierge-input" placeholder="voce@email.com"></label><label>Quantos países você quer visitar?<select id="plannerCountryCount" class="v2-concierge-input">${Array.from({length:10},(_,i)=>`<option value="${i+1}">${i+1} ${i===0?'país':'países'}</option>`).join('')}</select></label><label>Quantas cidades no total da viagem?<select id="plannerCityCount" class="v2-concierge-input">${Array.from({length:10},(_,i)=>`<option value="${i+1}">${i+1} ${i===0?'cidade':'cidades'}</option>`).join('')}</select></label><label>Duração total da viagem (dias)<input id="plannerDays" type="number" min="1" max="90" value="4" class="v2-concierge-input"></label><div class="ipa-planner-cities" id="plannerCities" aria-live="polite"></div><label>Adultos<input id="plannerAdults" type="number" min="1" value="2" class="v2-concierge-input"></label><label>Crianças<input id="plannerChildren" type="number" min="0" value="0" class="v2-concierge-input"></label></div>
  <label>Quanto pretende gastar com passeios e experiências? <small>por pessoa, para toda a viagem</small></label><div class="planner-budget"><select id="plannerCurrency" class="v2-concierge-input"><option value="EUR">€ EUR</option><option value="BRL">R$ BRL</option><option value="USD">$ USD</option></select><input id="plannerBudget" type="number" min="0" step="10" class="v2-concierge-input" placeholder="500"></div>
  <label>Seu ritmo</label><select id="plannerPace" class="v2-concierge-input"><option value="leve">Leve · 2 a 3 experiências/dia</option><option value="equilibrado" selected>Equilibrado · 3 a 4/dia</option><option value="intenso">Intenso · 4 a 5/dia</option></select>
  <label>O que mais combina com você?</label><div class="planner-interests">${IPA_INTERESTS.map(x=>`<label><input type="checkbox" value="${x}"> ${x}</label>`).join('')}</div>
@@ -3862,8 +3862,8 @@ function ipaGenerateRequestedCityRoute(lead){
  for(const stage of stages){
   const portion=Number(lead.budget||0)>0 ? Number(lead.budget)*Number(stage.days)/Math.max(1,Number(lead.days)) : 0;
   const route=ipaGenerateCuratedRoute({...lead,destination:stage.destination,days:stage.days,budget:portion});
-  allDays.push(...route.days.map(day=>({...day,day:day.day+dayOffset,city:stage.destination,title:`Dia ${day.day+dayOffset} · ${stage.destination}`})));
-  allCities.push({destination:stage.destination,days:stage.days,startDay:dayOffset+1,endDay:dayOffset+Number(stage.days)});
+  allDays.push(...route.days.map(day=>({...day,day:day.day+dayOffset,city:stage.destination,country:stage.country||'',title:`Dia ${day.day+dayOffset} · ${stage.destination}`})));
+  allCities.push({destination:stage.destination,country:stage.country||'',days:stage.days,startDay:dayOffset+1,endDay:dayOffset+Number(stage.days)});
   dayOffset+=Number(stage.days);totalSpent+=Number(route.spent)||0;matched+=Number(route.count)||0;
  }
  return {days:allDays,spent:totalSpent,budget:Number(lead.budget)||0,currency:lead.currency||'EUR',count:matched,optimizedByLocation:true,stages:allCities};
@@ -3877,7 +3877,7 @@ function ipaLeadWhatsappText(lead){
   `Pedido: ${lead.requestCode}\n`+
   `Plano: ${lead.plan||'A definir'}\n`+
   `Nome: ${lead.name}\n`+
-  `Destinos: ${lead.destination}\n`+((lead.stages||[]).length>1?`Cidades: ${lead.stages.map(x=>x.destination+" ("+x.days+" dias)").join("; ")}\n`:"")+
+  `Destinos: ${lead.destination}\n`+((lead.countries||[]).length?`Países: ${lead.countries.map(x=>x.name).join(" → ")}\n`:"")+((lead.stages||[]).length>1?`Cidades: ${lead.stages.map(x=>x.destination+(x.country?" / "+x.country:"")+" ("+x.days+" dias)").join("; ")}\n`:"")+
   `Duração: ${lead.days} dias\n`+
   `Viajantes: ${people}\n`+
   `Interesses: ${(lead.interests||[]).join(', ')||'A definir'}\n`+
@@ -3890,8 +3890,8 @@ function ipaLeadWhatsappText(lead){
 function adminLeads(){
  const leads=adminData().travelLeads||[];
  return `<div class="ipa-admin-head"><div><span class="eyebrow">NOVOS NEGÓCIOS</span><h1>Pedidos de viagem</h1><p>Gerencie pedidos externos ou crie uma viagem inteligente diretamente para um cliente cadastrado.</p></div><div class="lead-actions"><button class="btn btn-primary" data-admin-smart-client-trip>✨ Criar viagem inteligente para cliente</button><span class="chip">${leads.filter(x=>(x.status||'Novo')==='Novo').length} novos</span></div></div>
- <div class="lead-admin-grid">${leads.map(l=>`<article class="lead-admin-card ipa-lead-compact"><div class="lead-admin-top"><span class="chip orange">${ipaEscape(l.status||'Novo')}</span><small>${ipaEscape(l.requestCode||l.id)}</small></div><h3>${ipaEscape(l.name||'Novo viajante')} · ${ipaEscape(l.destination||'Destino')}</h3><p><b>${ipaEscape(l.plan||'Plano a definir')}</b> · ${l.days} dias · ${l.adults} adulto(s)${Number(l.children)?` + ${l.children} criança(s)`:''}</p><small>${(l.interests||[]).map(ipaEscape).join(' · ')||'Sem interesses marcados'}</small>${l.favoriteSong?`<p class="ipa-lead-favorite-song">♫ Música favorita: <b>${ipaEscape(l.favoriteSong)}</b></p>`:''}<div class="lead-budget"><span>Orçamento para experiências</span><b>${ipaCatalogMoney(l.budget,l.currency)} / pessoa</b></div>
- <div class="ipa-lead-city-editor"><button type="button" class="btn btn-light" data-lead-city-toggle="${ipaEscape(l.id)}">✎ Corrigir cidades</button><div class="ipa-lead-city-fields" data-lead-city-fields="${ipaEscape(l.id)}" hidden><div class="ipa-lead-city-grid">${(Array.isArray(l.stages)&&l.stages.length?l.stages:[{destination:l.destination||'',days:l.days}]).map((stage,i)=>`<div class="ipa-lead-city-row"><div class="ipa-lead-city-row-head"><strong>Cidade ${i+1}</strong>${stage.days?`<span class="chip">${Number(stage.days)} dia(s)</span>`:''}</div><input type="text" maxlength="120" data-lead-city-input="${ipaEscape(l.id)}" value="${ipaEscape(stage.destination||'')}" placeholder="Nome correto da cidade"></div>`).join('')}</div><small class="ipa-lead-city-help">Ex.: Rabbat → Rabat. O texto original ficará no histórico. As buscas e a próxima geração do roteiro usarão as cidades corrigidas.</small><button type="button" class="btn btn-primary" data-lead-city-save="${ipaEscape(l.id)}">✓ Salvar cidades corrigidas</button></div></div><div class="ipa-lead-budget-editor"><button type="button" class="btn btn-light" data-lead-budget-toggle="${ipaEscape(l.id)}">✎ Corrigir orçamento</button><div class="ipa-lead-budget-fields" data-lead-budget-fields="${ipaEscape(l.id)}" hidden><label>Valor correto por pessoa<input type="number" min="1" max="999999999" step="0.01" data-lead-budget-value="${ipaEscape(l.id)}" value="${Number(l.budget)||0}"></label><label>Moeda<select data-lead-budget-currency="${ipaEscape(l.id)}">${['EUR','BRL','USD'].map(c=>`<option value="${c}" ${String(l.currency||'EUR')===c?'selected':''}>${c}</option>`).join('')}</select></label><small>O valor original informado pelo cliente será preservado no histórico. A alteração será usada na geração automática.</small><button type="button" class="btn btn-primary" data-lead-budget-save="${ipaEscape(l.id)}">✓ Salvar orçamento corrigido</button></div></div><div class="lead-actions ipa-lead-primary-action"><button class="btn btn-primary" data-lead-generate="${l.id}">✨ Gerar sugestão</button></div><div data-lead-result="${l.id}">${l.adminSuggestion?ipaAdminSuggestionHtml(l,l.adminSuggestion):''}</div></article>`).join('')||'<div class="smart-empty"><b>Nenhum pedido externo ainda.</b><small>Você não precisa de um pedido externo para criar uma viagem: use o botão ✨ Criar viagem inteligente para cliente acima.</small><button class="btn btn-primary" data-admin-smart-client-trip>✨ Criar para cliente cadastrado</button></div>'}</div>`;
+ <div class="lead-admin-grid">${leads.map(l=>`<article class="lead-admin-card ipa-lead-compact"><div class="lead-admin-top"><span class="chip orange">${ipaEscape(l.status||'Novo')}</span><small>${ipaEscape(l.requestCode||l.id)}</small></div><h3>${ipaEscape(l.name||'Novo viajante')} · ${ipaEscape(l.destination||'Destino')}</h3><p><b>${ipaEscape(l.plan||'Plano a definir')}</b> · ${l.days} dias · ${l.adults} adulto(s)${Number(l.children)?` + ${l.children} criança(s)`:''}</p><small>${(l.interests||[]).map(ipaEscape).join(' · ')||'Sem interesses marcados'}</small>${(l.countries||[]).length?`<p class="ipa-lead-country-summary"><b>🌍 ${l.countries.length} país(es) · ${l.stages?.length||0} cidades</b><small>${l.countries.map(x=>ipaEscape(x.name)).join(" → ")}</small></p>`:""}${l.favoriteSong?`<p class="ipa-lead-favorite-song">♫ Música favorita: <b>${ipaEscape(l.favoriteSong)}</b></p>`:''}<div class="lead-budget"><span>Orçamento para experiências</span><b>${ipaCatalogMoney(l.budget,l.currency)} / pessoa</b></div>
+ <div class="ipa-lead-city-editor"><button type="button" class="btn btn-light" data-lead-city-toggle="${ipaEscape(l.id)}">✎ Corrigir cidades</button><div class="ipa-lead-city-fields" data-lead-city-fields="${ipaEscape(l.id)}" hidden><div class="ipa-lead-city-grid">${(Array.isArray(l.stages)&&l.stages.length?l.stages:[{destination:l.destination||'',days:l.days}]).map((stage,i)=>`<div class="ipa-lead-city-row"><div class="ipa-lead-city-row-head"><strong>Cidade ${i+1}${stage.country?" · "+ipaEscape(stage.country):""}</strong>${stage.days?`<span class="chip">${Number(stage.days)} dia(s)</span>`:''}</div><input type="text" maxlength="120" data-lead-city-input="${ipaEscape(l.id)}" value="${ipaEscape(stage.destination||'')}" placeholder="Nome correto da cidade"></div>`).join('')}</div><small class="ipa-lead-city-help">Ex.: Rabbat → Rabat. O texto original ficará no histórico. As buscas e a próxima geração do roteiro usarão as cidades corrigidas.</small><button type="button" class="btn btn-primary" data-lead-city-save="${ipaEscape(l.id)}">✓ Salvar cidades corrigidas</button></div></div><div class="ipa-lead-budget-editor"><button type="button" class="btn btn-light" data-lead-budget-toggle="${ipaEscape(l.id)}">✎ Corrigir orçamento</button><div class="ipa-lead-budget-fields" data-lead-budget-fields="${ipaEscape(l.id)}" hidden><label>Valor correto por pessoa<input type="number" min="1" max="999999999" step="0.01" data-lead-budget-value="${ipaEscape(l.id)}" value="${Number(l.budget)||0}"></label><label>Moeda<select data-lead-budget-currency="${ipaEscape(l.id)}">${['EUR','BRL','USD'].map(c=>`<option value="${c}" ${String(l.currency||'EUR')===c?'selected':''}>${c}</option>`).join('')}</select></label><small>O valor original informado pelo cliente será preservado no histórico. A alteração será usada na geração automática.</small><button type="button" class="btn btn-primary" data-lead-budget-save="${ipaEscape(l.id)}">✓ Salvar orçamento corrigido</button></div></div><div class="lead-actions ipa-lead-primary-action"><button class="btn btn-primary" data-lead-generate="${l.id}">✨ Gerar sugestão</button></div><div data-lead-result="${l.id}">${l.adminSuggestion?ipaAdminSuggestionHtml(l,l.adminSuggestion):''}</div></article>`).join('')||'<div class="smart-empty"><b>Nenhum pedido externo ainda.</b><small>Você não precisa de um pedido externo para criar uma viagem: use o botão ✨ Criar viagem inteligente para cliente acima.</small><button class="btn btn-primary" data-admin-smart-client-trip>✨ Criar para cliente cadastrado</button></div>'}</div>`;
 }
 function ipaAdminSuggestionHtml(lead,result){
  if(!result?.count)return `<div class="planner-empty"><b>Banco de Lugares sem combinação suficiente.</b><small>Cadastre mais experiências para ${ipaEscape(lead.destination||'este destino')} e gere novamente.</small></div>`;
@@ -3907,20 +3907,73 @@ ${plansSalesBlock()}
 <section class="section"><div class="instagram-showcase"><div class="instagram-mark">◎</div><div><span class="eyebrow">Conheça nossa comunidade</span><h2>Uma comunidade com mais de 23 mil apaixonados por viagens.</h2><p>Roteiros, dicas e experiências reais para inspirar sua próxima história.</p><b>@indo.por.ai.com.a.gente</b></div><button class="btn btn-primary" id="instagramBtn">Abrir Instagram</button></div></section>
 <section class="section"><div class="prospect-proof"><span>❤️</span><div><span class="eyebrow">Indo por Aí</span><h3>Não vendemos apenas um destino.</h3><p>Acompanhamos a história antes, durante e depois da viagem.</p></div></div></section>`}
 function ipaBindPlannerCities(){
- const count=document.querySelector('#plannerCityCount'),box=document.querySelector('#plannerCities'),days=document.querySelector('#plannerDays');
- if(!count||!box||!days)return;
- const update=()=>{
-  const previous=[...box.querySelectorAll('[data-planner-city]')].map(r=>({city:r.querySelector('[data-city-name]')?.value||'',days:r.querySelector('[data-city-days]')?.value||''}));
-  const n=Number(count.value)||1,total=Math.max(n,Number(days.value)||n);
-  const filled=previous.reduce((v,x)=>v+(Number(x.days)||0),0);
-  box.innerHTML=`<div class="ipa-planner-cities-head"><b>Monte sua viagem cidade por cidade</b><small>Informe a sequência e quantos dias deseja ficar em cada cidade.</small></div>${Array.from({length:n},(_,i)=>`<div class="ipa-planner-city-row" data-planner-city><span class="ipa-planner-city-index">${i+1}</span><label>Cidade ${i+1}<input data-city-name class="v2-concierge-input" maxlength="120" placeholder="${i===0?'Ex.: Lisboa':i===1?'Ex.: Porto':'Nome da cidade'}" value="${ipaEscape(previous[i]?.city||'')}"></label><label>Dias nesta cidade<input data-city-days class="v2-concierge-input" type="number" min="1" max="90" value="${ipaEscape(previous[i]?.days||String(i===0?Math.max(1,total-n+1):1))}"></label></div>`).join('')}<small id="plannerCityDaysStatus"></small>`;
-  box.querySelectorAll('[data-city-days]').forEach(e=>e.addEventListener('input',validate));validate();
- };
- function validate(){
-  const list=[...box.querySelectorAll('[data-city-days]')].map(x=>Number(x.value)||0),sum=list.reduce((a,b)=>a+b,0),total=Number(days.value)||0,info=document.querySelector('#plannerCityDaysStatus');
-  if(info){info.textContent=`${sum} de ${total} dias distribuídos entre as cidades${sum!==total?' — ajuste para fechar a duração total.':' ✓'}`;info.classList.toggle('ipa-planner-days-error',sum!==total)}
+ const countryCount=document.querySelector('#plannerCountryCount'),cityCount=document.querySelector('#plannerCityCount'),box=document.querySelector('#plannerCities'),days=document.querySelector('#plannerDays');
+ if(!countryCount||!cityCount||!box||!days)return;
+ function snapshot(){
+  return [...box.querySelectorAll('[data-planner-country]')].map((group)=>({
+   name:group.querySelector('[data-country-name]')?.value||'',
+   count:Number(group.querySelector('[data-country-city-count]')?.value)||1,
+   cities:[...group.querySelectorAll('[data-planner-city]')].map(row=>({city:row.querySelector('[data-city-name]')?.value||'',days:row.querySelector('[data-city-days]')?.value||''}))
+  }));
  }
- count.addEventListener('change',update);days.addEventListener('input',validate);update();
+ function validate(){
+  const groups=snapshot(),nCountry=Number(countryCount.value)||1,nCity=Number(cityCount.value)||1;
+  const assigned=groups.reduce((sum,g)=>sum+g.count,0);
+  const allDays=groups.flatMap(g=>g.cities.map(x=>Number(x.days)||0));
+  const totalDays=Number(days.value)||0,sum=allDays.reduce((a,b)=>a+b,0);
+  const info=document.querySelector('#plannerCityDaysStatus');
+  if(info){
+   const errors=[];
+   if(assigned!==nCity)errors.push(`${assigned} de ${nCity} cidades distribuídas — ajuste as quantidades de cada país`);
+   if(sum!==totalDays)errors.push(`${sum} de ${totalDays} dias distribuídos — ajuste a duração de cada cidade`);
+   if(nCity<nCountry)errors.push('A quantidade de cidades deve ser igual ou maior que a quantidade de países');
+   info.textContent=errors.length?errors.join(' · '):`${nCountry} país(es) · ${nCity} cidade(s) · ${sum} dias ✓`;
+   info.classList.toggle('ipa-planner-days-error',errors.length>0);
+  }
+ }
+ function update(){
+  const previous=snapshot(),nCountry=Number(countryCount.value)||1,nCity=Number(cityCount.value)||1;
+  if(nCity<nCountry){cityCount.value=String(nCountry)}
+  const totalCities=Number(cityCount.value)||1,totalDays=Math.max(totalCities,Number(days.value)||totalCities);
+  // Quando o usuário altera os totais, preserve os valores já preenchidos;
+  // a distribuição entre países pode ser ajustada manualmente.
+  const groups=Array.from({length:nCountry},(_,i)=>({name:previous[i]?.name||'',count:previous[i]?.count|| (i===0?Math.max(1,totalCities-nCountry+1):1),cities:previous[i]?.cities||[]}));
+  if(!previous.length)groups[0].count=Math.max(1,totalCities-nCountry+1);
+  let assigned=groups.reduce((sum,g)=>sum+g.count,0);
+  // Rebalanceia com no mínimo uma cidade por país e no máximo dez no total.
+  if(assigned<totalCities){groups[0].count+=totalCities-assigned}
+  else if(assigned>totalCities){
+   let excess=assigned-totalCities;
+   for(let i=groups.length-1;i>=0&&excess;i--){
+    const removable=Math.min(excess,groups[i].count-1);
+    groups[i].count-=removable;excess-=removable;
+   }
+  }
+  let ordinal=0;
+  box.innerHTML=`<div class="ipa-planner-cities-head"><b>Monte sua viagem país por país</b><small>Até 10 países e 10 cidades no total. Informe a ordem, as cidades e os dias em cada destino.</small></div>`+
+   groups.map((group,i)=>`<section class="ipa-planner-country" data-planner-country><div class="ipa-planner-country-heading"><strong>🌍 País ${i+1}</strong><label>Quantas cidades neste país?<select data-country-city-count class="v2-concierge-input">${Array.from({length:10},(_,j)=>`<option value="${j+1}" ${group.count===j+1?'selected':''}>${j+1} ${j===0?'cidade':'cidades'}</option>`).join('')}</select></label></div><label>Qual país?<input data-country-name class="v2-concierge-input" maxlength="100" placeholder="Ex.: ${i===0?'Marrocos':i===1?'Irlanda':'Portugal'}" value="${ipaEscape(group.name)}"></label><div class="ipa-planner-country-cities">${Array.from({length:group.count},(_,j)=>{const city=group.cities[j]||{};ordinal++;return `<div class="ipa-planner-city-row" data-planner-city><span class="ipa-planner-city-index">${ordinal}</span><label>Cidade ${ordinal}<input data-city-name class="v2-concierge-input" maxlength="120" placeholder="Ex.: ${i===0?'Casablanca':i===1?'Dublin':'Lisboa'}" value="${ipaEscape(city.city||'')}"></label><label>Dias nesta cidade<input data-city-days class="v2-concierge-input" type="number" min="1" max="90" value="${ipaEscape(city.days||String(ordinal===1?Math.max(1,totalDays-totalCities+1):1))}"></label></div>`}).join('')}</div></section>`).join('')+
+   `<small id="plannerCityDaysStatus" role="status" aria-live="polite"></small>`;
+  box.querySelectorAll('[data-country-city-count]').forEach(select=>select.addEventListener('change',()=>{
+   // Recria só o grupo alterado, preservando os campos existentes.
+   const gr=select.closest('[data-planner-country]');const target=Number(select.value)||1;
+   const rows=[...gr.querySelectorAll('[data-planner-city]')];
+   if(target>rows.length){const template=rows[rows.length-1];for(let n=rows.length;n<target;n++){
+    const clone=template.cloneNode(true);clone.querySelector('[data-city-name]').value='';clone.querySelector('[data-city-days]').value='1';gr.querySelector('.ipa-planner-country-cities').appendChild(clone);
+   }}else{rows.slice(target).forEach(row=>row.remove())}
+   // Atualiza o contador global sem alterar o número de países.
+   const total=[...box.querySelectorAll('[data-country-city-count]')].reduce((sum,el)=>sum+(Number(el.value)||1),0);
+   if(total>10){
+    toast('O máximo é 10 cidades no total da viagem.');
+    select.value=String(rows.length);
+    update();return;
+   }
+   cityCount.value=String(total);
+   update();
+  }));
+  box.querySelectorAll('[data-city-days],[data-city-name],[data-country-name]').forEach(el=>el.addEventListener('input',validate));
+  validate();
+ }
+ countryCount.addEventListener('change',update);cityCount.addEventListener('change',update);days.addEventListener('input',validate);update();
 }
 function ipaBindProspectForm(){
  ipaBindPlannerCities();
@@ -3928,8 +3981,15 @@ function ipaBindProspectForm(){
  send.onclick=async()=>{
   const val=id=>document.querySelector(id)?.value?.trim?.()||'';
   const interests=[...document.querySelectorAll('.planner-interests input:checked')].map(x=>x.value);
-  const stages=[...document.querySelectorAll('[data-planner-city]')].map((row,i)=>({order:i+1,destination:row.querySelector('[data-city-name]')?.value.trim()||'',days:Number(row.querySelector('[data-city-days]')?.value||0)}));
-  const lead={requestCode:ipaRequestCode(),plan:ipaProspectPlan||'A definir',name:val('#plannerName'),phone:val('#plannerPhone'),email:val('#plannerEmail'),destination:stages.map(x=>x.destination).filter(Boolean).join(' → '),stages,days:Number(val('#plannerDays')||1),adults:Number(val('#plannerAdults')||1),children:Number(val('#plannerChildren')||0),budget:Number(val('#plannerBudget')||0),currency:val('#plannerCurrency')||'EUR',pace:val('#plannerPace')||'equilibrado',interests,status:'Novo'};
+  const countryGroups=[...document.querySelectorAll('[data-planner-country]')];
+  const countries=countryGroups.map((group,i)=>({order:i+1,name:group.querySelector('[data-country-name]')?.value.trim()||'',cityCount:Number(group.querySelector('[data-country-city-count]')?.value)||1}));
+  const stages=countryGroups.flatMap((group,i)=>[...group.querySelectorAll('[data-planner-city]')].map(row=>({country:countries[i].name,destination:row.querySelector('[data-city-name]')?.value.trim()||'',days:Number(row.querySelector('[data-city-days]')?.value||0)}))).map((stage,i)=>({...stage,order:i+1}));
+  const lead={requestCode:ipaRequestCode(),plan:ipaProspectPlan||'A definir',name:val('#plannerName'),phone:val('#plannerPhone'),email:val('#plannerEmail'),destination:stages.map(x=>x.destination).filter(Boolean).join(' → '),countries,countryCount:countries.length,cityCount:stages.length,stages,days:Number(val('#plannerDays')||1),adults:Number(val('#plannerAdults')||1),children:Number(val('#plannerChildren')||0),budget:Number(val('#plannerBudget')||0),currency:val('#plannerCurrency')||'EUR',pace:val('#plannerPace')||'equilibrado',interests,status:'Novo'};
+  if(countries.length>10||stages.length>10||stages.length<countries.length)return toast('A viagem deve ter até 10 países e 10 cidades, com pelo menos uma cidade por país.');
+  if(countries.some(x=>!x.name))return toast('Informe o nome de todos os países da viagem.');
+  if(new Set(countries.map(x=>x.name.toLocaleLowerCase('pt-BR'))).size!==countries.length)return toast('Cada país deve aparecer uma única vez. Agrupe as cidades do mesmo país.');
+  if(stages.length!==Number(val('#plannerCityCount')))return toast('A quantidade de cidades não corresponde ao total informado.');
+  if(countries.length!==Number(val('#plannerCountryCount')))return toast('A quantidade de países não corresponde ao total informado.');
   if(stages.some(x=>!x.destination||x.days<1))return toast('Informe todas as cidades e os dias de cada etapa.');
   if(stages.reduce((sum,x)=>sum+x.days,0)!==lead.days)return toast('A soma dos dias por cidade precisa ser igual à duração total da viagem.');
   if(!lead.name){toast('Informe seu nome');return}if(!lead.phone){toast('Informe seu WhatsApp');return}if(!lead.destination){toast('Informe o destino');return}if(!interests.length){toast('Escolha pelo menos um interesse');return}

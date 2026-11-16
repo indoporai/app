@@ -1761,3 +1761,15 @@ body.hidden-nav .bottom-nav{display:none!important;}
 .ipa-entire-trip-summary {border:1px solid rgba(7,86,103,.17);background:linear-gradient(135deg,#f4fbfa,#ffffff);border-radius:22px;padding:22px!important;}
 .ipa-trip-all-cities{display:flex;gap:9px;flex-wrap:wrap;align-items:center;color:#075667;font-size:.91rem;font-weight:700;}
 .ipa-trip-all-cities span{display:inline-flex;align-items:center;}
+
+/* Beta 6.30.55 — Pedido MultiPaís: organização por país sem alterar o estilo original */
+.ipa-planner-country{display:grid;gap:12px;padding:14px;border:1px solid #c9e5e6;background:#fff;border-radius:17px;min-width:0}
+.ipa-planner-country-heading{display:flex;align-items:end;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.ipa-planner-country-heading strong{color:#075667;font-size:16px}
+.ipa-planner-country-heading label{max-width:240px;min-width:175px;font-size:13px}
+.ipa-planner-country>label{font-weight:600}
+.ipa-planner-country-cities{display:grid;gap:10px}
+.ipa-planner-country-cities .ipa-planner-city-row{border-top:1px solid #eaf1f1;padding-top:10px}
+.ipa-lead-country-summary{background:#eaf7f5;border-radius:12px;padding:10px 12px;margin:10px 0}
+.ipa-lead-country-summary small{display:block;margin-top:4px}
+@media(max-width:520px){.ipa-planner-country{padding:10px}.ipa-planner-country-heading label{width:100%;max-width:none}.ipa-planner-country-cities .ipa-planner-city-row{grid-template-columns:28px minmax(0,1fr) 90px;gap:6px}}

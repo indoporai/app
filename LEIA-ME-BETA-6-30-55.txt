@@ -1,0 +1,8 @@
+Indo por Aí — Beta 6.30.55 (base 6.30.54)
+
+- Formulário Quero Viajar: seleção de 1 a 10 países e 1 a 10 cidades no total.
+- Países com respectivas cidades e dias. Solicitações salvam countries, countryCount, cityCount, stages[].country e preservam campos antigos.
+- Validação de países distintos, pelo menos uma cidade por país e soma dos dias.
+- ADM Pedidos passa a exibir os países e preserva a associação por etapa ao criar roteiros.
+- Cores, financeiro, Mochilito, cliente e Firebase preservados da base 6.30.54.
+- Necessário validar fluxo completo publicado no Cloudflare.
