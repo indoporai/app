@@ -174,6 +174,7 @@ async function syncAll(data){
       visitReviews:data.visitReviews||{},
       ratings:data.ratings||{},
       hotelCatalog:Array.isArray(data.hotelCatalog)?data.hotelCatalog:[],
+      instagramFollowers:Number.isFinite(Number(data.instagramFollowers))?Number(data.instagramFollowers):26000,
       updatedAt:serverTimestamp()
     },{merge:true});
 
@@ -665,6 +666,13 @@ window.IPAFirebase = {
     const path=`memories/${clientId}/${tripId}/${Date.now()}-${safe}`;
     const snap=await uploadBytes(storageRef(storage,path),file,{contentType:file.type||"application/octet-stream"});
     return {url:await getDownloadURL(snap.ref),path};
+  },
+  async saveInstagramFollowers(count){
+    if(!currentUser || currentUser.uid!==ADMIN_UID)throw Error('Somente o administrador pode alterar seguidores.');
+    const n=Number(count);
+    if(!Number.isInteger(n)||n<0||n>999999999)throw Error('Quantidade inválida.');
+    await setDoc(doc(firestore,'settings','main'),{instagramFollowers:n,updatedAt:serverTimestamp()},{merge:true});
+    return n;
   },
   async saveTripDocument(record){
     if(!currentUser || currentUser.uid!==ADMIN_UID)throw new Error("Somente o ADM pode salvar documentos.");

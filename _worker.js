@@ -752,6 +752,16 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
 
+    if (url.pathname === '/api/public/community' && request.method === 'GET'){
+      try{
+        const access=await ipaGoogleServiceToken(env,'https://www.googleapis.com/auth/datastore');
+        const r=await fetch('https://firestore.googleapis.com/v1/projects/indo-por-ai-app/databases/(default)/documents/settings/main',{headers:{Authorization:'Bearer '+access},cache:'no-store'});
+        if(!r.ok)return json({instagramFollowers:26000});
+        const record=await r.json(),raw=record?.fields?.instagramFollowers?.integerValue;
+        const count=Number(raw);
+        return json({instagramFollowers:Number.isInteger(count)&&count>=0&&count<=999999999?count:26000});
+      }catch(e){console.warn('Community count fallback',String(e?.message||e));return json({instagramFollowers:26000});}
+    }
     if (url.pathname === "/api/client/access" && (request.method === "POST" || request.method === "GET")) return ipaAccessRequest(request,env);
     if (url.pathname === "/api/admin/payment-email" && (request.method === "GET" || request.method === "POST")) return json({ok:false,error:"A configuração do e-mail é fixa desde a Beta 6.30.33."},410);
     if (url.pathname === "/api/admin/reconcile-pix" && request.method === "POST") return ipaAdminReconcilePix(request,env);

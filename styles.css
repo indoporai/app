@@ -1773,3 +1773,22 @@ body.hidden-nav .bottom-nav{display:none!important;}
 .ipa-lead-country-summary{background:#eaf7f5;border-radius:12px;padding:10px 12px;margin:10px 0}
 .ipa-lead-country-summary small{display:block;margin-top:4px}
 @media(max-width:520px){.ipa-planner-country{padding:10px}.ipa-planner-country-heading label{width:100%;max-width:none}.ipa-planner-country-cities .ipa-planner-city-row{grid-template-columns:28px minmax(0,1fr) 90px;gap:6px}}
+
+/* Beta 6.30.56 — indicadores administrativos */
+.ipa-travel-now{border:1px solid rgba(9,103,115,.20)!important;background:linear-gradient(135deg,#f4fbfa,#ffffff)!important}
+.ipa-travel-now-count{font-size:15px;color:#075667;background:#e1f5ef;border-radius:30px;padding:8px 13px}
+.ipa-travel-now-row{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:15px 0;border-top:1px solid #dfebeb}
+.ipa-travel-now-row>div{display:flex;flex-direction:column;gap:5px;min-width:0}
+.ipa-travel-now-row small{color:#58747b}
+.ipa-instagram-admin-controls{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:10px 0}
+.ipa-instagram-admin-controls input{max-width:260px}
+@media(max-width:600px){.ipa-travel-now-row{align-items:flex-start;flex-direction:column}}
+
+/* Beta 6.30.56 — configuração segura de encontros, sem liberação de mídia */
+.ipa-travel-together-admin{border:1px solid #cde5e8!important;background:#f9fdfd!important}
+.ipa-travel-together-new{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));align-items:end;gap:14px;margin-top:17px}
+.ipa-travel-together-new label{display:flex;flex-direction:column;gap:7px;font-weight:600}
+.ipa-travel-together-existing{margin:15px 0}
+.ipa-travel-together-item{display:flex;justify-content:space-between;gap:14px;align-items:center;border:1px solid #e1eeee;padding:13px;border-radius:14px;margin-bottom:8px}
+.ipa-travel-together-item>div{display:flex;flex-direction:column;gap:3px}
+.ipa-travel-together-item small{color:#657f82}

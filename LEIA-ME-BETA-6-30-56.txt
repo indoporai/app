@@ -1,0 +1,20 @@
+INDO POR AÍ — BETA 6.30.56 (TESTE)
+
+Base: 6.30.55.
+
+ENTREGAS:
+- Entre no Clima: reconhecimento de Música / Playlist como categoria musical; reutiliza URLs Spotify explícitas salvas no ADM, quando houver.
+- ADM Dashboard: quem está viajando conforme datas de etapas, com acesso à viagem; sem rastreamento de GPS.
+- ADM Configurações: seguidores Instagram editáveis e armazenados no Firestore settings/main; vitrine pública consulta /api/public/community. Inicial: 26.000.
+- ADM Editar Viagem: planejamento de encontro Viajar Juntos, associando outro cliente e etapa de início (desabilitado para leitura cruzada).
+
+LIMITAÇÃO IMPORTANTE:
+O compartilhamento real de fotos, vídeos, chats ou roteiros ENTRE CONTAS DIFERENTES NÃO está ativo. Exige implementação e validação das regras Firebase Auth, Firestore e Storage, para assegurar que dados privados de uma cliente não fiquem acessíveis a outra. Os vínculos são somente configuração para uma etapa futura.
+
+TESTES:
+1) ADM > Configurações > Instagram; atualizar, conferir página pública e persistência.
+2) ADM > Dashboard; viagens em andamento segundo as datas cadastradas (horário de Brasília).
+3) ADM > Viagens > Editar > Viajar Juntos; salvar vínculo e confirmar persistência após recarga.
+4) Entre no Clima MultiPaís: conferir botão Spotify ao editar item Música/Playlist e cadastrar link direto válido. A tela não inventa URL onde não houver.
+
+O pacote NÃO modifica regras de segurança Firebase, pagamentos, Mercado Pago nem envios de e-mail.

@@ -30,6 +30,7 @@ function ipaPlanModules(plan){
 }
 
 const IPA_DEFAULT_DATA = {
+  instagramFollowers:26000,
   client:{id:"",name:"",plan:"",trip:""},
   plans:{
     Explore:["Roteiros configurados","Acesso ao app","Diário da viagem","Álbum e filme","Passaporte e selos","Comunidade Indo por Aí"],
@@ -88,6 +89,7 @@ window.IPAData={
  getAll(){return readData()},
  reset(){writeData(clone(IPA_DEFAULT_DATA))},
  updateClient(p){const d=readData();d.client={...d.client,...p};writeData(d)},
+ setInstagramFollowers(count){const d=readData();d.instagramFollowers=Math.max(0,Math.floor(Number(count)||0));writeData(d);},
  setBenefit(id,en){const d=readData();const b=d.benefits.find(x=>x.id===id);if(b)b.enabled=en;writeData(d)},
  updateExchange(p){const d=readData();d.exchange={...d.exchange,...p};writeData(d)},
  togglePrep(section,index){const d=readData();if(d.prep[section]?.[index])d.prep[section][index].done=!d.prep[section][index].done;writeData(d)},

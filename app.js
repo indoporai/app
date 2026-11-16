@@ -777,7 +777,7 @@ if(!window.__ipaClimateLinkDelegate){
 }
 function bind(){
  if(document.querySelector("[data-ipa-climate-card]")){
-  const t=activeTrip();if(t){for(const item of climateForTrip(t)){ipaClimateClientItems.set(ipaClimateDiscoveryKey(item,tripDestination(t)),item[5]||{});}}
+  const t=activeTrip();if(t){const country=ipaSelectedCountry(t),multi=ipaTripCountries(t).length>1,dest=multi?country:tripDestination(t);for(const item of (multi?ipaClimateCountryRows(t,country):climateForTrip(t))){ipaClimateClientItems.set(ipaClimateDiscoveryKey(item,dest),Array.isArray(item)?(item[5]||{}):(item.links||{}));}}
   void ipaClimateRefreshLinks();
  }
  setTimeout(()=>ipaHydrateTripWeather(),0);
@@ -1593,6 +1593,44 @@ function bind(){
    }
  };
  document.querySelectorAll('[data-firebase-logout]').forEach(b=>b.onclick=async()=>{await window.IPAFirebase.logout();render()});
+ const followersSave=document.querySelector('#ipaSaveInstagramFollowers');
+ if(followersSave)followersSave.onclick=async()=>{
+  const count=Number(document.querySelector('#ipaInstagramFollowers')?.value);
+  if(!Number.isInteger(count)||count<0||count>999999999){toast('Informe uma quantidade válida de seguidores.');return;}
+  followersSave.disabled=true;
+  try{
+   if(!window.IPAFirebase?.saveInstagramFollowers)throw Error('Atualize todos os arquivos do aplicativo.');
+   await window.IPAFirebase.saveInstagramFollowers(count);
+   IPAData.setInstagramFollowers(count);
+   toast('Seguidores atualizados no Firebase ✓');
+  }catch(e){toast('Não foi possível salvar: '+(e?.message||e));}
+  finally{followersSave.disabled=false;}
+ };
+ document.querySelectorAll('[data-ipa-add-travel-together]').forEach(btn=>btn.onclick=async()=>{
+  const id=btn.dataset.ipaAddTravelTogether,trip=adminData().trips.find(t=>t.id===id);
+  if(!trip)return;
+  const cid=document.querySelector('#ipaTravelTogetherClient')?.value||'';
+  const stageId=document.querySelector('#ipaTravelTogetherStage')?.value||'';
+  if(!cid||!stageId){toast('Selecione o cliente e a etapa de encontro.');return;}
+  if(cid===trip.clientId){toast('A viagem já pertence a esse cliente.');return;}
+  const stages=tripStages(trip);
+  const stage=stages.find(x=>String(x.id)===stageId);
+  if(!stage){toast('Etapa não encontrada.');return;}
+  const prev=Array.isArray(trip.travelTogetherPlans)?trip.travelTogetherPlans:[];
+  if(prev.some(x=>x.clientId===cid)){toast('Cliente já vinculado a este planejamento.');return;}
+  const plans=[...prev,{id:'together-'+Date.now()+'-'+Math.random().toString(36).slice(2,7),clientId:cid,fromStageId:stageId,fromCountry:stage.country||'',fromDate:stage.startDate||'',enabled:false,createdAt:new Date().toISOString()}];
+  btn.disabled=true;
+  try{IPAData.updateTrip(id,{travelTogetherPlans:plans});await window.IPAFirebase.syncNow();render();toast('Encontro registrado no ADM (sem compartilhar mídia).');}
+  catch(e){IPAData.updateTrip(id,{travelTogetherPlans:prev});toast('Falha ao registrar vínculo: '+(e?.message||e));btn.disabled=false;}
+ });
+ document.querySelectorAll('[data-ipa-remove-travel-together]').forEach(btn=>btn.onclick=async()=>{
+  const id=btn.dataset.ipaTravelTrip,trip=adminData().trips.find(t=>t.id===id);if(!trip)return;
+  if(!confirm('Remover o planejamento de viagem compartilhada?'))return;
+  const prev=Array.isArray(trip.travelTogetherPlans)?trip.travelTogetherPlans:[];
+  IPAData.updateTrip(id,{travelTogetherPlans:prev.filter(x=>x.id!==btn.dataset.ipaRemoveTravelTogether)});
+  try{await window.IPAFirebase.syncNow();render();toast('Planejamento removido.');}
+  catch(e){IPAData.updateTrip(id,{travelTogetherPlans:prev});toast('Não foi possível salvar: '+(e?.message||e));}
+ });
  document.querySelectorAll('[data-firebase-sync]').forEach(b=>b.onclick=async()=>{toast('Sincronizando com Firebase...');try{await window.IPAFirebase.syncNow();toast('Firebase sincronizado')}catch(e){toast(e.message||'Erro ao sincronizar')}});
  document.querySelectorAll('[data-ipa-navigate-place]').forEach(b=>b.onclick=()=>{
   const t=activeTrip();if(!t)return;
@@ -2008,6 +2046,7 @@ function bind(){
  };
  const instagramBtn=document.querySelector('#instagramBtn');
  if(instagramBtn)instagramBtn.onclick=()=>window.open('https://www.instagram.com/indo.por.ai.com.a.gente/','_blank');
+ const followersLabel=document.querySelector('#ipaInstagramFollowerTotal');if(followersLabel){const stamp=followersLabel;fetch('/api/public/community',{cache:'no-store'}).then(r=>r.ok?r.json():null).then(data=>{if(!stamp.isConnected||!data)return;const n=Math.max(0,Number(data.instagramFollowers)||26000);stamp.textContent='mais de '+Math.floor(n/1000)+' mil';}).catch(()=>{}); }
  document.querySelectorAll('[data-discovery]').forEach(card=>card.onclick=()=>{
    const data=JSON.parse(card.dataset.discovery);
    showModal(`<h2>${data.icon} ${data.name}</h2><p><b>${data.rating}</b> · ${data.reviews} avaliações</p><p>${data.description}</p><div class="discovery-detail-grid"><div><small>Distância</small><strong>${data.distance}</strong></div><div><small>Tempo extra</small><strong>${data.detour}</strong></div><div><small>Preço</small><strong>${data.price}</strong></div></div><button class="btn btn-primary btn-block" onclick="toast('Parada adicionada ao roteiro');modal.close()">Adicionar ao roteiro</button><button class="btn btn-light btn-block" data-map="${data.name} Portugal">Abrir no mapa</button>`);
@@ -2912,7 +2951,7 @@ function ipaClimateProviderFromUrl(url){
 
 function ipaClimatePlatformNames(type){
  const v=String(type||'').toLowerCase();
- return v.includes('playlist')?['Spotify','Deezer','Apple Music']:v.includes('livro')?['Kindle','Apple Books']:v.includes('filme')||v.includes('série')?['Netflix','Prime Video','Disney+','Apple TV','Trailer']:[];
+ return /playlist|música|musica|artista|som/.test(v)?['Spotify','Deezer','Apple Music']:v.includes('livro')?['Kindle','Apple Books']:v.includes('filme')||v.includes('série')?['Netflix','Prime Video','Disney+','Apple TV','Trailer']:[];
 }
 function ipaClimateEditorFields(item){
  const fields=ipaClimatePlatformNames(item.type),links=item.links||{};
@@ -2966,7 +3005,7 @@ const ipaClimateClientItems=new Map();
 
 function ipaStreamButtons(item){
  const type=String(item[1]||'').toLowerCase(),title=String(item[2]||'').trim();
- if(!title||!/(filme|série|playlist|livro)/.test(type))return '';
+ if(!title||!/(filme|série|playlist|livro|música|musica|artista)/.test(type))return '';
  const key=title.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
  const links={...(IPA_CLIMATE_DIRECT_LINKS[key]||{})};
  // Manter links próprios que tenham sido cadastrados pelo ADM.
@@ -2980,7 +3019,7 @@ function ipaStreamButtons(item){
  const oneUrl=String(item[4]||'');
  const detected=ipaClimateProviderFromUrl(oneUrl);
  if(detected)links[detected]=oneUrl;
- const names=type.includes('playlist')?['Spotify','Deezer','Apple Music']:
+ const names=/(playlist|música|musica|artista)/.test(type)?['Spotify','Deezer','Apple Music']:
    type.includes('livro')?['Kindle','Apple Books']:
    ['Netflix','Prime Video','Disney+','Apple TV','Trailer'];
  const mark={'Netflix':'N','Prime Video':'▶','Disney+':'D+','Apple TV':'●','Spotify':'≋','Deezer':'▥','Apple Music':'♫','Kindle':'K','Apple Books':'◈','Trailer':'▶'};
@@ -2999,7 +3038,7 @@ function ipaStreamButtons(item){
 
 function climateSection(t){
  const country=ipaSelectedCountry(t),multi=ipaTripCountries(t).length>1;
- const dest=multi?country:tripDestination(t),cards=multi?ipaClimateCountryRows(t,country):climateForTrip(t);
+ const dest=multi?country:tripDestination(t),raw=multi?ipaClimateCountryRows(t,country):climateForTrip(t),cards=raw.map(x=>Array.isArray(x)?x:[x.icon||'✨',x.type||'',x.title||'',x.description||'',x.url||'',x.links||{}]);
  if(!cards.length)return `<section class="section climate-section"><div class="section-head"><div><span class="eyebrow">✨ ENTRE NO CLIMA</span><h2>${ipaEscape(dest)}</h2></div></div><p>Estamos preparando recomendações culturais verificadas para este destino.</p></section>`;
  return `<section class="section climate-section"><div class="section-head"><div><span class="eyebrow">✨ ENTRE NO CLIMA</span><h2>${dest} começa antes do embarque</h2></div></div><div class="climate-grid">${cards.map((x,i)=>`<article data-ipa-climate-card="1" data-ipa-climate-type="${ipaEscape(x[1])}" data-ipa-climate-title="${ipaEscape(x[2])}" data-ipa-climate-destination="${ipaEscape(dest)}" data-ipa-climate-url="${ipaEscape(x[4]||'')}"><span>${x[0]}</span><small>${x[1]}</small><b>${x[2]}</b><p>${x[3]}</p><div class="ipa-climate-actions">${ipaStreamButtons(x)}</div>${x[4]&&!ipaClimateProviderFromUrl(x[4])?`<button data-external-route="${ipaEscape(x[4])}">Abrir sugestão ↗</button>`:i===4?`<button data-climate-explore="${encodeURIComponent(x[2])}">📍 Ver no Explorar</button>`:''}</article>`).join('')}</div></section>`;
 }
@@ -3227,7 +3266,33 @@ function adminData(){const d=ipaDB()||{};d.clients=Array.isArray(d.clients)?d.cl
 function adminMoney(v){return new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(Number(v||0))}
 function adminMetric(icon,label,value,sub=''){return `<div class="ipa-admin-metric"><span>${icon}</span><div><small>${label}</small><strong>${value}</strong><em>${sub}</em></div></div>`}
 function adminTripList(){const d=adminData();return `<div class="ipa-admin-trip-list">${d.trips.map(t=>{const c=d.clients.find(x=>x.id===t.clientId);return `<div class="trip-list-row"><button class="trip-list-open" data-admin-trip="${ipaEscape(t.id)}"><span>${[...new Set(tripStages(t).map(st=>st.country).filter(Boolean))].slice(0,4).map(countryFlag).join(" ")||countryFlag(tripCountry(t))}</span><div><b>${ipaEscape(t.name)}</b><small>${ipaEscape(c?.name||'Cliente')} · ${ipaEscape(t.destination||'')}</small></div><em>${ipaEscape(t.plan||'')}</em><i>${t.published?'Publicado':ipaEscape(t.status||'')}</i><strong>›</strong></button><div class="trip-list-actions"><button type="button" class="btn btn-light" data-admin-smart-client-trip="${ipaEscape(t.clientId||'')}" data-smart-existing-trip="${ipaEscape(t.id)}">✨ Criar roteiro</button><button type="button" class="btn btn-light trip-delete-action" data-admin-delete-trip="${ipaEscape(t.id)}">🗑 Excluir</button></div></div>`}).join('')||'<p>Nenhuma viagem cadastrada.</p>'}</div>`}
-function adminDashboard(){const d=adminData(),open=d.payments.filter(p=>p.status!=='Pago').reduce((s,p)=>s+Number(p.amount||0),0);return `<div class="ipa-admin-head"><div><span class="eyebrow">INDO POR AÍ BUSINESS</span><h1>Dashboard</h1><p>Gerencie clientes, viagens e receita em um só lugar.</p></div><button class="btn btn-primary" data-admin-new-trip>+ Nova viagem</button></div><div class="ipa-admin-metrics">${adminMetric('👤','Clientes',d.clients.length,'ativos')}${adminMetric('✈️','Viagens',d.trips.length,'cadastradas')}${adminMetric('💳','Em aberto',adminMoney(open),'a receber')}${adminMetric('🔴','Live',d.trips.filter(t=>t.modules?.live).length,'habilitadas')}</div><section class="ipa-admin-panel"><div class="section-head"><div><span class="eyebrow">OPERAÇÃO</span><h2>Viagens</h2></div><button class="btn btn-light" data-admin-section="trips">Ver todas</button></div>${adminTripList()}</section>`}
+function ipaAdminDateInBrazil(){
+ const parts=new Intl.DateTimeFormat('en-US',{timeZone:'America/Sao_Paulo',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date());
+ const get=k=>parts.find(x=>x.type===k)?.value||'';
+ return get('year')+'-'+get('month')+'-'+get('day');
+}
+function ipaAdminTravelNow(){
+ const d=adminData(),today=ipaAdminDateInBrazil();
+ return d.trips.filter(t=>t.published!==false).map(t=>{
+  const stages=tripStages(t).slice().sort((a,b)=>Number(a.order||0)-Number(b.order||0));
+  const current=stages.find(st=>st.startDate&&st.startDate<=today&&(!st.endDate||today<=st.endDate));
+  const inTrip=t.startDate&&t.startDate<=today&&(!t.endDate||today<=t.endDate);
+  if(!current&&!inTrip)return null;
+  const c=d.clients.find(x=>x.id===t.clientId);
+  return {trip:t,client:c,stage:current||null};
+ }).filter(Boolean);
+}
+function ipaAdminTripsTravelingHtml(){
+ const active=ipaAdminTravelNow();
+ const items=active.map(({trip,client,stage})=>`<div class="ipa-travel-now-row"><div><b>✈️ ${ipaEscape(client?.name||'Cliente')}</b><small>${ipaEscape(stage?.destination||tripDestination(trip))} · ${ipaEscape(stage?.country||tripCountry(trip))}</small><small>${ipaEscape(trip.startDate||'')} até ${ipaEscape(trip.endDate||'')}</small></div><button type="button" class="btn btn-light" data-admin-trip="${ipaEscape(trip.id)}">Ver viagem</button></div>`).join('');
+ return `<section class="ipa-admin-panel ipa-travel-now"><div class="section-head"><div><span class="eyebrow">✈️ ACOMPANHAMENTO EM TEMPO REAL</span><h2>Clientes viajando agora</h2></div><strong class="ipa-travel-now-count">${active.length} ${active.length===1?'viagem':'viagens'}</strong></div>${items||'<p>Nenhum cliente está em viagem neste momento, conforme as datas cadastradas.</p>'}</section>`;
+}
+function ipaAdminInstagramConfig(){
+ const d=adminData(),count=Math.max(0,Number(d.instagramFollowers)||26000);
+ return `<section class="ipa-admin-panel"><div class="section-head"><div><span class="eyebrow">COMUNIDADE INDO POR AÍ</span><h2>Instagram</h2></div></div><p>Atualize a quantidade de seguidores exibida na página inicial, sem alterar o layout.</p><label for="ipaInstagramFollowers">Seguidores atuais</label><div class="ipa-instagram-admin-controls"><input id="ipaInstagramFollowers" type="number" min="0" max="999999999" step="1" value="${count}" class="v2-concierge-input"><button type="button" class="btn btn-primary" id="ipaSaveInstagramFollowers">Salvar número</button></div><small>Perfil: @indo.por.ai.com.a.gente · Exibição arredondada em milhares</small></section>`;
+}
+function adminSettings(){return `<div class="ipa-admin-head"><div><span class="eyebrow">INDO POR AÍ BUSINESS</span><h1>Configurações</h1><p>Indicadores e comunicação da marca.</p></div></div>${ipaAdminInstagramConfig()}`;}
+function adminDashboard(){const d=adminData(),open=d.payments.filter(p=>p.status!=='Pago').reduce((s,p)=>s+Number(p.amount||0),0);return `<div class="ipa-admin-head"><div><span class="eyebrow">INDO POR AÍ BUSINESS</span><h1>Dashboard</h1><p>Gerencie clientes, viagens e receita em um só lugar.</p></div><button class="btn btn-primary" data-admin-new-trip>+ Nova viagem</button></div><div class="ipa-admin-metrics">${adminMetric('👤','Clientes',d.clients.length,'ativos')}${adminMetric('✈️','Viagens',d.trips.length,'cadastradas')}${adminMetric('💳','Em aberto',adminMoney(open),'a receber')}${adminMetric('🔴','Live',d.trips.filter(t=>t.modules?.live).length,'habilitadas')}</div>${ipaAdminTripsTravelingHtml()}<section class="ipa-admin-panel"><div class="section-head"><div><span class="eyebrow">OPERAÇÃO</span><h2>Viagens</h2></div><button class="btn btn-light" data-admin-section="trips">Ver todas</button></div>${adminTripList()}</section>`}
 function ipaPlanLimit(plan){return {Explore:1,Signature:3,Elite:5,Groups:Infinity}[plan]??1}
 function ipaAccessUsage(client,d=adminData()){
  const root=client.clientType==='Acompanhante'?(d.clients.find(x=>x.id===client.primaryClientId)||client):client;
@@ -3592,6 +3657,16 @@ function ipaAdminCountryWorkspace(t,d){
  const tiles=[['🗺️','Roteiro',days.length+' dia(s)','ipaCountryRoute'],['✈️','Passagens',hasFlight?'Voo cadastrado':'Cadastrar voo','ipaCountryFlight'],['🏨','Hotéis',stays.length+' reserva(s)','ipaCountryHotels'],['📄','Documentos',docs.length+' documento(s)','ipaCountryDocuments'],['🎬','Entre no clima',climate.length+' conteúdo(s)','ipaCountryClimate']];
  return `<div class="ipa-country-workspace-content"><div class="ipa-country-workspace-title"><b>${countryFlag(c)} ${ipaEscape(c)}</b><span>Você está editando somente este destino. Escolha outro país acima para trocar os dados.</span></div><div class="ipa-country-workspace-tiles">${tiles.map(x=>`<a href="#${x[3]}" class="ipa-country-workspace-tile"><span>${x[0]}</span><b>${x[1]}</b><small>${ipaEscape(x[2])}</small>↘</a>`).join('')}</div>${missingDocs||missingStays?`<p class="ipa-country-unclassified">⚠️ ${missingDocs} documento(s) e ${missingStays} hospedagem(ns) sem país definido. Classifique esses registros nos campos abaixo para separá-los no aplicativo do cliente.</p>`:''}</div>`;
 }
+function ipaAdminTravelTogetherPanel(t,d){
+ const candidates=(d.clients||[]).filter(c=>c.id!==t.clientId&&c.clientType!=='Acompanhante');
+ const stages=tripStages(t);
+ const shares=Array.isArray(t.travelTogetherPlans)?t.travelTogetherPlans:[];
+ return `<section class="ipa-admin-panel ipa-travel-together-admin"><div class="section-head"><div><span class="eyebrow">👥 VIAJAR JUNTOS</span><h2>Planejar viagens compartilhadas</h2></div></div>
+ <p>Vincule clientes independentes aos destinos em que estarão juntos. <strong>Apenas o planejamento administrativo está ativo nesta versão.</strong> Fotos e outros dados privados permanecem separados até a implantação das permissões de compartilhamento.</p>
+ <div class="ipa-travel-together-existing">${shares.map(v=>{const c=candidates.find(x=>x.id===v.clientId),st=stages.find(x=>String(x.id)===String(v.fromStageId));return `<div class="ipa-travel-together-item"><div><b>👤 ${ipaEscape(c?.name||'Cliente não encontrado')}</b><small>Encontro: ${ipaEscape(st?.destination||'Etapa não encontrada')} · ${ipaEscape(st?.country||'')}</small><small>Somente configuração · sem compartilhamento de mídia</small></div><button type="button" class="btn btn-light" data-ipa-remove-travel-together="${ipaEscape(v.id)}" data-ipa-travel-trip="${ipaEscape(t.id)}">Remover</button></div>`}).join('')||'<small>Nenhum vínculo de viagem conjunta configurado.</small>'}</div>
+ <div class="ipa-travel-together-new"><label>Cliente que vai se juntar à viagem<select class="v2-concierge-input" id="ipaTravelTogetherClient"><option value="">Selecione...</option>${candidates.map(c=>`<option value="${ipaEscape(c.id)}">${ipaEscape(c.name||'Cliente')}</option>`).join('')}</select></label><label>A partir de qual destino?<select class="v2-concierge-input" id="ipaTravelTogetherStage"><option value="">Selecione...</option>${stages.map(st=>`<option value="${ipaEscape(st.id||'')}">${ipaEscape(st.destination||'Destino')} · ${ipaEscape(st.country||'')}</option>`).join('')}</select></label><button class="btn btn-primary" type="button" data-ipa-add-travel-together="${ipaEscape(t.id)}">Registrar encontro</button></div>
+ <small>Roteiros, financeiro, atendimento e login de cada cliente continuam independentes. Não envie convites de compartilhamento antes da validação das regras de segurança.</small></section>`;
+}
 function adminTripEditor(id){
  const d=adminData(),t=d.trips.find(x=>x.id===id);if(!t)return adminTrips();
  adminTripId=id;
@@ -3610,6 +3685,7 @@ function adminTripEditor(id){
  <div class="admin-trip-fields trip-client-fields"><label>${c?'Alterar cliente vinculado':'Cliente'}<select data-trip-client-select="${t.id}"><option value="">Selecione um cliente...</option>${(d.clients||[]).map(client=>`<option value="${client.id}" ${client.id===t.clientId?'selected':''}>${ipaEscape(client.name)}${client.email?' · '+ipaEscape(client.email):''}${client.approvalStatus?' · '+ipaEscape(client.approvalStatus):''}</option>`).join('')}</select></label><button class="btn btn-light" data-admin-link-client="${t.id}">${c?'✏️ Alterar cliente':'Vincular cliente'}</button></div>${!c?`<small>⚠️ Vincule um cliente antes de publicar/enviar o acesso.</small>`:''}</section>
  ${ipaTripCountries(t).length>1?`<section class="ipa-admin-panel ipa-admin-country-workspace"><div class="section-head"><div><span class="eyebrow">🌍 MULTIPAÍS 2.0</span><h2>Gerenciar conteúdo por país</h2></div></div>${ipaCountrySelectorHtml(t,true)}${ipaAdminCountryWorkspace(t,d)}<p>Financeiro, acompanhantes e Mochilito continuam únicos. Os dados não identificados precisam ser classificados antes de aparecerem no país correto.</p></section>`:''}
  <section class="ipa-admin-panel"><div class="section-head"><div><span class="eyebrow">🧭 VIAGEM MULTIDESTINO</span><h2>Destinos / etapas</h2></div><button class="btn btn-light" data-admin-add-stage="${t.id}">+ Adicionar destino</button></div><p>Uma única viagem pode ter várias cidades ou países. O app muda automaticamente o destino ativo conforme as datas.</p><div class="admin-stage-list">${tripStages(t).map((st,i)=>`<div class="admin-stage-card"><strong>${i+1}</strong><div><b>${countryFlag(st.country)} ${ipaEscape(st.destination||'Destino')}</b><small>${st.startDate||'--/--'} → ${st.endDate||'--/--'} · ${ipaEscape(st.country||'')}</small></div><button class="btn btn-light" data-admin-edit-stage="${t.id}:${i}">✏️</button>${tripStages(t).length>1?`<button class="btn btn-light" data-admin-delete-stage="${t.id}:${i}">🗑</button>`:''}</div>`).join('')}</div></section>
+ ${ipaAdminTravelTogetherPanel(t,d)}
  <section class="ipa-admin-panel" id="ipaCountryHotels"><div class="section-head"><div><span class="eyebrow">🏨 HOSPEDAGENS CONTRATADAS</span><h2>Hospedagens ${ipaTripCountries(t).length>1?'· '+ipaEscape(ipaAdminCountry(t)):'do cliente'}</h2></div><button class="btn btn-primary" data-admin-add-hotel-booking="${t.id}">+ Vincular hospedagem</button></div><p>Selecione do Banco de Hospedagens. Ao confirmar, o card aparece automaticamente no app do cliente.</p><div class="trip-hotel-list">${(t.hotelBookings||[]).filter(st=>ipaTripCountries(t).length<2||ipaRecordInCountry(t,st,ipaAdminCountry(t))||!ipaCountryOfRecord(t,st)).map(st=>{const h=ipaFindBookedHotel(st,d.hotelCatalog);return `<div class="ipa-booking-card"><div class="ipa-booking-cover">${ipaBookedHotelImage(h,st)}</div><div><b>${ipaEscape(h.name||st.hotelName)}</b><small>${ipaEscape([st.city||h.city,st.startDate&&('de '+st.startDate),st.endDate&&('até '+st.endDate)].filter(Boolean).join(' · '))}</small><em>Venda ${adminMoney(st.sale||0)} · Custo ${adminMoney(st.cost||0)} · Margem ${adminMoney((st.sale||0)-(st.cost||0))}</em></div>${ipaTripCountries(t).length>1?`<label class="ipa-stay-country-label">País<select data-ipa-classify-stay="${ipaEscape(t.id)}:${ipaEscape(st.id)}"><option value="" ${!st.country?'selected':''}>⚠️ Não definido</option>${ipaTripCountries(t).map(c=>`<option value="${ipaEscape(c)}" ${ipaSameCountry(st.country,c)?'selected':''}>${ipaEscape(c)}</option>`).join('')}</select></label>`:''}<button class="btn btn-light" data-admin-remove-hotel-booking="${t.id}:${st.id}">🗑</button></div>`}).join('')||'<small>Nenhuma hospedagem vinculada.</small>'}</div></section>
  <section class="ipa-admin-panel"><div class="section-head"><div><span class="eyebrow">VIAGEM</span><h2>Destino principal e pacote</h2></div><b class="ipa-plan">${t.plan}</b></div>
  <div class="admin-trip-fields"><label>Destino<input id="editTripDestination" value="${tripDestination(t)}"></label><label>País<input id="editTripCountry" value="${country}"></label><button class="btn btn-light" data-admin-save-destination="${t.id}">Salvar destino</button></div>
@@ -3814,13 +3890,13 @@ function adminIntegratedView(){
  if(adminSection==='concierge')adminSection='dashboard';
  const service=window.IPAFirebase;
  if(!service?.user) return adminLoginView();
- const views={dashboard:adminDashboard,leads:adminLeads,concierge:adminConcierge,clients:adminClients,trips:adminTrips,places:adminPlaces,hotels:adminHotels,templates:adminTemplates,finance:adminFinance,live:adminLive,partners:adminPartners};
+ const views={dashboard:adminDashboard,leads:adminLeads,concierge:adminConcierge,clients:adminClients,trips:adminTrips,places:adminPlaces,hotels:adminHotels,templates:adminTemplates,finance:adminFinance,live:adminLive,partners:adminPartners,settings:adminSettings};
  return `<div class="ipa-admin-integrated">
    <div class="ipa-admin-bar">
     <div><b>Indo por Aí</b><small>BUSINESS</small></div>
     <div class="firebase-admin-actions">${adminCloudBadge()}<button data-firebase-sync>↻ Sincronizar</button><button data-firebase-logout>Sair</button><button data-admin-exit>← Voltar</button></div>
    </div>
-   <div class="ipa-admin-nav">${[['dashboard','⌂','Dashboard'],['leads','📩','Pedidos'],['clients','👤','Clientes'],['trips','✈️','Viagens'],['places','📍','Lugares'],['hotels','🏨','Hospedagens'],['templates','🗺️','Roteiros'],['finance','💳','Financeiro'],['live','🔴','Live'],['partners','☆','Parceiros']].map(([k,i,l])=>`<button data-admin-section="${k}" class="${adminSection===k?'active':''}">${i}<span>${l}</span>${k==='concierge'&&ipaConciergePendingCount()?`<b class="ipa-notification-count" aria-label="${ipaConciergePendingCount()} atendimentos pendentes">${ipaConciergePendingCount()}</b>`:''}${k==='leads'&&(adminData().travelLeads||[]).filter(x=>(x.status||'Novo')==='Novo').length?`<b class="ipa-notification-count">${(adminData().travelLeads||[]).filter(x=>(x.status||'Novo')==='Novo').length}</b>`:''}</button>`).join('')}</div>
+   <div class="ipa-admin-nav">${[['dashboard','⌂','Dashboard'],['leads','📩','Pedidos'],['clients','👤','Clientes'],['trips','✈️','Viagens'],['places','📍','Lugares'],['hotels','🏨','Hospedagens'],['templates','🗺️','Roteiros'],['finance','💳','Financeiro'],['live','🔴','Live'],['partners','☆','Parceiros'],['settings','⚙️','Configurações']].map(([k,i,l])=>`<button data-admin-section="${k}" class="${adminSection===k?'active':''}">${i}<span>${l}</span>${k==='concierge'&&ipaConciergePendingCount()?`<b class="ipa-notification-count" aria-label="${ipaConciergePendingCount()} atendimentos pendentes">${ipaConciergePendingCount()}</b>`:''}${k==='leads'&&(adminData().travelLeads||[]).filter(x=>(x.status||'Novo')==='Novo').length?`<b class="ipa-notification-count">${(adminData().travelLeads||[]).filter(x=>(x.status||'Novo')==='Novo').length}</b>`:''}</button>`).join('')}</div>
    <div class="ipa-admin-content">${(views[adminSection]||adminDashboard)()}</div>
    ${ipaAiiWidgetHtml()}
   </div>`;
@@ -3904,7 +3980,7 @@ function prospectView(){return `<section class="prospect-premium">
  <span class="eyebrow">Ainda não sou cliente</span><h1>Sua viagem começa antes do embarque.</h1><p>Escolha uma experiência e conte como você quer viajar. Nossa equipe recebe seu pedido e prepara uma proposta personalizada.</p><button class="btn btn-primary" id="openTravelPlanner">Quero viajar com o Indo por Aí</button>
 </section>
 ${plansSalesBlock()}
-<section class="section"><div class="instagram-showcase"><div class="instagram-mark">◎</div><div><span class="eyebrow">Conheça nossa comunidade</span><h2>Uma comunidade com mais de 23 mil apaixonados por viagens.</h2><p>Roteiros, dicas e experiências reais para inspirar sua próxima história.</p><b>@indo.por.ai.com.a.gente</b></div><button class="btn btn-primary" id="instagramBtn">Abrir Instagram</button></div></section>
+<section class="section"><div class="instagram-showcase"><div class="instagram-mark">◎</div><div><span class="eyebrow">Conheça nossa comunidade</span><h2>Uma comunidade com <span id="ipaInstagramFollowerTotal">mais de 26 mil</span> apaixonados por viagens.</h2><p>Roteiros, dicas e experiências reais para inspirar sua próxima história.</p><b>@indo.por.ai.com.a.gente</b></div><button class="btn btn-primary" id="instagramBtn">Abrir Instagram</button></div></section>
 <section class="section"><div class="prospect-proof"><span>❤️</span><div><span class="eyebrow">Indo por Aí</span><h3>Não vendemos apenas um destino.</h3><p>Acompanhamos a história antes, durante e depois da viagem.</p></div></div></section>`}
 function ipaBindPlannerCities(){
  const countryCount=document.querySelector('#plannerCountryCount'),cityCount=document.querySelector('#plannerCityCount'),box=document.querySelector('#plannerCities'),days=document.querySelector('#plannerDays');
