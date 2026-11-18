@@ -1811,3 +1811,21 @@ body.hidden-nav .bottom-nav{display:none!important;}
 
 /* Beta 6.30.59 — estado de carregamento e diagnóstico do catálogo */
 .ipa-experiences-empty{padding:18px 20px;border:1px solid rgba(7,86,103,.22);background:#f5fbfc;border-radius:16px;color:#075667;line-height:1.55}.ipa-experiences-empty button{margin-top:10px;display:inline-flex}
+
+/* Beta 6.30.60 — fotos de experiências, ADM e cliente */
+.ipa-experience-photo{position:relative;width:100%;height:175px;overflow:hidden;background:linear-gradient(135deg,#075667,#29a3aa);border-radius:14px}
+.ipa-experience-photo img{width:100%;height:100%;object-fit:cover;display:block}
+.ipa-experience-photo-fallback{width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;color:#fff;background:linear-gradient(135deg,#075667,#29a3aa);text-align:center;padding:12px}
+.ipa-experience-photo-fallback span{font-size:38px}.ipa-experience-photo-fallback small{font-size:12px;color:#fff}
+.ipa-experience-card .ipa-experience-photo{border-radius:0;height:175px}
+.ipa-experiences-admin{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,285px),1fr));gap:16px}
+.ipa-admin-experience-card{overflow:hidden;display:flex;flex-direction:column;gap:0!important;padding:0!important;border:1px solid #dce9e8!important}
+.ipa-admin-experience-card .ipa-experience-photo{border-radius:0;height:178px}
+.ipa-admin-experience-info{padding:18px;display:flex;flex-direction:column;gap:9px;flex:1}
+.ipa-admin-experience-info p{margin:0;color:#536b71}
+.ipa-admin-experience-heading{display:flex;justify-content:space-between;align-items:start;gap:10px}.ipa-admin-experience-heading b{font-size:18px;color:#075667}
+.ipa-experience-status{padding:5px 9px;border-radius:999px;background:#e5f7ec;color:#157b4c;font-size:12px;white-space:nowrap}.ipa-experience-status.inactive{background:#f2f4f5;color:#667980}
+.ipa-admin-experience-info .lead-actions{margin-top:auto;padding-top:12px;display:flex;gap:8px;flex-wrap:wrap}
+.ipa-experience-upload{padding:12px;border-radius:15px;border:1px solid #d6e5e6;background:#f7fbfb;display:grid;gap:12px;margin:12px 0}
+.ipa-experience-upload label{display:grid;gap:6px}.ipa-experience-upload small{color:#586f75}.ipa-experience-photo-preview{height:160px;border-radius:12px}
+@media(max-width:560px){.ipa-experiences-admin{grid-template-columns:1fr}}

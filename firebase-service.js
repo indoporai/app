@@ -699,6 +699,17 @@ window.IPAFirebase = {
     const snap=await uploadBytes(storageRef(storage,path),file,{contentType:file.type});
     return {url:await getDownloadURL(snap.ref),path};
   },
+  async uploadExperiencePhoto(file,experienceId){
+    if(!currentUser || currentUser.uid!==ADMIN_UID)throw new Error('Somente o ADM pode enviar fotos das experiências.');
+    if(!file || !['image/jpeg','image/png','image/webp'].includes(file.type) || file.size>8*1024*1024)
+      throw new Error('Use uma foto JPG, PNG ou WebP de até 8 MB.');
+    const id=String(experienceId||'').replace(/[^a-zA-Z0-9_-]/g,'_');
+    if(!id)throw new Error('Identificação da experiência inválida.');
+    const ext=({'image/jpeg':'jpg','image/png':'png','image/webp':'webp'})[file.type];
+    const path=`experiences/${id}/${Date.now()}-${Math.random().toString(36).slice(2,9)}.${ext}`;
+    const snap=await uploadBytes(storageRef(storage,path),file,{contentType:file.type});
+    return {url:await getDownloadURL(snap.ref),path};
+  },
   async uploadTripDocument(file,clientId,tripId){
     if(!currentUser || currentUser.uid!==ADMIN_UID)throw new Error("Somente o ADM pode enviar documentos.");
     const safe=(file.name||"documento").replace(/[^a-zA-Z0-9._-]/g,"_");

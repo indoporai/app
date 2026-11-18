@@ -1,0 +1,15 @@
+Indo por Aí — Beta 6.30.60
+
+- Fotos no catálogo administrativo de Experiências por Aí, com título, destino, duração e status.
+- Upload direto JPG/PNG/WebP (até 8 MB) usando Firebase Storage, caminho experiences/{id}/.
+- Prévia da foto escolhida; foto salva é compartilhada entre ADM e cliente.
+- Imagem substituta em ambos os locais quando a URL não funcionar.
+- URL HTTPS antiga continua aceita; não é necessário recadastrar experiências.
+
+ATENÇÃO AO FIREBASE STORAGE:
+A conta administradora precisa ter autorização de escrita no caminho experiences/{id}/ e os clientes precisam ter leitura das fotos.
+As regras de Storage são configuradas no Firebase Console e NÃO são alteradas por este ZIP.
+Teste o envio de uma foto no ADM e confira o card no modo cliente.
+Se receber storage/unauthorized, é necessário adequar as regras de Storage com segurança (somente ADM na escrita).
+
+Preservado: lógica do catálogo, roteiros, PIX, Mochilito e MultiPaís.
