@@ -1808,3 +1808,6 @@ body.hidden-nav .bottom-nav{display:none!important;}
 .ipa-experience-time-fields{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .ipa-experience-time-fields input{width:76px;min-width:65px}
 .ipa-experience-time-fields span{font-size:13px;color:#075667}
+
+/* Beta 6.30.59 — estado de carregamento e diagnóstico do catálogo */
+.ipa-experiences-empty{padding:18px 20px;border:1px solid rgba(7,86,103,.22);background:#f5fbfc;border-radius:16px;color:#075667;line-height:1.55}.ipa-experiences-empty button{margin-top:10px;display:inline-flex}

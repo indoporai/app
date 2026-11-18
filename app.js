@@ -211,8 +211,11 @@ function render(){
  }else if(previousY>0){
    window.scrollTo({top:0,behavior:'instant'});
  }
- if(state.profile==='client'&&state.scenarioChosen)
+ if(state.profile==='client'&&state.scenarioChosen){
    requestAnimationFrame(ipaSaveClientPage);
+   if((ipaIsClientAuthenticated()||ipaAdminPreviewAuthenticated())&&activeTrip()?.id&&!ipaExperiencesLoaded&&!ipaExperiencesLoading&&!ipaExperiencesError)
+     queueMicrotask(()=>ipaFetchExperiences());
+ }
 }
 
 function ipaParticipantKey(p){return p?.id||p?.participantId||p?.email||p?.name||''}
@@ -1090,6 +1093,7 @@ function bind(){
  try{ipaApplyInviteBinding()}catch(e){}
  bindCapturedExperience();
  document.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>{state.route=b.dataset.go;render()});
+ document.querySelectorAll('[data-ipa-experience-retry]').forEach(b=>b.onclick=()=>{ipaExperiencesLoaded=false;ipaExperiencesError='';void ipaFetchExperiences()});
  document.querySelectorAll('[data-ipa-experience]').forEach(b=>b.onclick=()=>ipaRequestExperience(b.dataset.ipaExperience));
  document.querySelectorAll('[data-ipa-experience-add]').forEach(b=>b.onclick=()=>ipaAddExperienceToRoute(b.dataset.ipaExperienceAdd));
  document.querySelectorAll('[data-mochilito-service]').forEach(b=>b.onclick=()=>{const x=IPA_MOCHILITO_SERVICES[Number(b.dataset.mochilitoService)];if(x)ipaOpenMochilito(x[2]);});
@@ -3209,16 +3213,36 @@ function ipaAdminEditTransport(tripId,dayNo,fromIndex){
  document.querySelector('#ipaSaveTransport').onclick=async e=>{const btn=e.currentTarget,mode=document.querySelector('#ipaTransportMode').value,instructions=document.querySelector('#ipaTransportInstructions').value.trim();btn.disabled=true;try{const legs={...(t.travelLegs||{})};legs[key]={mode,instructions};IPAData.updateTrip(tripId,{travelLegs:legs});if(window.IPAFirebase?.user)await window.IPAFirebase.syncNow();modal.close();toast('Deslocamento salvo para o cliente ✓')}catch(err){document.querySelector('#ipaTransportStatus').textContent='Erro ao salvar: '+(err.message||'Falha');btn.disabled=false}};
 }
 // Experiências por Aí — catálogo reutilizável administrado no Firebase.
-let ipaPublicExperiences=[];let ipaExperiencesLoaded=false;let ipaExperiencesLoading=false;
+let ipaPublicExperiences=[];let ipaExperiencesLoaded=false;let ipaExperiencesLoading=false;let ipaExperiencesError='';
 async function ipaFetchExperiences(){
- if(ipaExperiencesLoaded||ipaExperiencesLoading)return;ipaExperiencesLoading=true;
- try{const r=await fetch('/api/public/experiences',{cache:'no-store'});const j=await r.json();if(r.ok&&j.ok){ipaPublicExperiences=Array.isArray(j.experiences)?j.experiences:[];ipaExperiencesLoaded=true;render();}}catch(e){console.warn('Catálogo de experiências temporariamente indisponível',e)}finally{ipaExperiencesLoading=false}
+ if(ipaExperiencesLoaded||ipaExperiencesLoading)return;ipaExperiencesLoading=true;ipaExperiencesError='';
+ try{
+  const r=await fetch('/api/public/experiences',{cache:'no-store',headers:{'accept':'application/json'}});
+  if(!r.ok)throw new Error('HTTP '+r.status);
+  const j=await r.json();if(!j.ok||!Array.isArray(j.experiences))throw new Error('Resposta do catálogo inválida');
+  ipaPublicExperiences=j.experiences;ipaExperiencesLoaded=true;
+ }catch(e){ipaExperiencesError='Não foi possível carregar o catálogo agora.';console.warn('Catálogo de experiências indisponível:',e)}
+ finally{ipaExperiencesLoading=false;if(state.profile==='client'&&activeTrip()?.id)render()}
+}
+function ipaExperienceCountryKey(country){
+ const k=ipaNormText(country);return ({'morocco':'marrocos','netherlands':'paises baixos','holanda':'paises baixos','paises baixos':'paises baixos','ireland':'irlanda','united kingdom':'reino unido','uk':'reino unido','england':'reino unido','inglaterra':'reino unido'}[k]||k);
+}
+function ipaExperienceCityKey(city){
+ const k=ipaNormText(city);return ({'marrakesh':'marrakech','marrakech':'marrakech','amsterdam':'amsterda','amsterda':'amsterda','lisbon':'lisboa','dublin':'dublin','sao paulo':'sao paulo'}[k]||k);
 }
 function ipaExperiencesForTrip(trip){
- const d=ipaDB(),admin=state.profile==='admin';
- const all=admin?(d.experiences||[]):ipaPublicExperiences;
- const country=ipaContextCountry(trip);const cities=[...(trip?.stages||[])].filter(st=>!country||ipaSameCountry(st.country,country)).map(st=>ipaNormText(st.destination));
- return all.filter(x=>x.active!==false&&(!x.country||ipaNormText(x.country)===ipaNormText(country)||ipaTripCountries(trip).length===1&&ipaNormText(x.country)===ipaNormText(tripCountry(trip)))&&(!x.city||cities.includes(ipaNormText(x.city))||ipaNormText(x.city)===ipaNormText(tripDestination(trip))));
+ const d=ipaDB(),admin=state.profile==='admin'||ipaAdminPreviewAuthenticated();
+ const all=admin?(d?.experiences||[]):ipaPublicExperiences;
+ const country=ipaContextCountry(trip)||tripCountry(trip);
+ const cities=[...tripStages(trip).filter(st=>!ipaContextCountry(trip)||ipaExperienceCountryKey(st.country)===ipaExperienceCountryKey(country)).map(st=>st.destination),...ipaScopedDays(trip).map(day=>ipaDayCity(trip,day)),tripDestination(trip)].filter(Boolean).map(ipaExperienceCityKey);
+ const countries=ipaTripCountries(trip).map(ipaExperienceCountryKey);
+ return all.filter(x=>{
+  if(x.active===false)return false;
+  const c=ipaExperienceCountryKey(x.country);
+  const matchesCountry=!c||c===ipaExperienceCountryKey(country)||(!ipaContextCountry(trip)&&countries.includes(c));
+  const matchesCity=!x.city||cities.includes(ipaExperienceCityKey(x.city));
+  return matchesCountry&&matchesCity;
+ });
 }
 function ipaExperienceDurationMinutes(x){
  const n=Number(x?.durationMinutes||0);if(Number.isFinite(n)&&n>0)return Math.round(n);
@@ -3236,7 +3260,15 @@ function ipaExperienceDays(trip,x){
 }
 function ipaExperienceCardsHtml(trip){
  if(!trip)return '';
- const items=ipaExperiencesForTrip(trip);if(!items.length)return '';
+ const items=ipaExperiencesForTrip(trip);
+ if(!items.length){
+   const status=ipaExperiencesError
+    ?'<p>Não foi possível carregar os passeios. <button type="button" class="btn btn-secondary" data-ipa-experience-retry>🔄 Tentar novamente</button></p>'
+    :!ipaExperiencesLoaded&&!ipaAdminPreviewAuthenticated()
+      ?'<p>Carregando experiências do destino…</p>'
+      :'<p>Ainda não há experiências disponíveis para este destino. Confira no ADM se a experiência está ativa e se país e cidade correspondem ao roteiro.</p>';
+   return `<section class="section ipa-experiences"><div class="section-head"><div><span class="eyebrow">✨ EXPERIÊNCIAS POR AÍ</span><h2>Viva algo inesquecível</h2></div></div><div class="ipa-experiences-empty">${status}</div></section>`;
+ }
  return `<section class="section ipa-experiences"><div class="section-head"><div><span class="eyebrow">✨ EXPERIÊNCIAS POR AÍ</span><h2>Viva algo inesquecível</h2><p>Experiências selecionadas especialmente para este destino.</p></div></div><div class="ipa-experiences-grid">${items.slice(0,6).map(x=>`<article class="ipa-experience-card">${/^https:\/\//i.test(x.photoUrl||'')?`<img loading="lazy" src="${ipaEscape(x.photoUrl)}" alt="${ipaEscape(x.title)}">`:'<div class="ipa-experience-placeholder">🌍 ✨</div>'}<div class="ipa-experience-body"><span class="eyebrow">${ipaEscape(x.city||x.country)}</span><h3>${ipaEscape(x.title)}</h3><p>${ipaEscape(x.description||'')}</p><small>⏱ ${ipaEscape(ipaExperienceDurationLabel(x))} · ${ipaEscape(x.price||'Disponibilidade sob consulta')}${x.suggestedTime?' · 🕒 '+ipaEscape(x.suggestedTime):''}</small><button type="button" class="btn btn-secondary btn-block" data-ipa-experience-add="${ipaEscape(x.id)}">＋ Adicionar ao meu roteiro</button><button type="button" class="btn btn-primary btn-block" data-ipa-experience="${ipaEscape(x.id)}">Quero reservar essa experiência ↗</button><small class="ipa-experience-disclaimer">Adicionar ao roteiro não é uma reserva confirmada.</small></div></article>`).join('')}</div></section>`;
 }
 function ipaAddExperienceToRoute(experienceId){
@@ -5140,4 +5172,4 @@ function showAdminPreview(){
 // Catálogo público de experiências; recarrega quando um novo cliente abre o app.
 window.addEventListener('ipa-client-experience-ready',()=>{if(!ipaExperiencesLoaded)void ipaFetchExperiences()});
 
-setTimeout(()=>{if(state.profile==='client'&&!ipaExperiencesLoaded)void ipaFetchExperiences()},1200);
+// O carregamento também é acionado pelo render após login; não depende de temporizador.

@@ -1,0 +1,6 @@
+Indo por Aí — Beta 6.30.59: correção da vitrine Experiências por Aí.
+- Carregamento do catálogo após autenticação do cliente, independentemente do tempo de login.
+- Estados de carregamento, erro com nova tentativa e ausência de passeios (não ocultar seção).
+- Correspondência de país e cidade mais robusta (sinônimos e cidades das etapas/dias).
+- Mantidos catálogo ADM, roteiro pessoal, motor de viagens e fluxos financeiros.
+Teste: cadastrar experiência ativa com país/cidade do roteiro, login de cliente, visitar Antes e Durante; validar também erro de API e mudança de país.
