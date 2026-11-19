@@ -2208,11 +2208,11 @@ const PLAN_INCLUDED_LABELS={
 function packageIncluded(plan){return PLAN_INCLUDED_LABELS[plan]||PLAN_INCLUDED_LABELS.Explore}
 
 function countryFlag(country){
- const map={"Portugal":"🇵🇹","Brasil":"🇧🇷","Espanha":"🇪🇸","França":"🇫🇷","Itália":"🇮🇹","Reino Unido":"🇬🇧","Inglaterra":"🇬🇧","Estados Unidos":"🇺🇸","Argentina":"🇦🇷","Alemanha":"🇩🇪","Holanda":"🇳🇱","Países Baixos":"🇳🇱","Suíça":"🇨🇭","Áustria":"🇦🇹","Grécia":"🇬🇷","Irlanda":"🇮🇪","Bélgica":"🇧🇪","Croácia":"🇭🇷","Japão":"🇯🇵","Canadá":"🇨🇦","México":"🇲🇽","Chile":"🇨🇱","Uruguai":"🇺🇾","Marrocos":"🇲🇦","Morocco":"🇲🇦","Vaticano":"🇻🇦","Cidade do Vaticano":"🇻🇦","Estado da Cidade do Vaticano":"🇻🇦","Santa Sé":"🇻🇦"};
+ const map={"Portugal":"🇵🇹","Brasil":"🇧🇷","Espanha":"🇪🇸","França":"🇫🇷","Itália":"🇮🇹","Reino Unido":"🇬🇧","Inglaterra":"🇬🇧","Estados Unidos":"🇺🇸","Argentina":"🇦🇷","Alemanha":"🇩🇪","Holanda":"🇳🇱","Países Baixos":"🇳🇱","Suíça":"🇨🇭","Áustria":"🇦🇹","Grécia":"🇬🇷","Irlanda":"🇮🇪","Bélgica":"🇧🇪","Croácia":"🇭🇷","Japão":"🇯🇵","Canadá":"🇨🇦","México":"🇲🇽","Chile":"🇨🇱","Uruguai":"🇺🇾","Marrocos":"🇲🇦","Morocco":"🇲🇦","Vaticano":"🇻🇦","Cidade do Vaticano":"🇻🇦","Estado da Cidade do Vaticano":"🇻🇦","Santa Sé":"🇻🇦","Luxemburgo":"🇱🇺","Luxembourg":"🇱🇺","Luxemburg":"🇱🇺","Grão-Ducado de Luxemburgo":"🇱🇺"};
  return map[String(country||"").trim()]||"🌍";
 }
 function countryFlagCode(country){
- const map={"Portugal":"pt","Brasil":"br","Espanha":"es","França":"fr","Itália":"it","Reino Unido":"gb","Inglaterra":"gb","Estados Unidos":"us","Argentina":"ar","Alemanha":"de","Holanda":"nl","Países Baixos":"nl","Suíça":"ch","Áustria":"at","Grécia":"gr","Irlanda":"ie","Bélgica":"be","Croácia":"hr","Japão":"jp","Canadá":"ca","México":"mx","Chile":"cl","Uruguai":"uy","Marrocos":"ma","Morocco":"ma","Vaticano":"va","Cidade do Vaticano":"va","Estado da Cidade do Vaticano":"va","Santa Sé":"va"};
+ const map={"Portugal":"pt","Brasil":"br","Espanha":"es","França":"fr","Itália":"it","Reino Unido":"gb","Inglaterra":"gb","Estados Unidos":"us","Argentina":"ar","Alemanha":"de","Holanda":"nl","Países Baixos":"nl","Suíça":"ch","Áustria":"at","Grécia":"gr","Irlanda":"ie","Bélgica":"be","Croácia":"hr","Japão":"jp","Canadá":"ca","México":"mx","Chile":"cl","Uruguai":"uy","Marrocos":"ma","Morocco":"ma","Vaticano":"va","Cidade do Vaticano":"va","Estado da Cidade do Vaticano":"va","Santa Sé":"va","Luxemburgo":"lu","Luxembourg":"lu","Luxemburg":"lu","Grão-Ducado de Luxemburgo":"lu"};
  return map[String(country||"").trim()]||"";
 }
 function countryFlagMarkup(country){const code=countryFlagCode(country);return code?`<img src="https://flagcdn.com/40x30/${code}.png" alt="${ipaEscape(country)}" loading="lazy" referrerpolicy="no-referrer">`:countryFlag(country)}
