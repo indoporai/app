@@ -1,0 +1,12 @@
+INDO POR AÍ — BETA 6.30.63
+
+ADM → Viagens → Editar viagem → Roteiro inteligente:
+- Reordenar cada parada com setas ↑ ↓.
+- Editar nome, categoria, endereço, horário, duração e observações.
+- Excluir parada com confirmação.
+- + Lugar / dica: agora inclui categorias Transfer / Deslocamento e Aeroporto, com duração estimada.
+- Após cada edição, o roteiro oficial é salvo no Firebase. Se a sincronização falhar, a alteração é revertida no navegador.
+- A rota oficial usa a ordem atualizada das paradas.
+- Não modifica documentos, financeiro, motor de IA nem permissões do Viajar Juntos.
+
+TESTE: em uma viagem de teste, acrescente Check-out → Transfer → Aeroporto no último dia; reordene, edite, salve e recarregue. Confira também a rota no Maps.

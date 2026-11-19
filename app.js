@@ -191,6 +191,7 @@ function render(){
  document.querySelectorAll('.nav-item').forEach(b=>b.classList.toggle('active',b.dataset.route===state.route));
  document.body.classList.toggle('hidden-nav',state.profile==='prospect'||state.profile==='admin');
  bind();
+ if(state.route==='memories'&&state.profile==='client')queueMicrotask(ipaLoadSharedGallery);
  if(state.route==='admin'&&state.profile==='admin')ipaBindAiiWidget();
  if(state.profile==='client'&&!ipaAdminPreviewAuthenticated()){ipaBindClientAiiWidget();void ipaEnsureMochilitoWelcome();}
  if(ipaAdminPreviewAuthenticated()){
@@ -1098,6 +1099,67 @@ function bind(){
  document.querySelectorAll('[data-ipa-experience-add]').forEach(b=>b.onclick=()=>ipaAddExperienceToRoute(b.dataset.ipaExperienceAdd));
  document.querySelectorAll('[data-mochilito-service]').forEach(b=>b.onclick=()=>{const x=IPA_MOCHILITO_SERVICES[Number(b.dataset.mochilitoService)];if(x)ipaOpenMochilito(x[2]);});
  document.querySelectorAll('[data-admin-transport]').forEach(b=>b.onclick=()=>{const parts=b.dataset.adminTransport.split(':');ipaAdminEditTransport(parts[0],Number(parts[1]),Number(parts[2]))});
+
+ // Beta 6.30.63: edição exclusivamente administrativa das paradas oficiais.
+ const ipaRouteSave=async(tripId,dayNumber,transform,success)=>{
+  const trip=(adminData().trips||[]).find(t=>t.id===tripId);
+  if(!trip)return toast('Viagem não encontrada.');
+  const old=trip.itinerary||[];
+  const day=old.find(d=>Number(d.day)===dayNumber);
+  if(!day)return toast('Dia não encontrado.');
+  const next=old.map(d=>Number(d.day)===dayNumber?{...d,places:transform((d.places||[]).map(x=>typeof x==='string'?{name:x}:({...x})))}:d);
+  try{
+   IPAData.updateTrip(tripId,{itinerary:next});
+   if(!window.IPAFirebase?.user||!window.IPAFirebase?.syncNow)throw new Error('Entre com a conta ADM para sincronizar com o Firebase.');
+   await window.IPAFirebase.syncNow();
+   view.innerHTML=adminTripEditor(tripId);bind();toast(success);
+  }catch(e){
+   IPAData.updateTrip(tripId,{itinerary:old});
+   view.innerHTML=adminTripEditor(tripId);bind();
+   console.error('Salvar paradas do roteiro',e);
+   toast('Não foi possível confirmar no Firebase: '+(e?.message||'erro'));
+  }
+ };
+ document.querySelectorAll('[data-admin-place-move]').forEach(b=>b.onclick=async()=>{
+  const tripId=b.dataset.trip,day=Number(b.dataset.day),from=Number(b.dataset.index),dir=Number(b.dataset.direction);
+  b.disabled=true;
+  await ipaRouteSave(tripId,day,arr=>{const to=from+dir;if(from<0||to<0||to>=arr.length)return arr;arr.splice(to,0,arr.splice(from,1)[0]);return arr},'Nova ordem salva ✓');
+ });
+ document.querySelectorAll('[data-admin-place-delete]').forEach(b=>b.onclick=async()=>{
+  const tripId=b.dataset.trip,day=Number(b.dataset.day),index=Number(b.dataset.index);
+  const trip=(adminData().trips||[]).find(t=>t.id===tripId);
+  const place=trip?.itinerary?.find(x=>Number(x.day)===day)?.places?.[index];
+  if(!place||!confirm('Excluir "'+(typeof place==='string'?place:place.name||'esta parada')+'" do dia '+day+'?'))return;
+  b.disabled=true;
+  await ipaRouteSave(tripId,day,arr=>arr.filter((_,i)=>i!==index),'Parada excluída e sincronizada ✓');
+ });
+ document.querySelectorAll('[data-admin-place-edit]').forEach(b=>b.onclick=()=>{
+  const tripId=b.dataset.trip,dayNumber=Number(b.dataset.day),index=Number(b.dataset.index);
+  const trip=(adminData().trips||[]).find(t=>t.id===tripId);
+  const raw=trip?.itinerary?.find(x=>Number(x.day)===dayNumber)?.places?.[index];
+  if(raw===undefined)return;
+  const place=typeof raw==='string'?{name:raw}:raw;
+  const esc=x=>ipaEscape(String(x??''));
+  const categories=['🏛️ Atração','☕ Cafeteria','🍽️ Restaurante','🛍️ Loja','🌳 Parque','🏨 Hotel','🎟️ Experiência','🚐 Transfer / Deslocamento','✈️ Aeroporto','📍 Outro'];
+  showModal(`<span class="eyebrow">ROTEIRO OFICIAL · DIA ${dayNumber}</span><h2>Editar parada ${index+1}</h2><p>As alterações serão salvas no roteiro do cliente.</p>
+  <label>Nome do local ou deslocamento<input id="ipaPlaceEditName" class="v2-concierge-input" value="${esc(place.name)}"></label>
+  <label>Categoria<select id="ipaPlaceEditCategory" class="v2-concierge-input">${[...new Set([...categories,place.category||'📍 Outro'])].map(c=>`<option value="${esc(c)}" ${c===place.category?'selected':''}>${esc(c)}</option>`).join('')}</select></label>
+  <label>Endereço ou destino<input id="ipaPlaceEditAddress" class="v2-concierge-input" value="${esc(place.address)}"></label>
+  <label>Horário sugerido<input id="ipaPlaceEditTime" type="time" class="v2-concierge-input" value="${esc(place.time)}"></label>
+  <label>Duração estimada (minutos)<input id="ipaPlaceEditDuration" type="number" min="0" max="1440" class="v2-concierge-input" value="${esc(place.durationMinutes||'')}"></label>
+  <label>Orientações e observações<textarea id="ipaPlaceEditNote" class="rating-text">${esc(place.note)}</textarea></label>
+  <label>Dica Indo por Aí<textarea id="ipaPlaceEditTip" class="rating-text">${esc(place.smartTip||place.tip)}</textarea></label>
+  <button type="button" id="ipaPlaceEditSave" class="btn btn-primary btn-block">💾 Salvar parada</button>`);
+  setTimeout(()=>{const save=document.querySelector('#ipaPlaceEditSave');if(!save)return;save.onclick=async()=>{
+    const name=document.querySelector('#ipaPlaceEditName').value.trim();if(!name)return toast('Informe o nome da parada.');
+    const minutes=document.querySelector('#ipaPlaceEditDuration').value;
+    const updated={...place,name,category:document.querySelector('#ipaPlaceEditCategory').value,address:document.querySelector('#ipaPlaceEditAddress').value.trim(),time:document.querySelector('#ipaPlaceEditTime').value,note:document.querySelector('#ipaPlaceEditNote').value.trim(),smartTip:document.querySelector('#ipaPlaceEditTip').value.trim(),durationMinutes:minutes===''?'':Math.max(0,Math.min(1440,Number(minutes)||0))};
+    save.disabled=true;
+    modal.close();
+    await ipaRouteSave(tripId,dayNumber,arr=>arr.map((p,i)=>i===index?updated:p),'Parada atualizada ✓');
+  }},0);
+ });
+
  document.querySelectorAll('[data-modal]').forEach(b=>b.onclick=()=>showModal(b.dataset.modal));
  document.querySelectorAll('[data-map]').forEach(b=>b.onclick=()=>window.open('https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(b.dataset.map),'_blank'));
  document.querySelectorAll('[data-profile]').forEach(b=>b.onclick=()=>setProfile(b.dataset.profile));
@@ -1616,28 +1678,39 @@ function bind(){
   finally{followersSave.disabled=false;}
  };
  document.querySelectorAll('[data-ipa-add-travel-together]').forEach(btn=>btn.onclick=async()=>{
-  const id=btn.dataset.ipaAddTravelTogether,trip=adminData().trips.find(t=>t.id===id);
-  if(!trip)return;
+  const id=btn.dataset.ipaAddTravelTogether,trip=adminData().trips.find(t=>t.id===id);if(!trip)return;
   const cid=document.querySelector('#ipaTravelTogetherClient')?.value||'';
-  const stageId=document.querySelector('#ipaTravelTogetherStage')?.value||'';
-  if(!cid||!stageId){toast('Selecione o cliente e a etapa de encontro.');return;}
+  const stageIds=[...document.querySelectorAll('[data-ipa-together-new-stage]:checked')].map(e=>e.value);
+  if(!cid||!stageIds.length){toast('Selecione o cliente e pelo menos um destino.');return;}
   if(cid===trip.clientId){toast('A viagem já pertence a esse cliente.');return;}
-  const stages=tripStages(trip);
-  const stage=stages.find(x=>String(x.id)===stageId);
-  if(!stage){toast('Etapa não encontrada.');return;}
+  const stages=tripStages(trip),valid=stageIds.filter(x=>stages.some(st=>String(st.id)===x));
+  if(valid.length!==stageIds.length){toast('Um dos destinos não está cadastrado.');return;}
   const prev=Array.isArray(trip.travelTogetherPlans)?trip.travelTogetherPlans:[];
-  if(prev.some(x=>x.clientId===cid)){toast('Cliente já vinculado a este planejamento.');return;}
-  const plans=[...prev,{id:'together-'+Date.now()+'-'+Math.random().toString(36).slice(2,7),clientId:cid,fromStageId:stageId,fromCountry:stage.country||'',fromDate:stage.startDate||'',enabled:false,createdAt:new Date().toISOString()}];
+  if(prev.some(x=>x.clientId===cid)){toast('Cliente já vinculado: edite seus destinos compartilhados abaixo.');return;}
+  const first=stages.find(x=>String(x.id)===valid[0]);
+  const plans=[...prev,{id:'together-'+Date.now()+'-'+Math.random().toString(36).slice(2,7),clientId:cid,stageIds:valid,fromStageId:first.id,fromCountry:first.country||'',fromDate:first.startDate||'',enabled:true,createdAt:new Date().toISOString()}];
   btn.disabled=true;
-  try{IPAData.updateTrip(id,{travelTogetherPlans:plans});await window.IPAFirebase.syncNow();render();toast('Encontro registrado no ADM (sem compartilhar mídia).');}
+  try{IPAData.updateTrip(id,{travelTogetherPlans:plans});await window.IPAFirebase.syncNow();render();toast('Destinos compartilhados registrados. Fotos só aparecem com autorização de publicação.');}
   catch(e){IPAData.updateTrip(id,{travelTogetherPlans:prev});toast('Falha ao registrar vínculo: '+(e?.message||e));btn.disabled=false;}
+ });
+ document.querySelectorAll('[data-ipa-save-travel-together]').forEach(btn=>btn.onclick=async()=>{
+  const trip=adminData().trips.find(t=>t.id===btn.dataset.ipaTravelTrip);if(!trip)return;
+  const linkId=btn.dataset.ipaSaveTravelTogether;
+  const stageIds=[...document.querySelectorAll('[data-ipa-together-stage]')].filter(e=>e.dataset.linkId===linkId&&e.checked).map(e=>e.value);
+  if(!stageIds.length){toast('Selecione ao menos um destino para manter o vínculo.');return;}
+  const prev=Array.isArray(trip.travelTogetherPlans)?trip.travelTogetherPlans:[];
+  const first=tripStages(trip).find(st=>String(st.id)===stageIds[0]);
+  const plans=prev.map(x=>x.id===linkId?{...x,stageIds,fromStageId:first?.id||'',fromCountry:first?.country||'',enabled:true,updatedAt:new Date().toISOString()}:x);
+  btn.disabled=true;
+  try{IPAData.updateTrip(trip.id,{travelTogetherPlans:plans});await window.IPAFirebase.syncNow();render();toast('Destinos do grupo atualizados ✓');}
+  catch(e){IPAData.updateTrip(trip.id,{travelTogetherPlans:prev});toast('Não foi possível salvar o grupo: '+(e?.message||e));btn.disabled=false;}
  });
  document.querySelectorAll('[data-ipa-remove-travel-together]').forEach(btn=>btn.onclick=async()=>{
   const id=btn.dataset.ipaTravelTrip,trip=adminData().trips.find(t=>t.id===id);if(!trip)return;
   if(!confirm('Remover o planejamento de viagem compartilhada?'))return;
   const prev=Array.isArray(trip.travelTogetherPlans)?trip.travelTogetherPlans:[];
   IPAData.updateTrip(id,{travelTogetherPlans:prev.filter(x=>x.id!==btn.dataset.ipaRemoveTravelTogether)});
-  try{await window.IPAFirebase.syncNow();render();toast('Planejamento removido.');}
+  try{await window.IPAFirebase.syncNow();render();toast('Vínculo removido. O acesso às fotos compartilhadas é revogado pelo servidor.');}
   catch(e){IPAData.updateTrip(id,{travelTogetherPlans:prev});toast('Não foi possível salvar: '+(e?.message||e));}
  });
  document.querySelectorAll('[data-firebase-sync]').forEach(b=>b.onclick=async()=>{toast('Sincronizando com Firebase...');try{await window.IPAFirebase.syncNow();toast('Firebase sincronizado')}catch(e){toast(e.message||'Erro ao sincronizar')}});
@@ -1724,9 +1797,10 @@ function bind(){
    <small class="route-helper">Ao selecionar, os dados da sua curadoria são carregados automaticamente. Você também pode buscar outro lugar no Google abaixo.</small>
    <label>Buscar lugar no Google</label><div class="smart-place-search"><input id="routePlaceName" class="v2-concierge-input" autocomplete="off" placeholder="Ex.: Torre Eiffel, Café de Flore..."><button id="openGoogleSearch" class="btn btn-light">Maps ↗</button></div>
    <div id="placeSuggestions" class="place-suggestions"><small>Comece digitando para buscar um lugar diferente.</small></div>
-   <label>Categoria</label><select id="routePlaceCategory" class="v2-concierge-input"><option>🏛️ Atração</option><option>☕ Cafeteria</option><option>🍽️ Restaurante</option><option>🛍️ Loja</option><option>🌳 Parque</option><option>🏨 Hotel</option><option>🎟️ Experiência</option><option>📍 Outro</option></select>
+   <label>Categoria</label><select id="routePlaceCategory" class="v2-concierge-input"><option>🏛️ Atração</option><option>☕ Cafeteria</option><option>🍽️ Restaurante</option><option>🛍️ Loja</option><option>🌳 Parque</option><option>🏨 Hotel</option><option>🎟️ Experiência</option><option>🚐 Transfer / Deslocamento</option><option>✈️ Aeroporto</option><option>📍 Outro</option></select>
    <label>Endereço</label><input id="routePlaceAddress" class="v2-concierge-input" placeholder="Preenchido pela busca ou manualmente">
    <label>Horário</label><input id="routePlaceTime" type="time" class="v2-concierge-input">
+   <label>Duração estimada (minutos)</label><input id="routePlaceDuration" type="number" min="0" max="1440" class="v2-concierge-input" placeholder="Ex.: 45 para transfer ao aeroporto">
    <label>Dica inteligente</label><textarea id="routePlaceTip" class="rating-text" placeholder="Ex.: melhor horário, reserva, tempo sugerido, o que pedir..."></textarea>
    <label>Observação operacional</label><input id="routePlaceNote" class="v2-concierge-input" maxlength="140" placeholder="Ingresso, reserva, ponto de encontro...">
    <div id="routePhotoPreview" class="ipa-photo-search-preview">📷 Foto disponível ao selecionar um lugar na busca.</div><input id="routePhotoUrl" type="hidden"><input id="routePlaceId" type="hidden"><input id="routeMapsUrl" type="hidden">
@@ -1749,7 +1823,7 @@ function bind(){
        }catch(e){box.innerHTML='<small>Não foi possível buscar agora. Use o botão Maps.</small>'}
      },350)};
      document.querySelector('#openGoogleSearch').onclick=()=>window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q.value+' '+(trip?.destination||''))}`,'_blank');
-     const collect=()=>{const base=selectedCatalogPlace?{...selectedCatalogPlace,catalogPlaceId:selectedCatalogPlace.id}:{};return {...base,name:q.value.trim(),address:document.querySelector('#routePlaceAddress').value.trim(),time:document.querySelector('#routePlaceTime').value,photoUrl:document.querySelector('#routePhotoUrl').value||base.photoUrl||'',note:document.querySelector('#routePlaceNote').value.trim(),placeId:document.querySelector('#routePlaceId').value||base.placeId||'',mapsUrl:document.querySelector('#routeMapsUrl').value||base.mapsUrl||'',category:document.querySelector('#routePlaceCategory').value,smartTip:document.querySelector('#routePlaceTip').value.trim()||base.tip||''}};
+     const collect=()=>{const base=selectedCatalogPlace?{...selectedCatalogPlace,catalogPlaceId:selectedCatalogPlace.id}:{};return {...base,name:q.value.trim(),address:document.querySelector('#routePlaceAddress').value.trim(),time:document.querySelector('#routePlaceTime').value,durationMinutes:Number(document.querySelector('#routePlaceDuration').value||0),photoUrl:document.querySelector('#routePhotoUrl').value||base.photoUrl||'',note:document.querySelector('#routePlaceNote').value.trim(),placeId:document.querySelector('#routePlaceId').value||base.placeId||'',mapsUrl:document.querySelector('#routeMapsUrl').value||base.mapsUrl||'',category:document.querySelector('#routePlaceCategory').value,smartTip:document.querySelector('#routePlaceTip').value.trim()||base.tip||''}};
      const saveRouteBtn=document.querySelector('#saveRoutePlace');
      if(saveRouteBtn)saveRouteBtn.onclick=()=>{const p=collect();if(!p.name){toast('Informe ou selecione o local');return}saveRouteBtn.disabled=true;saveRouteBtn.textContent='Adicionando...';try{const saved=IPAData.addItineraryPlace(tripId,Number(day),p);if(!saved)throw new Error('Viagem não encontrada');toast('Local adicionado ao roteiro ✓');modal.close();view.innerHTML=adminTripEditor(tripId);bind();if(window.IPAFirebase?.user)window.IPAFirebase.syncNow().catch(e=>console.warn('Local salvo; sincronização pendente',e))}catch(e){console.error(e);saveRouteBtn.disabled=false;saveRouteBtn.textContent='+ Adicionar ao roteiro';toast(e.message||'Não foi possível adicionar o local')}};
      document.querySelector('#saveAsTip').onclick=async()=>{const p=collect();if(!p.name){toast('Informe o nome do local');return}IPAData.addRecommendation({...p,tripId,clientId:trip?.clientId,day:Number(day),networkRecommended:true});if(window.IPAFirebase?.user)await window.IPAFirebase.syncNow();toast('Dica adicionada à viagem ✓');modal.close();view.innerHTML=adminTripEditor(tripId);bind()};
@@ -3795,13 +3869,13 @@ function ipaAdminCountryWorkspace(t,d){
 }
 function ipaAdminTravelTogetherPanel(t,d){
  const candidates=(d.clients||[]).filter(c=>c.id!==t.clientId&&c.clientType!=='Acompanhante');
- const stages=tripStages(t);
- const shares=Array.isArray(t.travelTogetherPlans)?t.travelTogetherPlans:[];
- return `<section class="ipa-admin-panel ipa-travel-together-admin"><div class="section-head"><div><span class="eyebrow">👥 VIAJAR JUNTOS</span><h2>Planejar viagens compartilhadas</h2></div></div>
- <p>Vincule clientes independentes aos destinos em que estarão juntos. <strong>Apenas o planejamento administrativo está ativo nesta versão.</strong> Fotos e outros dados privados permanecem separados até a implantação das permissões de compartilhamento.</p>
- <div class="ipa-travel-together-existing">${shares.map(v=>{const c=candidates.find(x=>x.id===v.clientId),st=stages.find(x=>String(x.id)===String(v.fromStageId));return `<div class="ipa-travel-together-item"><div><b>👤 ${ipaEscape(c?.name||'Cliente não encontrado')}</b><small>Encontro: ${ipaEscape(st?.destination||'Etapa não encontrada')} · ${ipaEscape(st?.country||'')}</small><small>Somente configuração · sem compartilhamento de mídia</small></div><button type="button" class="btn btn-light" data-ipa-remove-travel-together="${ipaEscape(v.id)}" data-ipa-travel-trip="${ipaEscape(t.id)}">Remover</button></div>`}).join('')||'<small>Nenhum vínculo de viagem conjunta configurado.</small>'}</div>
- <div class="ipa-travel-together-new"><label>Cliente que vai se juntar à viagem<select class="v2-concierge-input" id="ipaTravelTogetherClient"><option value="">Selecione...</option>${candidates.map(c=>`<option value="${ipaEscape(c.id)}">${ipaEscape(c.name||'Cliente')}</option>`).join('')}</select></label><label>A partir de qual destino?<select class="v2-concierge-input" id="ipaTravelTogetherStage"><option value="">Selecione...</option>${stages.map(st=>`<option value="${ipaEscape(st.id||'')}">${ipaEscape(st.destination||'Destino')} · ${ipaEscape(st.country||'')}</option>`).join('')}</select></label><button class="btn btn-primary" type="button" data-ipa-add-travel-together="${ipaEscape(t.id)}">Registrar encontro</button></div>
- <small>Roteiros, financeiro, atendimento e login de cada cliente continuam independentes. Não envie convites de compartilhamento antes da validação das regras de segurança.</small></section>`;
+ const stages=tripStages(t),shares=Array.isArray(t.travelTogetherPlans)?t.travelTogetherPlans:[];
+ const options=(selected,attrs)=>stages.map(st=>`<label class="ipa-together-check"><input type="checkbox" value="${ipaEscape(st.id)}" ${attrs} ${selected.includes(String(st.id))?'checked':''}><span>📍 ${ipaEscape(st.destination||'Destino')} · ${ipaEscape(st.country||'')}<small>${ipaEscape(st.startDate||'')} — ${ipaEscape(st.endDate||'')}</small></span></label>`).join('');
+ return `<section class="ipa-admin-panel ipa-travel-together-admin"><div class="section-head"><div><span class="eyebrow">👥 VIAJAR JUNTOS</span><h2>Destinos compartilhados</h2></div></div>
+ <p>Selecione exatamente os destinos em que os clientes viajarão juntos. Cada pessoa mantém seu login, financeiro e documentos privados. <strong>Somente fotos publicadas voluntariamente entram no álbum compartilhado.</strong></p>
+ <div class="ipa-travel-together-existing">${shares.map(v=>{const c=candidates.find(x=>x.id===v.clientId),selected=Array.isArray(v.stageIds)?v.stageIds.map(String):[];return `<div class="ipa-travel-together-item ipa-together-link"><div><b>👤 ${ipaEscape(c?.name||'Cliente não encontrado')}</b><small>Escolha ou altere os destinos compartilhados:</small><div class="ipa-together-stages">${options(selected,`data-ipa-together-stage data-link-id="${ipaEscape(v.id)}"`)}</div><small>Os itens antigos precisam ser confirmados para ativar o compartilhamento seguro.</small></div><div class="ipa-together-actions"><button type="button" class="btn btn-primary" data-ipa-save-travel-together="${ipaEscape(v.id)}" data-ipa-travel-trip="${ipaEscape(t.id)}">Salvar destinos</button><button type="button" class="btn btn-light" data-ipa-remove-travel-together="${ipaEscape(v.id)}" data-ipa-travel-trip="${ipaEscape(t.id)}">Remover vínculo</button></div></div>`}).join('')||'<small>Nenhum vínculo configurado.</small>'}</div>
+ <div class="ipa-travel-together-new"><label>Cliente que vai se juntar à viagem<select class="v2-concierge-input" id="ipaTravelTogetherClient"><option value="">Selecione...</option>${candidates.map(c=>`<option value="${ipaEscape(c.id)}">${ipaEscape(c.name||'Cliente')}</option>`).join('')}</select></label><div><b>Quais destinos serão compartilhados?</b><div class="ipa-together-stages">${options([],`data-ipa-together-new-stage`)}</div></div><button class="btn btn-primary" type="button" data-ipa-add-travel-together="${ipaEscape(t.id)}">Vincular cliente aos destinos</button></div>
+ <small>Compartilhamento de memórias somente após publicação explícita da foto. Não compartilhar documentos, pagamentos nem mensagens do Mochilito.</small></section>`;
 }
 function adminTripEditor(id){
  const d=adminData(),t=d.trips.find(x=>x.id===id);if(!t)return adminTrips();
@@ -3829,8 +3903,8 @@ function adminTripEditor(id){
  <div class="package-native-box"><span class="eyebrow">NATIVO DO ${t.plan.toUpperCase()}</span><div>${packageIncluded(t.plan).map(x=>`<span>✓ ${x}</span>`).join('')}</div><small>Ao trocar de pacote, estes recursos são habilitados automaticamente. Você ainda pode ajustar os módulos manualmente abaixo.</small></div></section>
  <section class="ipa-admin-panel"><span class="eyebrow">EXPERIÊNCIA DO CLIENTE</span><h2>O que aparece no app</h2><div class="ipa-admin-module-grid">${Object.entries(labels).map(([k,v])=>`<label class="${t.modules?.[k]?'on':''}"><div><b>${v}</b><small>${t.modules?.[k]?'Visível':'Oculto'}</small></div><input type="checkbox" data-admin-module="${k}" ${t.modules?.[k]?'checked':''}></label>`).join('')}</div></section>
  <section class="ipa-admin-panel" id="ipaCountryRoute"><div class="section-head"><div><span class="eyebrow">ROTEIRO INTELIGENTE</span><h2>Dias, lugares e dicas ${ipaTripCountries(t).length>1?'· '+ipaEscape(ipaAdminCountry(t)):''}</h2></div><button class="btn btn-light" data-admin-add-day="${t.id}">+ Adicionar dia</button></div>
- <div class="smart-route-banner"><span>✨</span><div><b>Dica Inteligente</b><small>Cadastre atrações, cafés, restaurantes, lojas e experiências. Use “Adicionar como dica” para recomendações fora do roteiro principal.</small></div></div>
- <div class="ipa-admin-days">${(ipaTripCountries(t).length>1?[...(ipaScopedDays(t,ipaAdminCountry(t))),...(t.itinerary||[]).filter(day=>!ipaCountryOfDay(t,day))]:(t.itinerary||[])).sort((a,b)=>a.day-b.day).map(day=>`<div class="admin-day-expanded"><div class="admin-day-title"><strong>${day.day}</strong><span><b>${day.title}</b><small>${day.date||''} · ${ipaCountryOfDay(t,day)?countryFlag(ipaCountryOfDay(t,day))+' '+ipaEscape(ipaCountryOfDay(t,day)):'⚠️ País não identificado'}</small></span>${ipaTripCountries(t).length>1?`<select class="ipa-admin-day-country" data-ipa-classify-day="${ipaEscape(t.id)}:${day.day}" aria-label="País do dia ${day.day}">${ipaTripCountries(t).map(c=>`<option value="${ipaEscape(c)}" ${ipaSameCountry(c,ipaCountryOfDay(t,day))?'selected':''}>${ipaEscape(c)}</option>`).join('')}<option value="" ${!ipaCountryOfDay(t,day)?'selected':''}>⚠️ Não identificado</option></select>`:''}<button class="admin-add-place-btn" data-admin-add-place="${t.id}:${day.day}">+ Lugar / dica</button></div><div class="admin-place-list">${normalizedPlaces(day).map((p,i)=>`<div><span>${i+1}</span><div><b>${p.time?`${p.time} · `:''}${p.category||'📍'} ${p.name}</b><small>${p.address||p.note||''}</small>${p.smartTip?`<em>💡 ${p.smartTip}</em>`:''}</div>${p.mapsUrl?`<button type="button" class="admin-place-map" data-external-route="${ipaEscape(p.mapsUrl)}" aria-label="Abrir ${ipaEscape(p.name)} no Google Maps">↗ Maps</button>`:''}${i<normalizedPlaces(day).length-1?`<button type="button" class="admin-place-map" data-admin-transport="${ipaEscape(t.id)}:${day.day}:${i}">🚆 Deslocamento</button>`:''}</div>`).join('')||'<small>Nenhum local neste dia.</small>'}</div></div>`).join('')||'<p>Comece adicionando o primeiro dia.</p>'}</div>
+ <div class="smart-route-banner"><span>✨</span><div><b>Dica Inteligente</b><small>Adicione atrações, aeroportos e transfers. Use ↑ ↓ para reordenar e Editar / Excluir para ajustar sem recriar o roteiro. As alterações são salvas no Firebase.</small></div></div>
+ <div class="ipa-admin-days">${(ipaTripCountries(t).length>1?[...(ipaScopedDays(t,ipaAdminCountry(t))),...(t.itinerary||[]).filter(day=>!ipaCountryOfDay(t,day))]:(t.itinerary||[])).sort((a,b)=>a.day-b.day).map(day=>`<div class="admin-day-expanded"><div class="admin-day-title"><strong>${day.day}</strong><span><b>${day.title}</b><small>${day.date||''} · ${ipaCountryOfDay(t,day)?countryFlag(ipaCountryOfDay(t,day))+' '+ipaEscape(ipaCountryOfDay(t,day)):'⚠️ País não identificado'}</small></span>${ipaTripCountries(t).length>1?`<select class="ipa-admin-day-country" data-ipa-classify-day="${ipaEscape(t.id)}:${day.day}" aria-label="País do dia ${day.day}">${ipaTripCountries(t).map(c=>`<option value="${ipaEscape(c)}" ${ipaSameCountry(c,ipaCountryOfDay(t,day))?'selected':''}>${ipaEscape(c)}</option>`).join('')}<option value="" ${!ipaCountryOfDay(t,day)?'selected':''}>⚠️ Não identificado</option></select>`:''}<button class="admin-add-place-btn" data-admin-add-place="${t.id}:${day.day}">+ Lugar / dica</button></div><div class="admin-place-list">${normalizedPlaces(day).map((p,i)=>`<div><span>${i+1}</span><div><b>${p.time?`${p.time} · `:''}${p.category||'📍'} ${p.name}</b><small>${p.address||p.note||''}</small>${p.smartTip?`<em>💡 ${p.smartTip}</em>`:''}</div>${p.mapsUrl?`<button type="button" class="admin-place-map" data-external-route="${ipaEscape(p.mapsUrl)}" aria-label="Abrir ${ipaEscape(p.name)} no Google Maps">↗ Maps</button>`:''}${i<normalizedPlaces(day).length-1?`<button type="button" class="admin-place-map" data-admin-transport="${ipaEscape(t.id)}:${day.day}:${i}">🚆 Deslocamento</button>`:''}<div class="ipa-route-edit-actions"><button type="button" class="admin-place-map" data-admin-place-move data-trip="${ipaEscape(t.id)}" data-day="${day.day}" data-index="${i}" data-direction="-1" title="Mover para cima" ${i===0?'disabled':''}>↑</button><button type="button" class="admin-place-map" data-admin-place-move data-trip="${ipaEscape(t.id)}" data-day="${day.day}" data-index="${i}" data-direction="1" title="Mover para baixo" ${i===normalizedPlaces(day).length-1?'disabled':''}>↓</button><button type="button" class="admin-place-map" data-admin-place-edit data-trip="${ipaEscape(t.id)}" data-day="${day.day}" data-index="${i}">✏️ Editar</button><button type="button" class="admin-place-map ipa-remove-stop" data-admin-place-delete data-trip="${ipaEscape(t.id)}" data-day="${day.day}" data-index="${i}">🗑 Excluir</button></div></div>`).join('')||'<small>Nenhum local neste dia.</small>'}</div></div>`).join('')||'<p>Comece adicionando o primeiro dia.</p>'}</div>
  <div class="network-tip-list">${(d.recommendations||[]).filter(r=>r.tripId===t.id).map(r=>`<div><span>💡</span><div><b>${r.category||'Dica'} · ${r.name}</b><small>${r.address||''}</small><em>${r.smartTip||'Indo por Aí recomenda'}</em></div></div>`).join('')||'<small>Nenhuma dica extra cadastrada.</small>'}</div></section>
  <section class="ipa-admin-panel" id="ipaCountryClimate"><div class="section-head"><div><span class="eyebrow">✨ ANTES · ENTRE NO CLIMA</span><h2>Conteúdo ${ipaTripCountries(t).length>1?'de '+ipaEscape(ipaAdminCountry(t)):'do destino'}</h2></div><button class="btn btn-primary" data-admin-generate-climate="${t.id}">✨ Preparar conteúdo</button></div>${ipaCountrySelectorHtml(t,true)}<p>Filmes, playlists, livros, expressões, gastronomia e curiosidades. ${ipaTripCountries(t).length>1?'Cada país tem conteúdo independente. O roteiro e o financeiro permanecem únicos.':'O conteúdo personalizado existente permanece preservado.'}</p><div class="climate-admin-grid">${(ipaTripCountries(t).length>1?ipaClimateCountryRows(t,window.ipaAdminClimateCountryByTrip?.[t.id]||ipaTripCountries(t)[0]):climateForTrip(t)).map((x,i)=>`<div><span>${x[0]}</span><small>${x[1]}</small><b>${ipaEscape(x[2])}</b><p>${ipaEscape(x[3])}</p>${ipaStreamButtons(x)}<button class="btn btn-light" data-admin-edit-climate="${t.id}:${i}">✏️ Editar</button></div>`).join('')}</div></section>
  <section class="ipa-admin-panel" id="ipaCountryDocuments"><div class="section-head"><div><span class="eyebrow">ANTES · CARTEIRA DA VIAGEM</span><h2>Documentos ${ipaTripCountries(t).length>1?'· '+ipaEscape(ipaAdminCountry(t)):'do cliente'}</h2></div><button class="btn btn-light" data-admin-document="${t.id}" data-client-id="${t.clientId}">+ Documento</button></div><p>Passagens, hotel, vouchers, seguro, ingressos e transfer. O ADM cadastra e o cliente consulta no Antes.</p><div class="admin-doc-list">${(d.tripDocuments||[]).filter(x=>x.tripId===t.id&&(ipaTripCountries(t).length<2||ipaRecordInCountry(t,x,ipaAdminCountry(t))||!ipaCountryOfRecord(t,x))).map(x=>`<div><span>${x.type==='Passagem aérea'?'✈️':x.type.includes('Hospedagem')?'🏨':x.type.includes('trem')?'🚆':x.type.includes('ônibus')?'🚌':x.type.includes('Ingresso')?'🎟️':x.type.includes('Seguro')?'🛡️':'📄'}</span><div><b>${x.title}</b><small>${[x.date,x.time,x.terminal&&('Terminal '+x.terminal),x.gate&&('Portão '+x.gate)].filter(Boolean).join(' · ')}</small></div>${x.url?`<button data-external-route="${ipaEscape(x.url)}">Abrir</button>`:''}${ipaTripCountries(t).length>1?`<label class="ipa-doc-country-label">País<select data-ipa-classify-doc="${ipaEscape(x.id)}" data-doc-trip="${ipaEscape(t.id)}"><option value="" ${!x.country?'selected':''}>⚠️ Não definido</option>${ipaTripCountries(t).map(c=>`<option value="${ipaEscape(c)}" ${ipaSameCountry(c,x.country)?'selected':''}>${ipaEscape(c)}</option>`).join('')}<option value="Geral" ${ipaSameCountry('Geral',x.country)?'selected':''}>🌍 Geral / compartilhado</option></select></label>`:''}<button type="button" class="btn btn-light doc-delete-btn" data-admin-delete-document="${ipaEscape(x.id)}" data-document-trip="${ipaEscape(t.id)}" aria-label="Excluir documento ${ipaEscape(x.title)}">🗑 Excluir</button></div>`).join('')||'<small>Nenhum documento cadastrado.</small>'}</div></section>
@@ -4631,6 +4705,64 @@ function bindCapturedExperience(){
  ipaInlineMovieCleanup=cleanup;
 }
 
+// Beta 6.30.62: galeria com opt-in, autorizada no Worker por ID token.
+let ipaSharedGroups=[],ipaSharedGalleryLoading=false;
+async function ipaSharedFetch(path,method='GET',payload=null){
+ const user=window.IPAFirebase?.user;
+ if(!user||ipaAdminPreviewAuthenticated())throw Error('Entre na sua conta de viajante para acessar o grupo.');
+ const token=await user.getIdToken();const response=await fetch(path,{method,headers:{Authorization:'Bearer '+token,...(payload?{'Content-Type':'application/json'}:{})},body:payload?JSON.stringify(payload):undefined,cache:'no-store'});
+ const data=await response.json().catch(()=>({}));if(!response.ok||!data.ok)throw Error(data.error||'Não foi possível acessar a galeria compartilhada.');return data;
+}
+async function ipaLoadSharedGallery(){
+ const root=document.querySelector('#ipaSharedGallery');if(!root||ipaSharedGalleryLoading||ipaAdminPreviewAuthenticated())return;
+ ipaSharedGalleryLoading=true;
+ try{
+  const res=await ipaSharedFetch('/api/shared-trip/groups');ipaSharedGroups=res.groups||[];
+  if(!res.enabled){root.innerHTML='<p>🔒 A galeria conjunta aguarda a ativação segura do Firebase pelo administrador. Suas memórias continuam privadas.</p>';return;}
+  if(!ipaSharedGroups.length){root.innerHTML='<p>Nenhum destino compartilhado está vinculado à sua conta.</p>';return;}
+  const panels=await Promise.all(ipaSharedGroups.map(async g=>{
+   try{const data=await ipaSharedFetch('/api/shared-trip/media?tripId='+encodeURIComponent(g.tripId));return {group:g,items:data.items||[]};}
+   catch(e){return {group:g,error:e.message,items:[]}}
+  }));
+  if(!root.isConnected)return;
+  root.innerHTML=panels.map(({group:g,items,error})=>`<div class="ipa-shared-group"><h3>🌍 ${ipaEscape(g.name||'Viagem compartilhada')}</h3><p>${g.stages.map(x=>ipaEscape(x.destination+' · '+x.country)).join(' · ')}</p>${error?`<small>${ipaEscape(error)}</small>`:items.length?`<div class="ipa-shared-gallery-grid">${items.map(m=>`<article class="ipa-shared-tile">${m.type==='video'?`<video controls playsinline preload="metadata" data-ipa-shared-media="${ipaEscape(m.id)}" data-ipa-shared-trip="${ipaEscape(g.tripId)}"></video>`:`<img loading="lazy" data-ipa-shared-media="${ipaEscape(m.id)}" data-ipa-shared-trip="${ipaEscape(g.tripId)}" alt="Memória compartilhada">`}<small>${ipaEscape(m.caption||'Memória da viagem')} · ${ipaEscape(m.postedBy)}</small>${m.own?`<button class="ipa-share-memory" data-ipa-unshare-photo="${ipaEscape(m.id)}" data-ipa-unshare-trip="${ipaEscape(g.tripId)}">Deixar de compartilhar</button>`:''}</article>`).join('')}</div>`:'<p>O álbum fica pronto quando alguém escolher uma foto e clicar em “Compartilhar com o grupo”.</p>'}</div>`).join('');
+  root.querySelectorAll('[data-ipa-shared-media]').forEach(async media=>{
+   try{
+    const token=await window.IPAFirebase.user.getIdToken();
+    const resp=await fetch('/api/shared-trip/file?tripId='+encodeURIComponent(media.dataset.ipaSharedTrip)+'&id='+encodeURIComponent(media.dataset.ipaSharedMedia),{headers:{Authorization:'Bearer '+token},cache:'no-store'});
+    if(!resp.ok)throw Error('Arquivo indisponível');const blob=await resp.blob();if(!media.isConnected)return;
+    const objectUrl=URL.createObjectURL(blob);media.src=objectUrl;media.addEventListener('load',()=>setTimeout(()=>URL.revokeObjectURL(objectUrl),30000),{once:true});
+   }catch(e){media.alt='Não foi possível carregar esta memória';}
+  });
+  root.querySelectorAll('[data-ipa-unshare-photo]').forEach(b=>b.onclick=async()=>{
+   if(!confirm('Remover esta foto apenas do álbum compartilhado? A sua foto pessoal será mantida.'))return;
+   b.disabled=true;try{await ipaSharedFetch('/api/shared-trip/media','DELETE',{tripId:b.dataset.ipaUnshareTrip,id:b.dataset.ipaUnsharePhoto});toast('Publicação removida do grupo.');ipaLoadSharedGallery();}catch(e){toast(e.message);b.disabled=false;}
+  });
+ }catch(e){if(root.isConnected)root.innerHTML='<p>🔒 '+ipaEscape(e.message)+'</p>'}
+ finally{ipaSharedGalleryLoading=false}
+}
+async function ipaOfferShareMemory(memoryId){
+ const memory=(ipaDB().memories||[]).find(m=>m.id===memoryId),trip=activeTrip();
+ if(!memory||!trip)return;
+ if(!memory.cloudSynced||!/^https:\/\//.test(memory.url||memory.src||'')){toast('A foto precisa estar sincronizada com o Firebase antes de compartilhar.');return;}
+ try{
+  const groups=await ipaSharedFetch('/api/shared-trip/groups');
+  if(!groups.enabled)throw Error('O álbum compartilhado ainda aguarda a ativação das regras de segurança no Firebase.');
+  const day=(trip.itinerary||[]).find(d=>Number(d.day)===Number(memory.day));
+  const match=(groups.groups||[]).flatMap(g=>g.stages.filter(st=>{
+   const norm=x=>String(x||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]/g,'');
+   return (day?.country&&norm(day.country)===norm(st.country))||(day?.city&&norm(day.city)===norm(st.destination))||(day?.date&&st.startDate&&st.endDate&&day.date>=st.startDate&&day.date<=st.endDate);
+  }).map(stage=>({group:g,stage})));
+  if(!match.length)throw Error('Nenhum destino compartilhado corresponde ao dia desta foto.');
+  showModal(`<h2>Compartilhar com o grupo</h2><p>Somente os participantes autorizados dos destinos escolhidos verão esta foto. As outras memórias e documentos continuam privados.</p><label>Destino compartilhado<select id="ipaShareTarget" class="v2-concierge-input">${match.map((x,i)=>`<option value="${i}">${ipaEscape(x.stage.destination+' · '+x.stage.country+' — '+x.group.name)}</option>`).join('')}</select></label><button id="ipaConfirmShare" class="btn btn-primary btn-block">Compartilhar esta memória</button>`);
+  const button=document.querySelector('#ipaConfirmShare');if(button)button.onclick=async()=>{
+   button.disabled=true;const chosen=match[Number(document.querySelector('#ipaShareTarget')?.value||0)];
+   try{await ipaSharedFetch('/api/shared-trip/media','POST',{tripId:chosen.group.tripId,stageId:chosen.stage.id,memoryId});modal.close();toast('Memória compartilhada com os participantes ✓');ipaLoadSharedGallery();}
+   catch(e){toast(e.message);button.disabled=false;}
+  };
+ }catch(e){toast(e.message)}
+}
+
 function memoriesView(){
  const t=activeTrip();if(!t)return `<section class="section"><h2>Viagem não encontrada</h2></section>`;
  const days=(t.itinerary||[]).sort((a,b)=>Number(a.day)-Number(b.day)),countries=ipaTripCountries(t),country=countries.join(' · ')||tripCountry(t),flag=countries.length>1?'🌍':countryFlag(country);
@@ -4648,6 +4780,7 @@ function memoriesView(){
  }).join('');
  return `${memorySyncWarning}<div data-memory-pending-list></div><section class="album-hero"><span class="eyebrow">DIÁRIO AUTOMÁTICO · ${flag} ${country}</span><h1>${t.name}</h1><p>Seu diário cresce com checks, avaliações, fotos e vídeos desta viagem.</p><div class="album-stats"><span>📸 ${memories.filter(m=>m.type==='image').length} fotos</span><span>🎥 ${memories.filter(m=>m.type==='video').length} vídeos</span><span>📍 ${days.reduce((sum,d)=>sum+normalizedPlaces(d).length+ipaGetPersonalRoute(t,d.day).length,0)} lugares</span></div></section>
  <section class="section"><div class="section-head"><div><span class="eyebrow">LINHA DO TEMPO</span><h2>A viagem, dia por dia</h2></div></div><div class="album-days">${dayCards||'<p>O diário começará quando o roteiro for cadastrado.</p>'}</div></section>
+ <section class="section ipa-shared-gallery"><div class="section-head"><div><span class="eyebrow">👥 VIAJAR JUNTOS</span><h2>Nossas memórias compartilhadas</h2></div></div><div id="ipaSharedGallery"><p>Verificando seus grupos e destinos autorizados...</p></div></section>
  <section class="section"><div class="section-head"><div><span class="eyebrow">MOMENTOS SUGERIDOS</span><h2>Crie uma memória agora</h2></div></div><div class="memory-prompt-grid">${[['🥂','Hora do brinde'],['👨‍👩‍👧','Nossa turma'],['🍽️','Sabor inesquecível'],['🌅','A vista do dia'],['😂','Momento espontâneo'],['❤️','Meu favorito']].map(x=>`<button data-memory-prompt="${x[1]}"><span>${x[0]}</span><b>${x[1]}</b><small>${ipaCountryHeading(t)}</small></button>`).join('')}</div></section>
  `;
 }
@@ -5066,9 +5199,10 @@ function showMemoryDay(dayNumber){
  const places=normalizedPlaces(day);
  const title=`Dia ${Number(day.day)}${day.title?' · '+String(day.title):''}`;
  const media=mem.map(m=>m.type==='video'
-  ?`<article class="ipa-day-real-memory"><video controls playsinline preload="metadata" src="${ipaEscape(m.src||m.url||'')}"></video><small>${ipaEscape(m.prompt||m.caption||'Vídeo da viagem')}</small></article>`
-  :`<article class="ipa-day-real-memory"><img loading="lazy" src="${ipaEscape(m.src||m.url||'')}" alt="${ipaEscape(m.prompt||'Foto da viagem')}"><small>${ipaEscape(m.prompt||m.caption||'Foto da viagem')}</small></article>`).join('');
+  ?`<article class="ipa-day-real-memory"><video controls playsinline preload="metadata" src="${ipaEscape(m.src||m.url||'')}"></video><small>${ipaEscape(m.prompt||m.caption||'Vídeo da viagem')}</small>${m.cloudSynced?`<button class="ipa-share-memory" data-ipa-share-memory="${ipaEscape(m.id)}">👥 Compartilhar com grupo</button>`:''}</article>`
+  :`<article class="ipa-day-real-memory"><img loading="lazy" src="${ipaEscape(m.src||m.url||'')}" alt="${ipaEscape(m.prompt||'Foto da viagem')}"><small>${ipaEscape(m.prompt||m.caption||'Foto da viagem')}</small>${m.cloudSynced?`<button class="ipa-share-memory" data-ipa-share-memory="${ipaEscape(m.id)}">👥 Compartilhar com grupo</button>`:''}</article>`).join('');
  showModal(`<div class="memory-day-modal"><span class="eyebrow">ÁLBUM DE LEMBRANÇAS</span><h2>${ipaEscape(title)}</h2><p>${mem.length} memória${mem.length===1?'':'s'} registrada${mem.length===1?'':'s'} · ${places.length} lugar${places.length===1?'':'es'} no roteiro</p>${media?`<div class="ipa-day-real-grid">${media}</div>`:'<p>As fotos e os vídeos registrados neste dia aparecerão aqui automaticamente.</p>'}${places.length?`<h3>Lugares do dia</h3><div class="ipa-day-place-list">${places.map(p=>`<div>📍 ${ipaEscape(p.name||'Lugar visitado')}</div>`).join('')}</div>`:''}</div>`);
+ document.querySelectorAll('[data-ipa-share-memory]').forEach(btn=>btn.onclick=()=>ipaOfferShareMemory(btn.dataset.ipaShareMemory));
 }
 
 

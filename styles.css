@@ -1829,3 +1829,12 @@ body.hidden-nav .bottom-nav{display:none!important;}
 .ipa-experience-upload{padding:12px;border-radius:15px;border:1px solid #d6e5e6;background:#f7fbfb;display:grid;gap:12px;margin:12px 0}
 .ipa-experience-upload label{display:grid;gap:6px}.ipa-experience-upload small{color:#586f75}.ipa-experience-photo-preview{height:160px;border-radius:12px}
 @media(max-width:560px){.ipa-experiences-admin{grid-template-columns:1fr}}
+
+/* Viajar Juntos · destinos individuais, sem alterar o tema original */
+.ipa-together-stages{display:grid;grid-template-columns:repeat(auto-fit,minmax(205px,1fr));gap:10px;margin:14px 0}.ipa-together-check{display:flex;align-items:center;gap:9px;padding:12px;background:#eff8f8;border:1px solid #bddfe2;border-radius:14px;cursor:pointer}.ipa-together-check input{width:20px;height:20px;accent-color:#075667;flex-shrink:0}.ipa-together-check span{display:block;font-weight:700;color:#075667}.ipa-together-check small{display:block;font-weight:400;font-size:12px;color:#58747a}.ipa-together-link{display:block!important;margin:10px 0;padding:15px;background:#fbfdfd;border-radius:14px;border:1px solid #d7e6e8}.ipa-together-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}.ipa-travel-together-new{display:grid;gap:15px;margin-top:20px}.ipa-shared-gallery-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:12px}.ipa-shared-tile{border:1px solid #d8e7e9;padding:8px;border-radius:15px;background:white}.ipa-shared-tile img,.ipa-shared-tile video{display:block;width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:10px}.ipa-shared-tile small{display:block;margin:7px 2px;color:#49626a}.ipa-share-memory{display:block;margin:8px 0;padding:7px 10px;border:1px solid #b5dadc;border-radius:9px;background:#eaf7f6;color:#075667;font-weight:700}
+/* Beta 6.30.63 — controles de edição do roteiro oficial no ADM */
+.ipa-route-edit-actions{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:8px 0 0}
+.ipa-route-edit-actions .admin-place-map{min-width:38px;padding:7px 10px;cursor:pointer;border-radius:10px}
+.ipa-route-edit-actions .admin-place-map:disabled{opacity:.32;cursor:not-allowed}
+.ipa-route-edit-actions .ipa-remove-stop{color:#9e3b37;border-color:#ebc9c7}
+@media(max-width:600px){.ipa-route-edit-actions{width:100%;gap:5px}.ipa-route-edit-actions .admin-place-map{font-size:13px;padding:8px}}

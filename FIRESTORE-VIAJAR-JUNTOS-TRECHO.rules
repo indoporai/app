@@ -1,0 +1,10 @@
+// ADICIONE DENTRO de match /databases/{database}/documents,
+// depois de revisar cuidadosamente regras genéricas já existentes.
+// ESTE TRECHO SOZINHO NÃO SUBSTITUI AS REGRAS DO SEU PROJETO!
+match /sharedTripMedia/{mediaId} {
+  // Toda consulta é feita via Worker Cloudflare após autenticação/autorização.
+  allow read, write: if false;
+}
+// ATENÇÃO: se outro match mais amplo permitir o acesso,
+// esta regra NÃO anulará a permissão existente.
+// Remova a permissão abrangente para sharedTripMedia e teste com Rules Playground.

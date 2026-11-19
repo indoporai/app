@@ -1,0 +1,4 @@
+Indo por Aí Beta 6.30.62 — Viajar Juntos com múltiplos destinos e galeria compartilhada com consentimento.
+ATENÇÃO: Compartilhamento fica desativado até validar regras do Firebase e adicionar variável SHARED_TRIPS_RULES_CONFIRMED=true no Cloudflare. Consulte CONFIGURAR-FIREBASE-VIAJAR-JUNTOS.md.
+
+Não altera PIX, financeiro, documentos, Mochilito nem a identidade visual.

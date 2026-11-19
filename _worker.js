@@ -679,6 +679,82 @@ async function ipaClimateDiscover(request,env){
  return new Response(JSON.stringify({ok:true,links,sources,disclaimer:'Links específicos encontrados em catálogos públicos; a disponibilidade e o acesso dependem da plataforma.'}),{headers:{'content-type':'application/json; charset=utf-8','cache-control':'public, max-age=3600, s-maxage=43200','x-content-type-options':'nosniff'}});
 }
 
+// Beta 6.30.62 — Viajar Juntos: autorização sempre no Worker, nunca no navegador.
+// Não ativar publicação sem confirmar as regras do Firestore no projeto real.
+const IPA_SHARED_COLLECTION='sharedTripMedia';
+function ipaFSValue(v){if(!v)return null;if('stringValue'in v)return v.stringValue;if('booleanValue'in v)return v.booleanValue;if('integerValue'in v)return Number(v.integerValue);if('doubleValue'in v)return Number(v.doubleValue);if('timestampValue'in v)return v.timestampValue;if('nullValue'in v)return null;if('arrayValue'in v)return (v.arrayValue.values||[]).map(ipaFSValue);if('mapValue'in v)return Object.fromEntries(Object.entries(v.mapValue.fields||{}).map(([k,x])=>[k,ipaFSValue(x)]));return null;}
+function ipaFSDoc(d){const o=Object.fromEntries(Object.entries(d?.fields||{}).map(([k,v])=>[k,ipaFSValue(v)]));o.id=String(d?.name||'').split('/').pop()||o.id;return o;}
+function ipaFSField(v){if(v===null||v===undefined)return {nullValue:null};if(typeof v==='boolean')return {booleanValue:v};if(typeof v==='number')return {integerValue:String(Math.floor(v))};if(Array.isArray(v))return {arrayValue:{values:v.map(ipaFSField)}};if(typeof v==='object')return {mapValue:{fields:Object.fromEntries(Object.entries(v).map(([k,x])=>[k,ipaFSField(x)]))}};return {stringValue:String(v)}}
+async function ipaFSGet(token,collectionName,id){const r=await fetch(`${IPA_ACCESS_ROOT}/${collectionName}/${encodeURIComponent(id)}`,{headers:{Authorization:'Bearer '+token},cache:'no-store'});if(r.status===404)return null;if(!r.ok)throw Error(`Firestore ${collectionName} read ${r.status}`);return ipaFSDoc(await r.json());}
+async function ipaFSList(token,collectionName,maxPages=20){let next='',items=[],page=0;do{const u=`${IPA_ACCESS_ROOT}/${collectionName}?pageSize=100`+(next?'&pageToken='+encodeURIComponent(next):'');const r=await fetch(u,{headers:{Authorization:'Bearer '+token},cache:'no-store'});if(r.status===404)return [];if(!r.ok)throw Error(`Firestore ${collectionName} list ${r.status}`);const d=await r.json();items.push(...(d.documents||[]).map(ipaFSDoc));next=d.nextPageToken||'';page++;if(page>=maxPages&&next)throw Error('Limite de listagem atingido; não é seguro autorizar parcialmente.');}while(next);return items;}
+async function ipaFSWrite(token,collectionName,id,data){const fields=Object.fromEntries(Object.entries(data).map(([k,v])=>[k,ipaFSField(v)]));const r=await fetch(`${IPA_ACCESS_ROOT}/${collectionName}/${encodeURIComponent(id)}`,{method:'PATCH',headers:{Authorization:'Bearer '+token,'content-type':'application/json'},body:JSON.stringify({fields})});if(!r.ok)throw Error(`Firestore ${collectionName} write ${r.status}`);return ipaFSDoc(await r.json());}
+async function ipaFSDelete(token,collectionName,id){const r=await fetch(`${IPA_ACCESS_ROOT}/${collectionName}/${encodeURIComponent(id)}`,{method:'DELETE',headers:{Authorization:'Bearer '+token}});if(!r.ok&&r.status!==404)throw Error(`Firestore ${collectionName} delete ${r.status}`)}
+function ipaIdentityOwnsClient(identity,client){return !!(identity&&client&&(client.authUid===identity.localId||String(client.email||'').trim().toLowerCase()===String(identity.email||'').trim().toLowerCase())&&identity.email);}
+function ipaSharedMembership(trip,clientId){const stages=Array.isArray(trip.stages)?trip.stages:[];const links=(trip.travelTogetherPlans||[]).filter(x=>x.enabled===true&&Array.isArray(x.stageIds)&&x.stageIds.length);
+ const stageIds=clientId===trip.clientId?[...new Set(links.flatMap(x=>x.stageIds.map(String)))]:[...new Set(links.filter(x=>x.clientId===clientId).flatMap(x=>x.stageIds.map(String)))];
+ return stages.filter(x=>stageIds.includes(String(x.id))).map(x=>({id:String(x.id),destination:String(x.destination||''),country:String(x.country||''),startDate:String(x.startDate||''),endDate:String(x.endDate||'')}));}
+function ipaNormPlace(s){return String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]/g,'')}
+function ipaDayBelongsToStage(memory,originTrip,stage){const day=(originTrip.itinerary||[]).find(d=>Number(d.day)===Number(memory.day));if(!day)return false;const dest=ipaNormPlace(stage.destination),country=ipaNormPlace(stage.country),dCountry=ipaNormPlace(day.country),dCity=ipaNormPlace(day.city||day.destination);
+ if(dCountry&&country&&dCountry===country)return true;
+ if(dCity&&dest&&dCity===dest)return true;
+ if(day.date&&stage.startDate&&stage.endDate&&day.date>=stage.startDate&&day.date<=stage.endDate)return true;
+ const originStages=originTrip.stages||[];const matching=originStages.some(x=>(ipaNormPlace(x.country)===country&&country)||(ipaNormPlace(x.destination)===dest&&dest));
+ return !!(matching&&originStages.length===1&&!dCountry&&!dCity);
+}
+async function ipaSharedAuth(request,env){const identity=await ipaAdminIdentity(request,env);if(!identity)return {error:json({ok:false,error:'Faça login novamente.'},401)};const token=await ipaGoogleServiceToken(env,'https://www.googleapis.com/auth/datastore');
+ const clients=await ipaFSList(token,'clients',25);const client=clients.find(x=>ipaIdentityOwnsClient(identity,x));if(!client&&identity.localId!==IPA_ADMIN_UID)return {error:json({ok:false,error:'Cliente não associado a essa conta.'},403)};
+ return {identity,token,client};}
+async function ipaSharedTripApi(request,env,url){
+ try{
+  const auth=await ipaSharedAuth(request,env);if(auth.error)return auth.error;
+  const {identity,token,client}=auth;const isAdmin=identity.localId===IPA_ADMIN_UID;
+  const trips=await ipaFSList(token,'trips',25);
+  const groups=trips.map(t=>({trip:t,stages:client?ipaSharedMembership(t,client.id):[]})).filter(g=>g.stages.length);
+  if(url.pathname==='/api/shared-trip/groups'){
+    return json({ok:true,enabled:env.SHARED_TRIPS_RULES_CONFIRMED==='true',groups:groups.map(g=>({tripId:g.trip.id,name:g.trip.name||'Viagem compartilhada',stages:g.stages}))});
+  }
+  // Flag operacional é obrigatória: não publicar imagens antes de validar regras no Firebase.
+  if(env.SHARED_TRIPS_RULES_CONFIRMED!=='true')return json({ok:false,error:'Compartilhamento aguardando validação das regras do Firebase e ativação pelo ADM.'},503);
+  const body=request.method==='GET'?Object.fromEntries(url.searchParams):await request.json().catch(()=>({}));
+  const tripId=String(body.tripId||'');const group=groups.find(g=>g.trip.id===tripId);if(!group)return json({ok:false,error:'Grupo não autorizado para esta conta.'},403);
+  if(url.pathname==='/api/shared-trip/media'&&request.method==='GET'){
+    const docs=await ipaFSList(token,IPA_SHARED_COLLECTION,25);
+    const authorized=new Set(group.stages.map(st=>st.id));
+    const items=docs.filter(x=>x.groupTripId===tripId&&authorized.has(x.stageId)&&x.published===true).map(x=>({id:x.id,stageId:x.stageId,type:x.type,caption:x.caption||'',createdAt:x.createdAt||'',postedBy:x.postedBy||'Viajante',own:x.ownerUid===identity.localId}));
+    return json({ok:true,items});
+  }
+  if(url.pathname==='/api/shared-trip/file'&&request.method==='GET'){
+    const id=String(body.id||'');if(!/^share-[0-9a-f]{48}$/.test(id))return json({ok:false,error:'Arquivo inválido.'},400);
+    const item=await ipaFSGet(token,IPA_SHARED_COLLECTION,id);
+    if(!item||!item.published||item.groupTripId!==tripId||!group.stages.some(st=>st.id===item.stageId))return json({ok:false,error:'Foto não autorizada.'},403);
+    let source;try{source=new URL(item.url||'')}catch{return json({ok:false,error:'Arquivo indisponível.'},404)}
+    if(source.protocol!=='https:'||source.hostname!=='firebasestorage.googleapis.com'||!source.pathname.includes('indo-por-ai-app.firebasestorage.app'))return json({ok:false,error:'Origem de mídia não autorizada.'},403);
+    const response=await fetch(source.toString(),{cache:'no-store'});
+    if(!response.ok)return json({ok:false,error:'Foto não encontrada no armazenamento.'},502);
+    const contentType=response.headers.get('content-type')||'';
+    if(!/^(image\/(jpeg|png|webp)|video\/(mp4|webm))\b/i.test(contentType))return json({ok:false,error:'Formato não autorizado.'},415);
+    const size=Number(response.headers.get('content-length')||0);if(size>25*1024*1024)return json({ok:false,error:'Arquivo muito grande.'},413);
+    return new Response(response.body,{status:200,headers:{'Content-Type':contentType,'Cache-Control':'private,no-store','X-Content-Type-Options':'nosniff','Content-Security-Policy':"default-src 'none'"}});
+  }
+  if(url.pathname==='/api/shared-trip/media'&&request.method==='POST'){
+    if(isAdmin||!client)return json({ok:false,error:'Somente viajantes podem publicar suas fotos.'},403);
+    const stage=group.stages.find(x=>x.id===String(body.stageId||''));if(!stage)return json({ok:false,error:'Destino fora deste grupo.'},403);
+    const memoryId=String(body.memoryId||'');if(!/^[\w-]{5,120}$/.test(memoryId))return json({ok:false,error:'Memória inválida.'},400);
+    const memory=await ipaFSGet(token,'memories',memoryId);const mediaUrl=String(memory?.url||memory?.src||'');let mediaSource;try{mediaSource=new URL(mediaUrl)}catch{}if(!memory||memory.ownerUid!==identity.localId||memory.clientId!==client.id||!['image','video'].includes(memory.type)||mediaSource?.hostname!=='firebasestorage.googleapis.com'||!mediaSource.pathname.includes('indo-por-ai-app.firebasestorage.app'))return json({ok:false,error:'Somente uma memória própria sincronizada no Firebase pode ser compartilhada.'},403);
+    const origin=trips.find(t=>t.id===memory.tripId);if(!origin||origin.clientId!==client.id||!ipaDayBelongsToStage(memory,origin,stage))return json({ok:false,error:'A foto não pertence ao destino selecionado.'},403);
+    const photoId='share-'+Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(tripId+'|'+stage.id+'|'+memoryId)))).map(x=>x.toString(16).padStart(2,'0')).join('').slice(0,48);
+    const payload={groupTripId:tripId,stageId:stage.id,originTripId:origin.id,memoryId,ownerUid:identity.localId,ownerClientId:client.id,type:memory.type,url:memory.url||memory.src,caption:String(memory.caption||memory.prompt||'').slice(0,160),postedBy:String(client.name||'Viajante').slice(0,80),createdAt:new Date().toISOString(),published:true};
+    await ipaFSWrite(token,IPA_SHARED_COLLECTION,photoId,payload);return json({ok:true,id:photoId});
+  }
+  if(url.pathname==='/api/shared-trip/media'&&request.method==='DELETE'){
+    const id=String(body.id||'');if(!/^share-[0-9a-f]{48}$/.test(id))return json({ok:false,error:'Foto inválida.'},400);
+    const item=await ipaFSGet(token,IPA_SHARED_COLLECTION,id);if(!item||item.groupTripId!==tripId||!group.stages.some(x=>x.id===item.stageId)||(!isAdmin&&item.ownerUid!==identity.localId))return json({ok:false,error:'Sem permissão para remover esta publicação.'},403);
+    await ipaFSDelete(token,IPA_SHARED_COLLECTION,id);return json({ok:true});
+  }
+  return json({ok:false,error:'Método não permitido.'},405);
+ }catch(e){console.error('Viajar Juntos API',String(e?.message||e).slice(0,180));return json({ok:false,error:'Não foi possível consultar o álbum compartilhado. Confira a configuração de segurança.'},502)}
+}
+
 // Beta 6.30.38 — monitoramento autenticado de sessões de clientes.
 // Mantido em coleção isolada para não interferir no CRM nem na sincronização de clientes.
 const IPA_ACCESS_ROOT=`https://firestore.googleapis.com/v1/projects/${IPA_FIREBASE_PROJECT}/databases/(default)/documents`;
@@ -779,6 +855,7 @@ export default {
         return json({ok:true,experiences:list});
       }catch(e){console.error('Experiências indisponíveis',e?.message);return json({ok:false,experiences:[]},503)}
     }
+    if ((url.pathname === '/api/shared-trip/groups' && request.method==='GET')||(url.pathname === '/api/shared-trip/media'&&['GET','POST','DELETE'].includes(request.method))||(url.pathname === '/api/shared-trip/file'&&request.method==='GET'))return ipaSharedTripApi(request,env,url);
     if (url.pathname === "/api/client/access" && (request.method === "POST" || request.method === "GET")) return ipaAccessRequest(request,env);
     if (url.pathname === "/api/admin/payment-email" && (request.method === "GET" || request.method === "POST")) return json({ok:false,error:"A configuração do e-mail é fixa desde a Beta 6.30.33."},410);
     if (url.pathname === "/api/admin/reconcile-pix" && request.method === "POST") return ipaAdminReconcilePix(request,env);
