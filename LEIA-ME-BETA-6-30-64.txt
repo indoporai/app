@@ -1,0 +1,11 @@
+INDO POR AÍ — BETA 6.30.64
+Base: Beta 6.30.63
+
+ADM: cards de viagens do Dashboard compactados, bandeiras em linha e botões agrupados.
+ADM: cartões de paradas redesenhados com barra compacta de ações (Maps, trajeto, subir, descer, editar, excluir).
+ADM: controle de meta de 1–10 atrações por dia, salvo no campo attractionTarget de cada dia, preservando locais existentes.
+ADM: criação inteligente passa a aceitar quantidade individual por dia, utilizada pelo motor de curadoria; se não houver lugares suficientes no banco, o resultado poderá ficar abaixo da meta.
+
+OBSERVAÇÕES: Aeroportos e transfers não são considerados atrações no indicador exibido; editar a meta não exclui ou recria automaticamente locais. O controle do planejamento inteligente limita a seleção de atrações conforme o acervo e a duração.
+Sem alterações intencionais na lógica de PIX, no Firebase, no Mochilito ou no compartilhamento Viajar Juntos. As regras de segurança do compartilhamento continuam pendentes no Firebase.
+Recomendado testar em ambiente de homologação antes de produção.

@@ -834,6 +834,30 @@ window.IPAFirebase = {
     if(!currentUser) throw new Error("Faça login primeiro.");
     return pullAll();
   },
+  async deleteClientIfUnlinked(id){
+    if(!currentUser || currentUser.uid!==ADMIN_UID)throw new Error('Somente o ADM pode excluir cadastros.');
+    if(!id)throw new Error('Cliente inválido.');
+    const cid=String(id),ref=doc(firestore,'clients',cid);
+    const snapshot=await getDocFromServer(ref);
+    if(!snapshot.exists())throw new Error('Cadastro não encontrado no Firebase. Atualize a lista.');
+    const client=snapshot.data();
+    if(client.authUid||client.firebaseUid||client.uid)throw new Error('Cliente com acesso autenticado. Revogue o acesso no Firebase Auth antes de excluir o cadastro.');
+    const sources=['trips','payments','paymentPlans','tripDocuments','memories','travelLeads','conciergeRequests'];
+    for(const col of sources){
+      for(const field of ['clientId',...(col==='conciergeRequests'?['requesterClientId']:[])]){
+        const result=await getDocs(query(collection(firestore,col),where(field,'==',cid),limit(1)));
+        if(!result.empty)throw new Error('Existem registros vinculados em '+col+'. A exclusão foi bloqueada.');
+      }
+    }
+    // A guest may also be referenced by a travelTogetherPlans array in a different trip.
+    const tripsSnap=await getDocs(collection(firestore,'trips'));
+    if(tripsSnap.docs.some(d=>(d.data().travelTogetherPlans||[]).some(link=>String(link.clientId)===cid)))
+      throw new Error('Este cliente participa de um grupo Viajar Juntos. Remova o vínculo primeiro.');
+    await deleteDoc(ref);
+    const check=await getDocFromServer(ref);
+    if(check.exists())throw new Error('O Firebase não confirmou a exclusão.');
+    return true;
+  },
   async deleteTrip(id){
     if(!currentUser || currentUser.uid!==ADMIN_UID)throw new Error('Somente o ADM pode excluir viagens.');
     if(!id)throw new Error('Viagem inválida.');

@@ -1838,3 +1838,102 @@ body.hidden-nav .bottom-nav{display:none!important;}
 .ipa-route-edit-actions .admin-place-map:disabled{opacity:.32;cursor:not-allowed}
 .ipa-route-edit-actions .ipa-remove-stop{color:#9e3b37;border-color:#ebc9c7}
 @media(max-width:600px){.ipa-route-edit-actions{width:100%;gap:5px}.ipa-route-edit-actions .admin-place-map{font-size:13px;padding:8px}}
+
+/* Beta 6.30.64 — ADM: cards móveis compactos, sem alterar o visual do cliente */
+.ipa-admin-integrated .ipa64-trip-list{display:grid;gap:12px}
+.ipa-admin-integrated .ipa64-trip-card{display:flex!important;flex-direction:column!important;align-items:stretch!important;gap:10px!important;margin:0!important;padding:16px!important;border:1px solid #dce9e8!important;border-radius:20px!important;box-shadow:0 8px 22px rgba(5,61,72,.06)}
+.ipa-admin-integrated .ipa64-trip-card .trip-list-open{display:grid!important;grid-template-columns:minmax(0,1fr) 20px!important;gap:9px!important;width:100%!important;align-items:start!important;padding:0!important}
+.ipa-admin-integrated .ipa64-trip-card .ipa64-flags{grid-column:1 / -1!important;display:block!important;width:100%!important;font-size:21px!important;line-height:1.3!important;white-space:nowrap!important;overflow:hidden!important;letter-spacing:3px}
+.ipa-admin-integrated .ipa64-trip-card .ipa64-trip-info{grid-column:1!important;min-width:0!important;overflow-wrap:anywhere}
+.ipa-admin-integrated .ipa64-trip-card .ipa64-trip-info b{font-size:17px!important;line-height:1.3!important}
+.ipa-admin-integrated .ipa64-trip-card .ipa64-trip-info small{font-size:12px!important}
+.ipa-admin-integrated .ipa64-trip-card .ipa64-trip-meta{display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-top:8px}
+.ipa-admin-integrated .ipa64-trip-card .ipa64-trip-meta em,.ipa-admin-integrated .ipa64-trip-card .ipa64-trip-meta i{display:inline-flex!important;margin:0!important;background:#eef7f5;border-radius:100px;padding:5px 9px!important;font-size:11px!important}
+.ipa-admin-integrated .ipa64-trip-card .ipa64-trip-meta small{font-size:11px!important;margin-left:4px}
+.ipa-admin-integrated .ipa64-trip-card .trip-list-open>strong{grid-column:2!important;grid-row:2!important;justify-self:end}
+.ipa-admin-integrated .ipa64-trip-actions{display:grid!important;grid-template-columns:1fr 1fr!important;gap:10px!important;justify-content:stretch!important;margin:0!important}
+.ipa-admin-integrated .ipa64-trip-actions button{width:100%!important;min-height:42px!important;white-space:normal!important;text-align:center!important}
+.ipa-admin-integrated .ipa64-day-target{margin:12px 0 8px;padding:11px 13px;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:9px;background:#eaf6f5;border:1px solid #cce7e5;border-radius:13px;color:#075667}
+.ipa-admin-integrated .ipa64-day-target b{display:block;font-size:13px}
+.ipa-admin-integrated .ipa64-day-target small{display:block;font-size:11px;color:#617b7e;margin-top:4px}
+.ipa-admin-integrated .ipa64-day-target button{border:1px solid #aed8d5;background:white;color:#075667;border-radius:10px;padding:9px 12px;min-height:37px;font-weight:750;cursor:pointer}
+.ipa-admin-integrated .ipa64-place-list{display:grid!important;gap:12px!important;padding:0!important;margin-top:12px!important}
+.ipa-admin-integrated .ipa64-place-list .ipa64-stop-card{display:grid!important;grid-template-columns:33px minmax(0,1fr)!important;gap:10px!important;align-items:start!important;padding:14px!important;border:1px solid #e2eceb!important;border-left:4px solid #0d8994!important;border-radius:16px!important;background:#fff!important;box-shadow:0 4px 12px rgba(9,65,70,.045)}
+.ipa-admin-integrated .ipa64-stop-card .ipa64-stop-number{grid-column:1!important;grid-row:1!important;background:#f59b3e!important;color:#fff!important;font-size:13px!important;font-weight:800!important;width:30px!important;height:30px!important;display:grid!important;place-items:center!important;border-radius:50%!important}
+.ipa-admin-integrated .ipa64-stop-card .ipa64-stop-info{grid-column:2!important;grid-row:1!important;min-width:0!important;overflow-wrap:anywhere!important}
+.ipa-admin-integrated .ipa64-stop-card .ipa64-stop-info b{font-size:15px!important;line-height:1.3!important;color:#073d49!important}
+.ipa-admin-integrated .ipa64-stop-card .ipa64-stop-info small,.ipa-admin-integrated .ipa64-stop-card .ipa64-stop-info em{font-size:12px!important;line-height:1.4!important}
+.ipa-admin-integrated .ipa64-stop-card .ipa64-stop-actions{grid-column:1 / -1!important;grid-row:2!important;display:flex!important;flex-direction:row!important;flex-wrap:wrap!important;gap:7px!important;align-items:stretch!important;border-top:1px solid #e6eeee;padding-top:11px;margin:0!important;justify-content:flex-start!important;width:100%!important}
+.ipa-admin-integrated .ipa64-stop-card .ipa64-stop-actions button.admin-place-map{grid-column:auto!important;justify-self:auto!important;min-width:0!important;width:auto!important;min-height:37px!important;margin:0!important;padding:8px 11px!important;white-space:normal!important;border-radius:10px!important}
+.ipa-admin-integrated .ipa64-stop-card .ipa64-stop-actions button[data-direction]{min-width:39px!important;font-weight:800!important}
+.ipa64-planner-goals{padding:14px;background:#f0f8f7;border:1px solid #d5e9e7;border-radius:16px;margin:14px 0}
+.ipa64-planner-goals h3{margin:0 0 6px;color:#075667;font-size:17px}
+.ipa64-planner-goals p{font-size:12px;margin:0 0 13px;color:#617b7e}
+.ipa64-goals-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(105px,1fr));gap:10px;max-height:260px;overflow:auto}
+.ipa64-goals-grid label{font-size:12px;font-weight:750;color:#075667}
+.ipa64-goals-grid select{display:block;width:100%;margin-top:6px;padding:9px 5px;border:1px solid #cee2e1;background:#fff;border-radius:9px;font-size:12px}
+@media(max-width:520px){.ipa-admin-integrated .ipa64-trip-card{padding:13px!important}.ipa-admin-integrated .ipa64-day-target button{width:100%}.ipa-admin-integrated .ipa64-stop-card .ipa64-stop-actions{justify-content:stretch!important}.ipa-admin-integrated .ipa64-stop-card .ipa64-stop-actions button.admin-place-map{flex:1 0 auto!important}}
+
+
+/* Beta 6.30.65 — limpeza visual do editor de paradas no celular */
+.ipa-admin-integrated .ipa64-place-list .ipa65-stop-card {
+  display:grid!important;grid-template-columns:34px minmax(0,1fr)!important;
+  grid-template-rows:auto auto!important; align-items:start!important;
+  column-gap:10px!important;row-gap:12px!important;
+  padding:14px!important; margin:0!important; overflow:hidden!important;
+  min-width:0!important; border:1px solid #dcebe9!important;
+  border-left:4px solid #12868c!important;border-radius:17px!important;
+  box-shadow:0 3px 12px rgba(3,63,73,.05)!important;
+}
+.ipa-admin-integrated .ipa65-stop-card .ipa64-stop-number {
+  grid-area:1 / 1 / 2 / 2!important; margin-top:1px!important;
+}
+.ipa-admin-integrated .ipa65-stop-card .ipa64-stop-info {
+  grid-area:1 / 2 / 2 / 3!important; min-width:0!important;
+  overflow-wrap:anywhere!important;
+}
+.ipa-admin-integrated .ipa65-stop-card .ipa65-stop-actions {
+  grid-area:2 / 1 / 3 / 3!important;
+  display:grid!important; grid-template-columns:repeat(4,minmax(0,1fr))!important;
+  grid-auto-flow:row!important; grid-auto-rows:minmax(40px,auto)!important;
+  align-items:stretch!important; justify-content:stretch!important;
+  flex:none!important;gap:8px!important;width:100%!important;min-width:0!important;
+  padding:12px 0 0!important;margin:0!important;
+  border-top:1px solid #e4efed!important; overflow:visible!important;
+}
+.ipa-admin-integrated .ipa65-stop-card .ipa65-stop-actions>button.admin-place-map {
+  position:static!important;transform:none!important;float:none!important;
+  display:flex!important;grid-column:auto!important;grid-row:auto!important;
+  align-items:center!important;justify-content:center!important;
+  box-sizing:border-box!important;min-width:0!important;max-width:100%!important;
+  width:100%!important;min-height:40px!important;height:auto!important;
+  padding:8px 5px!important;margin:0!important;flex:none!important;
+  font-size:12px!important;line-height:1.25!important;white-space:normal!important;
+  text-align:center!important;overflow-wrap:normal!important;
+  border-radius:11px!important;box-shadow:none!important;
+}
+.ipa-admin-integrated .ipa65-stop-card .ipa65-stop-actions>.ipa65-map,
+.ipa-admin-integrated .ipa65-stop-card .ipa65-stop-actions>.ipa65-transport {
+  grid-column:span 2!important; font-weight:750!important;
+  background:#e8f5f3!important;color:#075667!important;
+}
+.ipa-admin-integrated .ipa65-stop-card .ipa65-stop-actions>.ipa65-move {
+  font-size:17px!important;font-weight:850!important;
+}
+.ipa-admin-integrated .ipa65-stop-card .ipa65-stop-actions>.ipa65-delete {
+  color:#a43e3a!important;background:#fff7f6!important;border-color:#efd5d2!important;
+}
+.ipa-admin-integrated .ipa65-stop-card .ipa65-stop-actions>button:disabled {
+  opacity:.35!important;cursor:not-allowed!important;
+}
+@media(min-width:760px){
+ .ipa-admin-integrated .ipa65-stop-card .ipa65-stop-actions {grid-template-columns:repeat(8,minmax(0,1fr))!important}
+ .ipa-admin-integrated .ipa65-stop-card .ipa65-stop-actions>.ipa65-map,
+ .ipa-admin-integrated .ipa65-stop-card .ipa65-stop-actions>.ipa65-transport {grid-column:span 2!important}
+}
+
+/* 6.30.66 — Viajar Juntos sem painel duplicado e exclusão administrativa */
+.ipa-travel-together-new[hidden]{display:none!important}
+.ipa-together-add-toggle{margin:10px 0 4px}
+.ipa-client-delete-account{border-color:#efd5d1!important;color:#a23b31!important}
+@media(max-width:680px){.ipa-travel-together-item{display:block!important}.ipa-travel-together-item>div{min-width:0;width:100%}.ipa-together-stages{grid-template-columns:minmax(0,1fr)!important}.ipa-together-check{min-width:0;justify-content:flex-start}.ipa-together-actions{display:grid;grid-template-columns:1fr;gap:8px}.ipa-together-actions .btn{width:100%}.ipa-travel-together-new{display:grid;grid-template-columns:1fr!important}}

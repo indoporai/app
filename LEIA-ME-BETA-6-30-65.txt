@@ -1,0 +1,1 @@
+Beta 6.30.65 — correção visual ADM: botões das paradas em grade fixa, sem sobreposição no mobile. Nenhuma alteração na lógica de roteiro, pagamentos, Firebase, Mochilito ou Viajar Juntos. Publicar os arquivos do ZIP completo e testar editor no celular.

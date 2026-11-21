@@ -1,0 +1,7 @@
+Indo por Aí 6.30.66 — Correção Viajar Juntos e exclusão de clientes
+- Evita seleção duplicada: o formulário de novo participante fica recolhido quando já há vínculos.
+- Mantém possibilidade de vincular outro cliente em botão próprio.
+- Em ADM > Clientes, agora há ações distintas Excluir viagem e Excluir cliente.
+- Excluir cliente somente se não houver registros vinculados e sem vínculo de autenticação registrado; confirma com EXCLUIR e verifica no Firestore.
+- Não remove contas do Firebase Authentication automaticamente e não exclui documentos, pagamentos ou memórias associados.
+- Viajar Juntos permanece condicionado à configuração segura do Firebase, conforme guia existente.
