@@ -1,0 +1,5 @@
+Beta 6.30.67 — Reestruturação isolada dos cards do ADM.
+- Viagens: bandeiras em chips, cards compactos e botões sem espaçamentos exagerados.
+- Roteiro: textos horizontais, ações organizadas em duas linhas e proteção mobile contra sobreposição.
+- Mantidos data-admin-trip, exclusão, criação inteligente, edição, reordenação, mapas e deslocamento.
+- Não altera Firebase nem motor de recomendação.

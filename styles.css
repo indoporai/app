@@ -1937,3 +1937,38 @@ body.hidden-nav .bottom-nav{display:none!important;}
 .ipa-together-add-toggle{margin:10px 0 4px}
 .ipa-client-delete-account{border-color:#efd5d1!important;color:#a23b31!important}
 @media(max-width:680px){.ipa-travel-together-item{display:block!important}.ipa-travel-together-item>div{min-width:0;width:100%}.ipa-together-stages{grid-template-columns:minmax(0,1fr)!important}.ipa-together-check{min-width:0;justify-content:flex-start}.ipa-together-actions{display:grid;grid-template-columns:1fr;gap:8px}.ipa-together-actions .btn{width:100%}.ipa-travel-together-new{display:grid;grid-template-columns:1fr!important}}
+
+
+/* 6.30.67: isolated card components; no legacy grid selectors apply to these structures */
+.ipa-admin-integrated .ipa67-trip-list{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;width:100%;min-width:0}
+.ipa-admin-integrated .ipa67-trip-card{display:block;box-sizing:border-box;min-width:0;width:100%;padding:16px;border:1px solid #d8e9e7;border-radius:20px;background:#fff;box-shadow:0 8px 22px rgba(3,60,70,.055);margin:0}
+.ipa-admin-integrated .ipa67-trip-open{display:grid;grid-template-columns:minmax(0,1fr) 18px;grid-template-areas:'flags flags' 'info chevron';gap:10px 8px;width:100%;min-width:0;padding:0;border:0;background:transparent;color:#073d49;text-align:left;cursor:pointer;align-items:center}
+.ipa-admin-integrated .ipa67-trip-flags{grid-area:flags;display:flex;align-items:center;flex-wrap:wrap;gap:6px;min-width:0;max-width:100%;line-height:1.2}
+.ipa-admin-integrated .ipa67-flag-chip{display:inline-flex;gap:5px;align-items:center;white-space:nowrap;flex:0 0 auto;padding:5px 8px;border-radius:999px;background:#edf7f5;border:1px solid #e0eeee;color:#075667;font-size:12px}
+.ipa-admin-integrated .ipa67-flag-chip>span{font-size:19px;line-height:1.1}
+.ipa-admin-integrated .ipa67-flag-chip>b{font-size:11px;font-weight:750}
+.ipa-admin-integrated .ipa67-trip-info{grid-area:info;min-width:0;display:block;overflow-wrap:break-word;word-break:normal;writing-mode:horizontal-tb}
+.ipa-admin-integrated .ipa67-trip-info>b{display:block;font-size:17px;line-height:1.3;color:#083b48;white-space:normal;overflow-wrap:break-word}
+.ipa-admin-integrated .ipa67-trip-info>small{display:block;font-size:12px;color:#758588;margin-top:3px;white-space:normal}
+.ipa-admin-integrated .ipa67-trip-chevron{grid-area:chevron;align-self:center;justify-self:end;font-size:23px}
+.ipa-admin-integrated .ipa67-trip-meta{display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin-top:10px}
+.ipa-admin-integrated .ipa67-trip-meta em,.ipa-admin-integrated .ipa67-trip-meta i{font-style:normal;font-size:11px;padding:5px 9px;background:#edf7f5;color:#075667;border-radius:999px}
+.ipa-admin-integrated .ipa67-trip-meta small{font-size:11px;color:#7b8c8e}
+.ipa-admin-integrated .ipa67-trip-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:15px;padding-top:13px;border-top:1px solid #e2eeec;min-width:0}
+.ipa-admin-integrated .ipa67-trip-actions button{display:flex;align-items:center;justify-content:center;min-width:0;min-height:44px;padding:9px 8px!important;border-radius:12px!important;white-space:normal!important;font-size:13px!important;font-weight:800;color:#075667;background:#e8f5f3;border:1px solid #d4e9e5}
+.ipa-admin-integrated .ipa67-trip-actions .ipa67-trip-delete{color:#a23b35!important;border-color:#f0c9c6!important;background:#fff9f8!important}
+.ipa-admin-integrated .ipa67-place-list{display:grid!important;grid-template-columns:minmax(0,1fr)!important;gap:12px!important;width:100%!important;min-width:0!important;padding:0!important;margin-top:12px!important;box-sizing:border-box}
+.ipa-admin-integrated .ipa67-place-list>.ipa67-stop-card{display:grid!important;grid-template-columns:minmax(0,1fr)!important;grid-template-rows:auto auto auto!important;gap:11px!important;box-sizing:border-box!important;min-width:0!important;max-width:100%!important;width:100%!important;padding:15px!important;margin:0!important;background:#fff!important;border:1px solid #dae9e7!important;border-radius:18px!important;box-shadow:0 6px 15px rgba(5,63,75,.05)!important;overflow:visible!important}
+.ipa-admin-integrated .ipa67-stop-head{display:grid;grid-template-columns:30px minmax(0,1fr);gap:10px;align-items:start;min-width:0}
+.ipa-admin-integrated .ipa67-stop-number{display:grid;place-items:center;background:#f5a044;color:white;border-radius:50%;height:30px;width:30px;font-weight:800;font-size:14px}
+.ipa-admin-integrated .ipa67-stop-info{min-width:0;width:100%;overflow-wrap:break-word;word-break:normal;writing-mode:horizontal-tb}
+.ipa-admin-integrated .ipa67-stop-info b{display:block;color:#073d49;font-size:15px;line-height:1.3;overflow-wrap:break-word}
+.ipa-admin-integrated .ipa67-stop-info small{display:block;font-size:12px;color:#79878a;line-height:1.4;margin-top:3px}
+.ipa-admin-integrated .ipa67-stop-info em{display:block;color:#07828b;font-size:12px;line-height:1.4;margin-top:6px;overflow-wrap:break-word}
+.ipa-admin-integrated .ipa67-stop-travel{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;min-width:0}
+.ipa-admin-integrated .ipa67-stop-actions{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px;min-width:0;border-top:1px solid #e4eeed;padding-top:11px}
+.ipa-admin-integrated .ipa67-action{display:flex!important;align-items:center;justify-content:center;gap:4px;min-width:0!important;width:100%!important;max-width:100%!important;min-height:42px;box-sizing:border-box!important;padding:8px 4px!important;border:1px solid #cfe6e3!important;border-radius:11px!important;background:#ecf8f6!important;color:#075667!important;font-weight:650;font-size:12px!important;line-height:1.2!important;text-align:center!important;white-space:normal!important;word-break:normal!important;overflow-wrap:normal!important;writing-mode:horizontal-tb!important;position:static!important;float:none!important;margin:0!important;transform:none!important}
+.ipa-admin-integrated .ipa67-action:disabled{opacity:.35;cursor:not-allowed}
+.ipa-admin-integrated .ipa67-delete{border-color:#f0d0cc!important;background:#fff8f7!important;color:#a23b35!important}
+.ipa-admin-integrated .ipa67-travel-button{font-size:13px!important}
+@media(max-width:390px){.ipa-admin-integrated .ipa67-trip-card{padding:12px}.ipa-admin-integrated .ipa67-stop-actions{gap:5px}.ipa-admin-integrated .ipa67-stop-actions .ipa67-action{font-size:11px!important;padding:7px 2px!important}.ipa-admin-integrated .ipa67-stop-card{padding:12px!important}}

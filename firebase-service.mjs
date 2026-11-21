@@ -1,0 +1,1121 @@
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-app.js";
+import {
+  getAuth,
+  signInWithEmailAndPassword,
+  signOut,
+  onAuthStateChanged,
+  setPersistence,
+  browserLocalPersistence,
+  isSignInWithEmailLink,
+  signInWithEmailLink,
+  updatePassword,
+  sendPasswordResetEmail
+} from "https://www.gstatic.com/firebasejs/12.17.1/firebase-auth.js";
+import {
+  getFirestore,
+  collection,
+  getDocs,
+  doc,
+  getDoc,
+  getDocFromServer,
+  setDoc,
+  deleteDoc,
+  serverTimestamp,
+  query,
+  where,
+  limit,
+  addDoc,
+  orderBy,
+  onSnapshot,
+  updateDoc,
+  runTransaction,
+  arrayUnion
+} from "https://www.gstatic.com/firebasejs/12.17.1/firebase-firestore.js";
+import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-storage.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyD_EYtJ3h_WDvga2eV8LKEiCpDaT8gSEiM",
+  authDomain: "indo-por-ai-app.firebaseapp.com",
+  projectId: "indo-por-ai-app",
+  storageBucket: "indo-por-ai-app.firebasestorage.app",
+  messagingSenderId: "140345034738",
+  appId: "1:140345034738:web:6b0dc70f830f56d45ecd6b",
+  measurementId: "G-MDCQ5H74KT"
+};
+
+const ADMIN_UID = "5dlGX6JlrUQHyjFWSHB9Dye0r1E3";
+
+const firebaseApp = initializeApp(firebaseConfig);
+const auth = getAuth(firebaseApp);
+const firestore = getFirestore(firebaseApp);
+const storage = getStorage(firebaseApp);
+
+await setPersistence(auth, browserLocalPersistence);
+
+let currentUser = null;
+let status = "connecting";
+let lastError = "";
+let syncing = false;
+let initialized = false;
+let syncTimer = null;
+
+function notify(name="ipa-firebase-state"){
+  window.dispatchEvent(new CustomEvent(name,{detail:{user:currentUser,status,error:lastError}}));
+}
+
+async function readCollection(name){
+  const snap = await getDocs(collection(firestore,name));
+  return snap.docs.map(d=>({id:d.id,...d.data()}));
+}
+
+// Beta 6.28.1: ambiente persistente. Nenhum reset automático de dados.
+async function remoteHasData(){
+  const snap = await getDocs(collection(firestore,"clients"));
+  return !snap.empty;
+}
+
+async function pullAll(){
+  const [clients,trips,payments,benefits,itineraryTemplates,paymentPlans,recommendations,tripDocuments,memories,conciergeRequests,placeCatalog,travelLeads] = await Promise.all([
+    readCollection("clients"),
+    readCollection("trips"),
+    readCollection("payments"),
+    readCollection("benefits"),
+    readCollection("itineraryTemplates"),
+    readCollection("paymentPlans"),
+    readCollection("recommendations"),
+    readCollection("tripDocuments"),
+    readCollection("memories"),
+    readCollection("conciergeRequests"),
+    readCollection("placeCatalog"),
+    readCollection("travelLeads")
+  ]);
+
+  const settingsSnap = await getDoc(doc(firestore,"settings","main"));
+  const settings = settingsSnap.exists() ? settingsSnap.data() : {};
+
+  const cloudData = {
+    ...settings,
+    clients,
+    trips,
+    payments,
+    benefits,
+    itineraryTemplates,
+    paymentPlans,
+    recommendations,
+    tripDocuments,
+    memories,
+    conciergeRequests,
+    placeCatalog,
+    hotelCatalog:Array.isArray(settings.hotelCatalog)?settings.hotelCatalog:[],
+    experiences:Array.isArray(settings.experiences)?settings.experiences:[],
+    travelLeads
+  };
+
+  if(window.IPAData?.replaceFromCloud){
+    window.IPAData.replaceFromCloud(cloudData);
+  }
+  return cloudData;
+}
+
+async function upsertCollection(name,items){
+  for(const item of (items||[])){
+    if(!item?.id) continue;
+    await setDoc(doc(firestore,name,item.id),{
+      ...item,
+      updatedAt: serverTimestamp()
+    },{merge:true});
+  }
+}
+
+async function upsertPaymentsPreservingApproved(items){
+  for(const payment of (items||[])){
+    if(!payment?.id)continue;
+    const ref=doc(firestore,'payments',String(payment.id));
+    const remote=await runTransaction(firestore,async transaction=>{
+      const snap=await transaction.get(ref);
+      const previous=snap.exists()?snap.data():null;
+      const approved=previous?.status==='Pago'&&previous?.mpStatus==='approved'&&previous?.mpPaymentId;
+      const guarded=approved?{
+        ...payment,status:'Pago',paidAt:previous.paidAt,mpPaymentId:previous.mpPaymentId,
+        mpStatus:'approved',mpStatusDetail:previous.mpStatusDetail||'',
+        paymentEnvironment:previous.paymentEnvironment||'production',reconciledAt:previous.reconciledAt||''
+      }:payment;
+      transaction.set(ref,{...guarded,updatedAt:serverTimestamp()},{merge:true});
+      return approved?previous:null;
+    });
+    if(remote&&window.IPAData?.updatePayment){
+      window.IPAData.updatePayment(payment.id,{status:'Pago',paidAt:remote.paidAt,mpPaymentId:remote.mpPaymentId,mpStatus:'approved',paymentEnvironment:remote.paymentEnvironment||'production'});
+    }
+  }
+}
+
+async function syncAll(data){
+  if(!currentUser || currentUser.uid!==ADMIN_UID || syncing || !data) return;
+  syncing = true;
+  try{
+    await Promise.all([
+      upsertCollection("clients",data.clients),
+      upsertCollection("trips",data.trips),
+      upsertPaymentsPreservingApproved(data.payments),
+      upsertCollection("benefits",data.benefits),
+      upsertCollection("itineraryTemplates",data.itineraryTemplates),
+      upsertCollection("paymentPlans",data.paymentPlans),
+      upsertCollection("recommendations",data.recommendations),
+      upsertCollection("tripDocuments",data.tripDocuments),
+      upsertCollection("memories",data.memories),
+      upsertCollection("placeCatalog",data.placeCatalog),
+      upsertCollection("travelLeads",data.travelLeads)
+    ]);
+
+    await setDoc(doc(firestore,"settings","main"),{
+      client:data.client||{},
+      plans:data.plans||{},
+      exchange:data.exchange||{},
+      prep:data.prep||{},
+      visitReviews:data.visitReviews||{},
+      ratings:data.ratings||{},
+      hotelCatalog:Array.isArray(data.hotelCatalog)?data.hotelCatalog:[],
+      experiences:Array.isArray(data.experiences)?data.experiences:[],
+      instagramFollowers:Number.isFinite(Number(data.instagramFollowers))?Number(data.instagramFollowers):26000,
+      updatedAt:serverTimestamp()
+    },{merge:true});
+
+    await setDoc(doc(firestore,"users",currentUser.uid),{
+      uid:currentUser.uid,
+      email:currentUser.email||"",
+      role:"admin",
+      updatedAt:serverTimestamp()
+    },{merge:true});
+
+    status="connected";
+    lastError="";
+    notify("ipa-firebase-synced");
+  }catch(err){
+    console.error("Firebase sync error",err);
+    status="error";
+    lastError=err?.message||String(err);
+    notify();
+  }finally{
+    syncing=false;
+  }
+}
+
+function scheduleSync(data){
+  clearTimeout(syncTimer);
+  syncTimer=setTimeout(()=>syncAll(data),500);
+}
+
+window.addEventListener("ipa-data-updated",event=>{
+  if(event.detail?.source==="cloud") return;
+  if(currentUser?.uid===ADMIN_UID){
+    scheduleSync(event.detail?.data);
+  }
+});
+
+
+
+
+function parseInviteFromUrl(rawUrl){
+  let clientId="",tripId="";
+  const visited=new Set();
+
+  function scan(urlText,depth=0){
+    if(!urlText || depth>4 || visited.has(urlText)) return;
+    visited.add(urlText);
+    let u;
+    try{ u=new URL(urlText,window.location.origin); }catch{return;}
+
+    clientId=clientId||u.searchParams.get("clientId")||"";
+    tripId=tripId||u.searchParams.get("tripId")||"";
+    const payload=u.searchParams.get("ipaInvite")||"";
+    if(payload && (!clientId||!tripId)){
+      try{
+        const obj=JSON.parse(decodeURIComponent(escape(atob(payload))));
+        clientId=clientId||obj.clientId||"";
+        tripId=tripId||obj.tripId||"";
+      }catch(e){}
+    }
+
+    // O Firebase/Google pode encapsular a URL original em vários parâmetros.
+    for(const key of ["continueUrl","continue_url","link","url","redirectUrl","redirect_url"]){
+      const nested=u.searchParams.get(key);
+      if(!nested)continue;
+      let decoded=nested;
+      for(let i=0;i<3;i++){
+        try{
+          const next=decodeURIComponent(decoded);
+          if(next===decoded)break;
+          decoded=next;
+        }catch{break;}
+      }
+      scan(decoded,depth+1);
+    }
+  }
+
+  scan(rawUrl);
+  return {clientId,tripId};
+}
+
+const BOOT_INVITE_CONTEXT=parseInviteFromUrl(window.location.href);
+
+function readInviteContext(){
+  const live=parseInviteFromUrl(window.location.href);
+  const clientId=
+    live.clientId
+    ||BOOT_INVITE_CONTEXT.clientId
+    ||localStorage.getItem("ipa-client-id-for-signin")
+    ||"";
+  const tripId=
+    live.tripId
+    ||BOOT_INVITE_CONTEXT.tripId
+    ||localStorage.getItem("ipa-trip-id-for-signin")
+    ||"";
+
+  if(clientId)localStorage.setItem("ipa-client-id-for-signin",clientId);
+  if(tripId)localStorage.setItem("ipa-trip-id-for-signin",tripId);
+
+  return {clientId,tripId};
+}
+
+async function loadClientExperience(){
+  if(!currentUser || currentUser.uid===ADMIN_UID) return null;
+
+  status="syncing";
+  lastError="";
+  const normalizedEmail=(currentUser.email||"").trim().toLowerCase();
+  const inviteContext=readInviteContext();
+
+  let clientDoc=null;
+
+  // 1. ID do convite (mais determinístico)
+  if(inviteContext.clientId){
+    try{
+      const snap=await getDoc(doc(firestore,"clients",inviteContext.clientId));
+      if(snap.exists())clientDoc=snap;
+    }catch(e){
+      console.warn("Falha ao ler clientId do convite",e);
+    }
+  }
+
+  // 2. Cliente já vinculado ao UID em acesso anterior
+  if(!clientDoc){
+    try{
+      const snap=await getDocs(
+        query(collection(firestore,"clients"),where("authUid","==",currentUser.uid),limit(1))
+      );
+      if(!snap.empty)clientDoc=snap.docs[0];
+    }catch(e){
+      console.warn("Busca por authUid indisponível",e);
+    }
+  }
+
+  // 3. Primeiro acesso: e-mail
+  if(!clientDoc){
+    try{
+      const snap=await getDocs(
+        query(collection(firestore,"clients"),where("email","==",normalizedEmail),limit(1))
+      );
+      if(!snap.empty)clientDoc=snap.docs[0];
+    }catch(e){
+      console.warn("Busca por e-mail falhou",e);
+    }
+  }
+
+  if(!clientDoc){
+    status="client-no-profile";
+    lastError=`Acesso autenticado como ${normalizedEmail}, mas nenhum cadastro de cliente foi encontrado.`;
+    notify("ipa-client-experience-ready");
+    return null;
+  }
+
+  const client={id:clientDoc.id,...clientDoc.data()};
+  const clientEmail=String(client.email||"").trim().toLowerCase();
+
+  if(clientEmail!==normalizedEmail && client.authUid!==currentUser.uid){
+    status="client-no-profile";
+    lastError="O e-mail autenticado não corresponde ao cliente deste convite.";
+    notify("ipa-client-experience-ready");
+    return null;
+  }
+
+  // Vincula UID no primeiro acesso.
+  if(!client.authUid){
+    try{
+      await setDoc(doc(firestore,"clients",client.id),{
+        authUid:currentUser.uid,
+        firstAccessAt:serverTimestamp()
+      },{merge:true});
+      client.authUid=currentUser.uid;
+    }catch(e){
+      console.warn("Não foi possível registrar authUid",e);
+    }
+  }
+
+  let chosenTrip=null;
+
+  // A viagem enviada no e-mail é a primeira escolha e NÃO depende de activeTripId.
+  if(inviteContext.tripId){
+    try{
+      const snap=await getDoc(doc(firestore,"trips",inviteContext.tripId));
+      if(snap.exists()){
+        const trip={id:snap.id,...snap.data()};
+        if(trip.clientId===client.id && trip.published===true){
+          chosenTrip=trip;
+        }else{
+          console.warn("tripId do convite não pertence ao cliente ou não está publicado",trip);
+        }
+      }
+    }catch(e){
+      console.warn("Não foi possível abrir tripId do convite",e);
+    }
+  }
+
+  // Se o link trouxer um tripId antigo/inválido, não deixa o cliente em uma tela vazia.
+  // A fonte de verdade passa a ser também a viagem ativa vinculada ao cadastro do cliente.
+  // Isso é importante quando o acesso foi aprovado antes da viagem final ser criada/publicada.
+  if(!chosenTrip){
+    const fallbackId=client.activeTripId||client.lastInvitedTripId||"";
+    if(fallbackId){
+      try{
+        const snap=await getDoc(doc(firestore,"trips",fallbackId));
+        if(snap.exists()){
+          const trip={id:snap.id,...snap.data()};
+          if(trip.clientId===client.id && trip.published===true)chosenTrip=trip;
+        }
+      }catch(e){
+        console.warn("Falha no fallback de viagem",e);
+      }
+    }
+  }
+
+  // Sempre carregamos TODAS as viagens publicadas deste cliente.
+  // Um convite aponta a viagem inicial, mas não restringe o login a ela.
+  let trips=[];
+  try{
+    const snap=await getDocs(query(collection(firestore,"trips"),where("clientId","==",client.id)));
+    trips=snap.docs.map(d=>({id:d.id,...d.data()})).filter(t=>t.published===true);
+    const today=new Date().toISOString().slice(0,10);
+    trips.sort((a,b)=>{
+      const aa=String(a.startDate||"9999-12-31"),bb=String(b.startDate||"9999-12-31");
+      const af=aa>=today,bf=bb>=today;
+      return af!==bf?(af?-1:1):(af?aa.localeCompare(bb):bb.localeCompare(aa));
+    });
+  }catch(e){
+    console.warn("Não foi possível listar todas as viagens",e);
+    // Conserva a experiência de uma viagem caso a consulta falhe.
+    
+  }
+  // A listagem pode falhar por rede/índice. Nunca descartar uma viagem
+  // publicada que já foi validada por leitura direta de documento.
+  if(chosenTrip && !trips.some(t=>t.id===chosenTrip.id))trips.unshift(chosenTrip);
+  const lastSelected=localStorage.getItem("ipa-active-trip-id");
+  chosenTrip=trips.find(t=>t.id===lastSelected)
+    ||trips.find(t=>t.id===chosenTrip?.id)
+    ||trips[0]||null;
+
+  if(!chosenTrip){
+    status="client-no-trip";
+    lastError=`Cliente encontrado (${client.name||client.id}), mas nenhuma viagem publicada pôde ser aberta. Convite: ${inviteContext.tripId||"sem tripId"}.`;
+    notify("ipa-client-experience-ready");
+    return null;
+  }
+
+  let payments=[];
+  try{
+    const snap=await getDocs(
+      query(collection(firestore,"payments"),where("clientId","==",client.id))
+    );
+    payments=snap.docs.map(d=>({id:d.id,...d.data()}));
+  }catch(e){console.warn("Pagamentos indisponíveis",e);}
+
+  let benefits=[];
+  try{benefits=await readCollection("benefits");}
+  catch(e){console.warn("Benefícios indisponíveis",e);}
+
+  let memories=[],tripDocuments=[],recommendations=[];
+  window.ipaMemoryCloudLoadError = false;
+  try{
+    // As regras publicadas concedem leitura pela propriedade clientId.
+    // O Firestore nao filtra documentos pelas regras: a consulta deve
+    // restringir clientId ANTES de receber os resultados.
+    const s=await getDocs(query(collection(firestore,"memories"),where("clientId","==",client.id)));
+    memories=s.docs.map(d=>({id:d.id,...d.data()})).filter(x=>trips.some(t=>String(t.id)===String(x.tripId)));
+  }catch(e){
+    window.ipaMemoryCloudLoadError=true;
+    console.warn("Não foi possível carregar as memórias da nuvem",e);
+  }
+  try{const s=await getDocs(query(collection(firestore,"tripDocuments"),where("clientId","==",client.id)));tripDocuments=s.docs.map(d=>({id:d.id,...d.data()})).filter(x=>trips.some(t=>t.id===x.tripId))}catch(e){}
+  for(const trip of trips){
+    try{const s=await getDocs(query(collection(firestore,"recommendations"),where("tripId","==",trip.id)));
+      recommendations.push(...s.docs.map(d=>({id:d.id,...d.data()})));
+    }catch(e){console.warn("Recomendações indisponíveis para a viagem",trip.id,e)}
+  }
+
+  const cloudData={
+    activeClientId:client.id,
+    activeTripId:chosenTrip.id,
+    clients:[client],
+    client:{
+      id:client.id,
+      name:client.name||"Viajante",
+      email:client.email||normalizedEmail,
+      plan:chosenTrip.plan||"Explore",
+      trip:chosenTrip.name||"Minha viagem"
+    },
+    trips,
+    payments,
+    benefits,
+    memories,
+    tripDocuments,
+    recommendations
+  };
+
+  if(window.IPAData?.replaceFromCloud)window.IPAData.replaceFromCloud(cloudData);
+
+  localStorage.setItem("ipa-active-client-id",client.id);
+  localStorage.setItem("ipa-active-trip-id",chosenTrip.id);
+  localStorage.setItem("ipa-client-id-for-signin",client.id);
+  localStorage.setItem("ipa-trip-id-for-signin",chosenTrip.id);
+
+  status="client-connected";
+  lastError="";
+  initialized=true;
+
+  // Limpa a URL somente DEPOIS de a viagem ter sido resolvida.
+  try{
+    const clean=new URL(window.location.href);
+    ["mode","oobCode","apiKey","lang","clientInvite","clientId","tripId","ipaInvite","continueUrl","continue_url"]
+      .forEach(k=>clean.searchParams.delete(k));
+    history.replaceState({},document.title,clean.pathname+(clean.searchParams.toString()?("?"+clean.searchParams.toString()):""));
+  }catch(e){}
+
+  // O registro remoto é não bloqueante e não impede o viajante de usar o app.
+  void ipaTrackClientSession(client.id);
+  notify("ipa-client-experience-ready");
+  return cloudData;
+}
+
+// Uma sessão por aba autenticada. Recarregar/trocar de tela não gera outro acesso.
+async function ipaTrackClientSession(clientId){
+  if(!currentUser||currentUser.uid===ADMIN_UID||!clientId)return;
+  try{
+    const key='ipa-client-session-v1';
+    let sessionId=sessionStorage.getItem(key);
+    if(!sessionId){sessionId=crypto.randomUUID();sessionStorage.setItem(key,sessionId)}
+    const token=await currentUser.getIdToken();
+    const r=await fetch('/api/client/access',{method:'POST',headers:{authorization:'Bearer '+token,'content-type':'application/json'},body:JSON.stringify({clientId,sessionId}),cache:'no-store'});
+    const data=await r.json().catch(()=>({}));
+    if(!r.ok||!data.ok)console.warn('Registro de sessão indisponível:',data.error||r.status);
+  }catch(e){console.warn('Não foi possível registrar o acesso:',e?.message||e)}
+}
+
+async function bootstrapAfterLogin(){
+  status="syncing";
+  notify();
+  try{
+    // Beta 6.29.4: Firestore is the source of truth after admin login.
+    // An intentionally empty cloud database must stay empty; never repopulate
+    // it automatically from stale browser/localStorage data.
+    await pullAll();
+    initialized=true;
+    status="connected";
+    lastError="";
+    notify("ipa-firebase-ready");
+  }catch(err){
+    console.error("Firebase bootstrap error",err);
+    status="error";
+    lastError=err?.message||String(err);
+    notify();
+  }
+}
+
+onAuthStateChanged(auth,async user=>{
+  currentUser=user||null;
+  if(!user){
+    try{sessionStorage.removeItem('ipa-client-session-v1')}catch(e){}
+    status="signed-out";
+    initialized=false;
+    notify("ipa-firebase-ready");
+    return;
+  }
+
+  if(user.uid!==ADMIN_UID){
+    // No primeiro acesso pelo convite, o cliente precisa criar uma senha
+    // antes de entrar definitivamente na experiência.
+    if(isSignInWithEmailLink(auth,window.location.href) || sessionStorage.getItem("ipa-client-password-setup")==="1"){
+      status="client-password-setup";
+      lastError="";
+      notify("ipa-client-password-setup");
+      return;
+    }
+    try{
+      await loadClientExperience();
+      notify("ipa-firebase-ready");
+    }catch(err){
+      console.error("Client experience error",err);
+      status="error";
+      lastError=err?.message||String(err);
+      notify("ipa-client-experience-ready");
+    }
+    return;
+  }
+
+  await bootstrapAfterLogin();
+});
+
+function ipaIsCurrentFreeTrip(tripId){
+ const data=window.IPAData?.getAll?.();
+ return (data?.trips||[]).some(t=>String(t.id)===String(tripId)&&t.plan==='Free');
+}
+function ipaIsCurrentFreeConcierge(){
+ const data=window.IPAData?.getAll?.();return (data?.trips||[]).some(t=>t.plan==='Free'&&String(t.id)===String(data.activeTripId||''));
+}
+window.IPAFirebase = {
+  async ensureConciergeWelcome({tripId,clientId='',requesterName=''}){
+    if(!currentUser||currentUser.uid===ADMIN_UID||!tripId||ipaIsCurrentFreeTrip(tripId))return null;
+    // Existing clients keep their conversation untouched and receive no late welcome.
+    const existing=await getDocs(query(collection(firestore,'conciergeRequests'),where('requesterUid','==',currentUser.uid),limit(1)));
+    if(!existing.empty)return null;
+    // Stable per-user document id prevents duplicate welcome threads across reloads/devices.
+    const id='conc-welcome-'+currentUser.uid;
+    const ref=doc(firestore,'conciergeRequests',id);
+    const previous=await getDoc(ref);
+    if(previous.exists())return null;
+    const greeting='Opa, viajante! 🌍✈️ Mochilito na área! Por aqui a gente resolve os perrengues e deixa você só com a parte boa da viagem. Me conta, qual é a missão de hoje? 😎';
+    const when=new Date().toISOString();
+    const item={id,tripId:String(tripId),clientId:String(clientId||''),type:'Boas-vindas Mochilito',text:greeting,requesterUid:currentUser.uid,requesterEmail:currentUser.email||'',requesterName:String(requesterName||currentUser.displayName||currentUser.email?.split('@')[0]||'Viajante').slice(0,120),status:'Respondido',createdAt:when,updatedAt:when,messages:[{sender:'mochilito',text:greeting,createdAt:when}]};
+    await setDoc(ref,item);
+    return item;
+  },
+  async submitConciergeRequest(request){
+    if(!currentUser || currentUser.uid===ADMIN_UID)throw new Error('Entre com o login do viajante.');
+    if(ipaIsCurrentFreeTrip(request?.tripId))throw new Error('O Mochilito Free é demonstrativo. Conheça o Signature para conversar com a equipe.');
+    if(!request?.tripId || !String(request.text||'').trim())throw new Error('Informe a viagem e os detalhes do pedido.');
+    const item={id:'conc-'+currentUser.uid+'-'+Date.now(),tripId:String(request.tripId),clientId:String(request.clientId||''),type:String(request.type||'Outro').slice(0,80),text:String(request.text).trim().slice(0,3000),requesterUid:currentUser.uid,requesterEmail:currentUser.email||'',requesterName:String(request.requesterName||currentUser.displayName||currentUser.email?.split('@')[0]||'Viajante').slice(0,120),status:'Enviado',createdAt:new Date().toISOString(),messages:[{sender:'client',text:String(request.text).trim().slice(0,3000),createdAt:new Date().toISOString()}]};
+    await setDoc(doc(firestore,'conciergeRequests',item.id),item);
+    return item;
+  },
+  listenAdminConciergeRequests(onChange,onError){
+    if(!currentUser || currentUser.uid!==ADMIN_UID)return ()=>{};
+    return onSnapshot(collection(firestore,'conciergeRequests'),snap=>{
+      onChange?.(snap.docs.map(d=>({id:d.id,...d.data()})));
+    },err=>onError?.(err));
+  },
+  async getConciergeRequests(){
+    if(!currentUser || currentUser.uid!==ADMIN_UID)throw new Error('Somente o ADM pode consultar pedidos.');
+    return readCollection('conciergeRequests');
+  },
+  async deleteConciergeRequest(id){
+    if(!currentUser || currentUser.uid!==ADMIN_UID)throw new Error('Somente o ADM pode excluir atendimentos.');
+    const ref=doc(firestore,'conciergeRequests',String(id));
+    await deleteDoc(ref);
+    const check=await getDoc(ref);
+    if(check.exists())throw new Error('O atendimento ainda consta no Firebase.');
+  },
+  async updateConciergeRequest(id,fields){
+    if(!currentUser || currentUser.uid!==ADMIN_UID)throw new Error('Somente o ADM pode atualizar pedidos.');
+    await setDoc(doc(firestore,'conciergeRequests',id),{status:fields.status||'Em análise',adminReply:String(fields.adminReply||'').slice(0,3000),answeredAt:new Date().toISOString()},{merge:true});
+  },
+  listenConciergeRequest(id,onChange,onError){
+    if(!currentUser||!id)return ()=>{};
+    return onSnapshot(doc(firestore,'conciergeRequests',String(id)),snap=>onChange?.(snap.exists()?{id:snap.id,...snap.data()}:null),err=>onError?.(err));
+  },
+  async getMyConciergeRequests(tripId){
+    if(!currentUser||currentUser.uid===ADMIN_UID)throw new Error('Entre como viajante.');
+    const q=query(collection(firestore,'conciergeRequests'),where('requesterUid','==',currentUser.uid),limit(100));
+    const snap=await getDocs(q);
+    return snap.docs.map(d=>({id:d.id,...d.data()})).filter(r=>String(r.tripId)===String(tripId)).sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
+  },
+  async sendConciergeMessage(id,text){
+    if(!currentUser)throw new Error('Faça login.');
+    const clean=String(text||'').trim();if(!clean)throw new Error('Digite uma mensagem.');
+    const ref=doc(firestore,'conciergeRequests',String(id));
+    const snap=await getDoc(ref);if(!snap.exists())throw new Error('Atendimento não encontrado.');
+    const item=snap.data();
+    if(currentUser.uid!==ADMIN_UID && item.requesterUid!==currentUser.uid)throw new Error('Sem acesso a este atendimento.');
+    if(currentUser.uid!==ADMIN_UID&&ipaIsCurrentFreeTrip(item.tripId))throw new Error('O Mochilito Free é demonstrativo.');
+    const sender=currentUser.uid===ADMIN_UID?'admin':'client';
+    await updateDoc(ref,{messages:arrayUnion({sender,text:clean.slice(0,3000),createdAt:new Date().toISOString(),uid:currentUser.uid}),status:sender==='admin'?'Respondido':'Em análise',updatedAt:new Date().toISOString()});
+  },
+  async submitProspectRequest(lead,client){
+    if(!lead?.id || !client?.id) throw new Error("Pedido inválido.");
+    // Grava somente os dois documentos necessários. As regras do Firestore 6.28.1
+    // permitem CREATE público validado, mas leitura/alteração continuam exclusivas do ADM.
+    await setDoc(doc(firestore,"travelLeads",lead.id),{...lead,createdAt:lead.createdAt||new Date().toISOString()},{merge:false});
+    await setDoc(doc(firestore,"clients",client.id),{...client,createdAt:client.createdAt||new Date().toISOString()},{merge:false});
+    return {leadId:lead.id,clientId:client.id};
+  },
+  listenTripMessages(tripId,onChange,onError){
+    if(!tripId)return ()=>{};
+    const q=query(collection(firestore,"tripMessages"),where("tripId","==",tripId),orderBy("createdAt","asc"),limit(200));
+    return onSnapshot(q,snap=>onChange&&onChange(snap.docs.map(d=>({id:d.id,...d.data()}))),err=>{console.error("Trip messages listener",err);onError&&onError(err)});
+  },
+  async sendTripMessage({tripId,text,participantId="",participantName=""}){
+    if(!currentUser)throw new Error("Faça login para enviar mensagens.");
+    const clean=String(text||"").trim();
+    if(!tripId||!clean)throw new Error("Mensagem inválida.");
+    const ref=await addDoc(collection(firestore,"tripMessages"),{
+      tripId,text:clean.slice(0,2000),participantId,
+      participantName:participantName||currentUser.displayName||currentUser.email||"Viajante",
+      userUid:currentUser.uid,userEmail:currentUser.email||"",createdAt:serverTimestamp()
+    });
+    return ref.id;
+  },
+  async saveMemory(record){
+    if(!currentUser)throw new Error("Entre na sua conta para sincronizar a memória.");
+    if(!record?.id||!record?.tripId||!record?.clientId||!record?.url)throw new Error("Memória incompleta: viagem ou arquivo não identificado.");
+    if(!String(record.url).startsWith("https://"))throw new Error("Arquivo ainda não está salvo na nuvem.");
+    const payload={...record,ownerUid:currentUser.uid,updatedAt:new Date().toISOString()};
+    await setDoc(doc(firestore,"memories",record.id),payload);
+    const checked=await getDocFromServer(doc(firestore,"memories",record.id));
+    if(!checked.exists())throw new Error("Não foi possível confirmar a memória no Firebase.");
+    return record.id;
+  },
+  async uploadMemory(file,clientId,tripId){
+    if(!currentUser)throw new Error("Faça login para enviar a memória.");
+    const safe=(file.name||"arquivo").replace(/[^a-zA-Z0-9._-]/g,"_");
+    const path=`memories/${clientId}/${tripId}/${Date.now()}-${safe}`;
+    const snap=await uploadBytes(storageRef(storage,path),file,{contentType:file.type||"application/octet-stream"});
+    return {url:await getDownloadURL(snap.ref),path};
+  },
+  async saveInstagramFollowers(count){
+    if(!currentUser || currentUser.uid!==ADMIN_UID)throw Error('Somente o administrador pode alterar seguidores.');
+    const n=Number(count);
+    if(!Number.isInteger(n)||n<0||n>999999999)throw Error('Quantidade inválida.');
+    await setDoc(doc(firestore,'settings','main'),{instagramFollowers:n,updatedAt:serverTimestamp()},{merge:true});
+    return n;
+  },
+  async saveTripDocument(record){
+    if(!currentUser || currentUser.uid!==ADMIN_UID)throw new Error("Somente o ADM pode salvar documentos.");
+    if(!record?.id||!record.tripId||!record.clientId)throw new Error("Viagem ou cliente não identificado.");
+    await setDoc(doc(firestore,"tripDocuments",record.id),{...record,updatedAt:serverTimestamp()});
+    return record.id;
+  },
+  async uploadHotelPhoto(file,hotelId){
+    if(!currentUser || currentUser.uid!==ADMIN_UID)throw new Error("Somente o ADM pode enviar fotos de hospedagens.");
+    if(!file || !["image/jpeg","image/png","image/webp"].includes(file.type) || file.size>8*1024*1024)throw new Error("Use JPG, PNG ou WebP de até 8 MB.");
+    const safe=(file.name||"foto.jpg").replace(/[^a-zA-Z0-9._-]/g,"_");
+    const path=`hotels/${String(hotelId).replace(/[^a-zA-Z0-9_-]/g,"_")}/${Date.now()}-${safe}`;
+    const snap=await uploadBytes(storageRef(storage,path),file,{contentType:file.type});
+    return {url:await getDownloadURL(snap.ref),path};
+  },
+  async uploadExperiencePhoto(file,experienceId){
+    if(!currentUser || currentUser.uid!==ADMIN_UID)throw new Error('Somente o ADM pode enviar fotos das experiências.');
+    if(!file || !['image/jpeg','image/png','image/webp'].includes(file.type) || file.size>8*1024*1024)
+      throw new Error('Use uma foto JPG, PNG ou WebP de até 8 MB.');
+    const id=String(experienceId||'').replace(/[^a-zA-Z0-9_-]/g,'_');
+    if(!id)throw new Error('Identificação da experiência inválida.');
+    const ext=({'image/jpeg':'jpg','image/png':'png','image/webp':'webp'})[file.type];
+    const path=`experiences/${id}/${Date.now()}-${Math.random().toString(36).slice(2,9)}.${ext}`;
+    const snap=await uploadBytes(storageRef(storage,path),file,{contentType:file.type});
+    return {url:await getDownloadURL(snap.ref),path};
+  },
+  async uploadTripDocument(file,clientId,tripId){
+    if(!currentUser || currentUser.uid!==ADMIN_UID)throw new Error("Somente o ADM pode enviar documentos.");
+    const safe=(file.name||"documento").replace(/[^a-zA-Z0-9._-]/g,"_");
+    const path=`documents/${clientId}/${tripId}/${Date.now()}-${safe}`;
+    const snap=await uploadBytes(storageRef(storage,path),file,{contentType:file.type||"application/octet-stream"});
+    return {url:await getDownloadURL(snap.ref),path};
+  },
+
+  get user(){ return currentUser; },
+  get status(){ return status; },
+  get error(){ return lastError; },
+  get initialized(){ return initialized; },
+  async login(email,password){
+    status="signing-in";
+    lastError="";
+    // IMPORTANTE: não dispara notify() aqui.
+    // O notify anterior fazia o app re-renderizar o formulário no meio do login,
+    // recriando o botão "Entrando..." e causando o looping visual.
+    try{
+      const credential = await signInWithEmailAndPassword(auth,String(email||"").trim().toLowerCase(),password);
+      currentUser=credential.user;
+
+      if(currentUser.uid!==ADMIN_UID){
+        await signOut(auth);
+        currentUser=null;
+        status="unauthorized";
+        lastError="Este usuário não é o administrador autorizado.";
+        notify("ipa-firebase-ready");
+        throw new Error(lastError);
+      }
+
+      // Libera o painel imediatamente.
+      status="connected";
+      lastError="";
+      notify("ipa-admin-login-success");
+
+      // A sincronização completa continua pelo onAuthStateChanged.
+      return credential.user;
+    }catch(err){
+      if(status!=="unauthorized"){
+        currentUser=null;
+        status="signed-out";
+        lastError=err?.message||String(err);
+        notify("ipa-admin-login-error");
+      }
+      throw err;
+    }
+  },
+  async clientLogin(email,password){
+    status="client-signing-in"; lastError="";
+    const credential=await signInWithEmailAndPassword(auth,String(email||"").trim().toLowerCase(),password);
+    currentUser=credential.user;
+    if(currentUser.uid===ADMIN_UID){
+      await signOut(auth); currentUser=null;
+      throw new Error("Use o acesso ADM para esta conta.");
+    }
+    await loadClientExperience();
+    return credential.user;
+  },
+  async setClientPassword(password){
+    if(!currentUser || currentUser.uid===ADMIN_UID) throw new Error("Acesso de cliente não autenticado.");
+    if(String(password||"").length<6) throw new Error("A senha precisa ter pelo menos 6 caracteres.");
+    // A operação de senha é independente do carregamento dos dados de viagem.
+    // Depois do sucesso, nunca pedir para o cliente cadastrar a senha novamente
+    // só porque uma consulta ao Firestore falhou.
+    await updatePassword(currentUser,password);
+    sessionStorage.removeItem("ipa-client-password-setup");
+    history.replaceState({},document.title,window.location.pathname);
+    try{
+      await loadClientExperience();
+    }catch(err){
+      console.error('Senha salva; falha ao carregar experiência:',err);
+      status='client-load-error';
+      lastError=err?.message||'Falha ao carregar os dados da viagem.';
+      notify('ipa-client-experience-ready');
+      return {passwordSaved:true,experienceLoaded:false,status,error:lastError};
+    }
+    notify('ipa-client-experience-ready');
+    return {passwordSaved:true,experienceLoaded:status==='client-connected',status,error:lastError};
+  },
+  async resetClientPassword(email){
+    const normalized=String(email||"").trim().toLowerCase();
+    if(!normalized) throw new Error("Informe seu e-mail.");
+    await sendPasswordResetEmail(auth,normalized,{url:"https://app.indoporaicomagente.com/"});
+    return true;
+  },
+  async logout(){
+    await signOut(auth);
+  },
+  async sendCustomClientInvite(email,clientId,tripId="",name=""){
+    if(!currentUser||currentUser.uid!==ADMIN_UID)throw new Error("Entre como ADM para enviar o convite.");
+    const response=await fetch('/api/email/invite',{method:'POST',headers:{'authorization':'Bearer '+await currentUser.getIdToken(),'content-type':'application/json'},body:JSON.stringify({email,clientId,tripId,name})});
+    let data={};try{data=await response.json()}catch{}
+    if(!response.ok||!data.ok)throw new Error(data.error||'Falha no envio personalizado.');
+    return data;
+  },
+  // Compatibilidade: qualquer fluxo antigo de convites também usa somente o Resend.
+  // Nunca chamar sendSignInLinkToEmail aqui, pois ele dispara o email genérico do Firebase.
+  async sendClientInvite(email,clientId,tripId="",name="Viajante"){
+    return this.sendCustomClientInvite(email,clientId,tripId,name);
+  },
+  isEmailSignInLink(){ return isSignInWithEmailLink(auth,window.location.href); },
+  async completeEmailLink(email){
+    if(!isSignInWithEmailLink(auth,window.location.href)) return null;
+    const context=readInviteContext();
+    if(context.clientId)localStorage.setItem("ipa-client-id-for-signin",context.clientId);
+    if(context.tripId)localStorage.setItem("ipa-trip-id-for-signin",context.tripId);
+    email=(email||localStorage.getItem("ipa-email-for-signin")||"").trim().toLowerCase();
+    if(!email) throw new Error("Confirme o e-mail que recebeu o convite.");
+    sessionStorage.setItem("ipa-client-password-setup","1");
+    const user=(await signInWithEmailLink(auth,email,window.location.href)).user;
+    localStorage.removeItem("ipa-email-for-signin");
+    status="client-password-setup";
+    notify("ipa-client-password-setup");
+    return user;
+  },
+  async loadClientExperience(){
+    if(!currentUser) throw new Error("Faça login primeiro.");
+    return loadClientExperience();
+  },
+  async refresh(){
+    if(!currentUser) throw new Error("Faça login primeiro.");
+    return pullAll();
+  },
+  async deleteClientIfUnlinked(id){
+    if(!currentUser || currentUser.uid!==ADMIN_UID)throw new Error('Somente o ADM pode excluir cadastros.');
+    if(!id)throw new Error('Cliente inválido.');
+    const cid=String(id),ref=doc(firestore,'clients',cid);
+    const snapshot=await getDocFromServer(ref);
+    if(!snapshot.exists())throw new Error('Cadastro não encontrado no Firebase. Atualize a lista.');
+    const client=snapshot.data();
+    if(client.authUid||client.firebaseUid||client.uid)throw new Error('Cliente com acesso autenticado. Revogue o acesso no Firebase Auth antes de excluir o cadastro.');
+    const sources=['trips','payments','paymentPlans','tripDocuments','memories','travelLeads','conciergeRequests'];
+    for(const col of sources){
+      for(const field of ['clientId',...(col==='conciergeRequests'?['requesterClientId']:[])]){
+        const result=await getDocs(query(collection(firestore,col),where(field,'==',cid),limit(1)));
+        if(!result.empty)throw new Error('Existem registros vinculados em '+col+'. A exclusão foi bloqueada.');
+      }
+    }
+    // A guest may also be referenced by a travelTogetherPlans array in a different trip.
+    const tripsSnap=await getDocs(collection(firestore,'trips'));
+    if(tripsSnap.docs.some(d=>(d.data().travelTogetherPlans||[]).some(link=>String(link.clientId)===cid)))
+      throw new Error('Este cliente participa de um grupo Viajar Juntos. Remova o vínculo primeiro.');
+    await deleteDoc(ref);
+    const check=await getDocFromServer(ref);
+    if(check.exists())throw new Error('O Firebase não confirmou a exclusão.');
+    return true;
+  },
+  async deleteTrip(id){
+    if(!currentUser || currentUser.uid!==ADMIN_UID)throw new Error('Somente o ADM pode excluir viagens.');
+    if(!id)throw new Error('Viagem inválida.');
+    await deleteDoc(doc(firestore,'trips',id));
+    return true;
+  },
+  async deleteTripDocument(id){
+    if(!currentUser || currentUser.uid!==ADMIN_UID) throw new Error("Somente o ADM pode excluir documentos.");
+    if(!id) throw new Error("Documento inválido.");
+    await deleteDoc(doc(firestore,"tripDocuments",id));
+    return true;
+  },
+  async createCatalogPlace(place){
+    if(!currentUser || currentUser.uid!==ADMIN_UID)throw new Error('Somente o ADM pode cadastrar lugares. Faça login administrativo novamente.');
+    if(!place?.id || !place?.name || !place?.city || !place?.country)throw new Error('Informe nome, cidade e país.');
+    const ref=doc(firestore,'placeCatalog',String(place.id));
+    const exists=await getDoc(ref);
+    if(exists.exists())throw new Error('Já existe um lugar com este identificador. Tente novamente.');
+    await setDoc(ref,place);
+    const confirmed=await getDoc(ref);
+    if(!confirmed.exists() || confirmed.data().name!==place.name)throw new Error('O Firebase não confirmou o cadastro.');
+    return confirmed.data();
+  },
+  async saveCatalogPhoto(id,patch){
+    if(!currentUser || currentUser.uid!==ADMIN_UID)throw new Error('Apenas o ADM pode atualizar o catálogo.');
+    const ref=doc(firestore,'placeCatalog',String(id));
+    const before=await getDoc(ref);
+    if(!before.exists())throw new Error('Lugar não encontrado no Firebase.');
+    if(before.data().photoUrl)return false;
+    await updateDoc(ref,{...patch,updatedAt:serverTimestamp()});
+    const after=await getDoc(ref);
+    if(after.data()?.photoUrl!==patch.photoUrl)throw new Error('A foto não foi confirmada no Firebase.');
+    return true;
+  },
+  async saveTripItineraryPhotos(tripId,itinerary){
+    if(!currentUser || currentUser.uid!==ADMIN_UID)throw new Error('Apenas o ADM pode atualizar roteiros.');
+    const ref=doc(firestore,'trips',String(tripId));
+    await updateDoc(ref,{itinerary,updatedAt:serverTimestamp()});
+    const verified=await getDoc(ref);
+    if(!verified.exists())throw new Error('Viagem não encontrada após salvar.');
+    const saved=verified.data().itinerary||[];
+    const expected=itinerary.flatMap(d=>(d.places||[]).filter(p=>p&&p.photoUrl).map(p=>({day:d.day,id:p.id,name:p.name,photoUrl:p.photoUrl})));
+    for(const pic of expected){
+      const day=saved.find(d=>String(d.day)===String(pic.day));
+      const found=(day?.places||[]).find(p=>pic.id?String(p.id)===String(pic.id):p.name===pic.name);
+      if(!found||found.photoUrl!==pic.photoUrl)throw new Error('Foto não confirmada na viagem.');
+    }
+  },
+  async deleteCatalogPlace(id){
+    if(!currentUser || currentUser.uid!==ADMIN_UID) throw new Error("Somente o ADM pode excluir lugares.");
+    if(!id) throw new Error("Lugar inválido.");
+    await deleteDoc(doc(firestore,"placeCatalog",id));
+    return true;
+  },
+  async saveHotelPhotosToTrips(updates){
+    if(!currentUser || currentUser.uid!==ADMIN_UID) throw new Error("Somente o ADM pode atualizar as fotos das viagens.");
+    const results=[];
+    for(const item of updates){
+      if(!item.tripId || !Array.isArray(item.hotelBookings)) continue;
+      const tripRef=doc(firestore,"trips",String(item.tripId));
+      await setDoc(tripRef,{hotelBookings:item.hotelBookings},{merge:true});
+      const confirmed=await getDoc(tripRef);
+      if(!confirmed.exists()) throw new Error("Viagem não encontrada após salvar: "+item.tripId);
+      const stored=confirmed.data().hotelBookings||[];
+      for(const booking of item.hotelBookings){
+        if(!booking.photoUrl) continue;
+        const found=stored.find(x=>String(x.id)===String(booking.id));
+        if(!found || found.photoUrl!==booking.photoUrl)throw new Error("A URL da foto não foi confirmada na viagem "+item.tripId);
+      }
+      results.push(item.tripId);
+    }
+    return results;
+  },
+  async confirmClientTripPublication(clientId,tripId,approveClient=true){
+    if(!currentUser || currentUser.uid!==ADMIN_UID)throw new Error('Entre no ADM autorizado.');
+    if(!clientId||!tripId)throw new Error('Selecione cliente e viagem.');
+    const local=window.IPAData?.getAll?.()||{};
+    const c=(local.clients||[]).find(x=>x.id===clientId);
+    const t=(local.trips||[]).find(x=>x.id===tripId);
+    if(!c||!t)throw new Error('Cadastro ou viagem não encontrado.');
+    if(t.clientId && t.clientId!==clientId)throw new Error('A viagem está vinculada a outro cliente.');
+    if(!String(c.email||'').trim())throw new Error('Cliente sem e-mail.');
+    const now=new Date().toISOString();
+    // As gravações são explícitas: syncNow pode estar em andamento e não
+    // confirma os documentos individuais.
+    await setDoc(doc(firestore,'clients',clientId),{
+      ...c,...(approveClient?{approvalStatus:'Aprovado',accessApproved:true,approvedAt:c.approvedAt||now}:{}),
+      activeTripId:tripId,lastInvitedTripId:tripId,updatedAt:serverTimestamp()
+    },{merge:true});
+    await setDoc(doc(firestore,'trips',tripId),{
+      ...t,clientId,published:true,status:'Publicado',publishedAt:t.publishedAt||now,
+      updatedAt:serverTimestamp()
+    },{merge:true});
+    const [clientCheck,tripCheck]=await Promise.all([
+      getDoc(doc(firestore,'clients',clientId)),getDoc(doc(firestore,'trips',tripId))
+    ]);
+    if(!clientCheck.exists()||!tripCheck.exists()||
+      clientCheck.data().activeTripId!==tripId||
+      (approveClient && clientCheck.data().approvalStatus!=='Aprovado')||
+      tripCheck.data().clientId!==clientId||tripCheck.data().published!==true){
+      throw new Error('A publicação não foi confirmada no Firebase. O convite não foi enviado.');
+    }
+    return {clientId,tripId};
+  },
+  async saveClientPublicationNotice(clientId,tripId,{channel,sentAt}){
+    if(!currentUser||currentUser.uid!==ADMIN_UID)throw Error('Entre como ADM.');
+    if(!clientId||!tripId||!sentAt)throw Error('Dados do convite incompletos.');
+    await Promise.all([
+      setDoc(doc(firestore,'clients',String(clientId)),{inviteStatus:'sent',inviteSentAt:sentAt,updatedAt:serverTimestamp()},{merge:true}),
+      setDoc(doc(firestore,'trips',String(tripId)),{publicationInviteSentAt:sentAt,publicationInviteError:'',notificationChannel:channel,updatedAt:serverTimestamp()},{merge:true})
+    ]);
+    return true;
+  },
+  // Trilha individual do filme: gravação confirmada no servidor, sem sync geral.
+  async saveTripMovieMusicConfirmed(tripId,{favoriteSong='',movieAudioUrl=''}){
+    if(!currentUser||currentUser.uid!==ADMIN_UID)throw new Error('Entre como ADM.');
+    if(!tripId)throw new Error('Viagem não identificada.');
+    const target=doc(firestore,'trips',String(tripId));
+    const savedFields={favoriteSong:String(favoriteSong).slice(0,160),movieAudioUrl:String(movieAudioUrl),updatedAt:serverTimestamp()};
+    await setDoc(target,savedFields,{merge:true});
+    const snapshot=await getDocFromServer(target);
+    if(!snapshot.exists()||snapshot.data().favoriteSong!==savedFields.favoriteSong||snapshot.data().movieAudioUrl!==savedFields.movieAudioUrl)
+      throw new Error('A alteração ainda não foi confirmada no Firebase.');
+    return true;
+  },
+  // Atualização pontual: não depende de syncAll (que pode estar em andamento).
+  async saveTripClimateConfirmed(tripId,climateContent,editedAt){
+    if(!currentUser||currentUser.uid!==ADMIN_UID)throw new Error('Entre como administrador para salvar.');
+    if(!tripId||!Array.isArray(climateContent))throw new Error('Dados da recomendação incompletos.');
+    const target=doc(firestore,'trips',String(tripId));
+    // Elimina valores undefined internos rejeitados pelo Firestore e diferenças de serialização.
+    const cleaned=JSON.parse(JSON.stringify(climateContent));
+    const write=setDoc(target,{climateContent:cleaned,climateEditedAt:editedAt,updatedAt:serverTimestamp()},{merge:true});
+    // Não considere a ausência de resposta como falha confirmada: a gravação ainda pode concluir.
+    let writeTimeout;
+    try{
+      await Promise.race([write,new Promise((_,reject)=>{writeTimeout=setTimeout(()=>reject(new Error('O Firebase não respondeu em 25 segundos. O resultado é incerto: reabra a viagem e confira o link antes de tentar novamente.')),25000)})]);
+    }finally{clearTimeout(writeTimeout)}
+    const snapshot=await getDocFromServer(target);
+    if(!snapshot.exists())throw new Error('A viagem não foi encontrada após salvar.');
+    const saved=snapshot.data();
+    if(saved.climateEditedAt!==editedAt)throw new Error('A confirmação ainda não apareceu no servidor. Reabra a viagem para conferir.');
+    // Confere especificamente os links por plataforma (não os demais campos antigos do roteiro).
+    for(let i=0;i<cleaned.length;i++){
+      const expected=cleaned[i]?.links||{},actual=saved.climateContent?.[i]?.links||{};
+      for(const [platform,url] of Object.entries(expected))if(actual[platform]!==url)
+        throw new Error('Link de '+platform+' não foi confirmado no servidor.');
+    }
+    return true;
+  },
+  // Gravação explícita e conferida de correções de orçamento no pedido.
+  async saveLeadBudgetConfirmed(leadId){
+    if(!currentUser||currentUser.uid!==ADMIN_UID)throw new Error('Entre como ADM para alterar o orçamento.');
+    const lead=(window.IPAData?.getAll?.().travelLeads||[]).find(l=>String(l.id)===String(leadId));
+    if(!lead)throw new Error('Pedido não encontrado.');
+    const ref=doc(firestore,'travelLeads',String(leadId));
+    const payload={budget:Number(lead.budget),currency:lead.currency,budgetOriginal:lead.budgetOriginal,budgetCurrencyOriginal:lead.budgetCurrencyOriginal,budgetHistory:lead.budgetHistory||[],budgetUpdatedAt:lead.budgetUpdatedAt,adminSuggestion:null,updatedAt:serverTimestamp()};
+    await setDoc(ref,payload,{merge:true});
+    const snapshot=await getDoc(ref);
+    if(!snapshot.exists()||Number(snapshot.data().budget)!==payload.budget||snapshot.data().currency!==payload.currency)throw new Error('O orçamento não foi confirmado no servidor.');
+    return true;
+  },
+  // Persiste as correções dos destinos diretamente no pedido, verificando a resposta do Firebase.
+  async saveLeadCitiesConfirmed(leadId){
+    if(!currentUser||currentUser.uid!==ADMIN_UID)throw new Error('Entre como ADM para corrigir cidades.');
+    const lead=(window.IPAData?.getAll?.().travelLeads||[]).find(l=>String(l.id)===String(leadId));
+    if(!lead)throw new Error('Pedido não encontrado.');
+    const ref=doc(firestore,'travelLeads',String(leadId));
+    const payload={destination:lead.destination,stages:lead.stages||[],cityOriginal:lead.cityOriginal,cityHistory:lead.cityHistory||[],cityUpdatedAt:lead.cityUpdatedAt,adminSuggestion:null,updatedAt:serverTimestamp()};
+    await setDoc(ref,payload,{merge:true});
+    const check=await getDoc(ref);
+    if(!check.exists()||check.data().destination!==payload.destination||JSON.stringify(check.data().stages||[])!==JSON.stringify(payload.stages))throw new Error('As cidades não foram confirmadas no Firebase.');
+    return true;
+  },
+  // Salva a ordem escolhida pelo ADM sem depender de sincronização global.
+  async saveLeadSuggestionConfirmed(leadId){
+    if(!currentUser||currentUser.uid!==ADMIN_UID)throw new Error('Entre como ADM para salvar a ordem.');
+    const lead=(window.IPAData?.getAll?.().travelLeads||[]).find(l=>String(l.id)===String(leadId));
+    if(!lead)throw new Error('Pedido não encontrado.');
+    const ref=doc(firestore,'travelLeads',String(leadId));
+    await setDoc(ref,{adminSuggestion:lead.adminSuggestion,updatedAt:serverTimestamp()},{merge:true});
+    const check=await getDoc(ref);
+    if(!check.exists()||!check.data().adminSuggestion)throw new Error('A ordem não foi confirmada no Firebase.');
+    return true;
+  },
+  // Beta 6.29.84: gravação confirmada do fluxo Pedidos → Viagens.
+  // Não depende de syncAll, que pode retornar durante outra sincronização.
+  async saveLeadTripConfirmed({tripId,clientId,leadId,onProgress}){
+    const progress=typeof onProgress==='function'?onProgress:()=>{};
+    if(!currentUser || currentUser.uid!==ADMIN_UID)throw new Error('Entre com a conta ADM para salvar.');
+    const d=window.IPAData?.getAll?.()||{};
+    const trip=(d.trips||[]).find(t=>String(t.id)===String(tripId));
+    const client=(d.clients||[]).find(c=>String(c.id)===String(clientId));
+    const lead=(d.travelLeads||[]).find(l=>String(l.id)===String(leadId));
+    if(!trip||!client||!lead)throw new Error('Não foi possível localizar o pedido, a viagem ou o cliente.');
+    if(String(trip.clientId)!==String(clientId))throw new Error('A viagem não está vinculada ao cliente selecionado.');
+    if(!Array.isArray(trip.itinerary)||!trip.itinerary.length)throw new Error('O roteiro precisa ter ao menos um dia.');
+    // Evita criar uma segunda viagem quando o ADM precisar tentar outra vez.
+    clearTimeout(syncTimer);
+    const tripRef=doc(firestore,'trips',String(tripId));
+    const clientRef=doc(firestore,'clients',String(clientId));
+    const leadRef=doc(firestore,'travelLeads',String(leadId));
+    const steps=[
+      {name:'Gravando viagem...',ref:tripRef,data:{...trip,sourceLeadId:leadId,updatedAt:serverTimestamp()}},
+      {name:'Vinculando cliente...',ref:clientRef,data:{...client,activeTripId:tripId,lastConfiguredTripId:tripId,updatedAt:serverTimestamp()}},
+      {name:'Atualizando pedido...',ref:leadRef,data:{...lead,tripId,status:'Roteiro aprovado',updatedAt:serverTimestamp()}}
+    ];
+    for(const step of steps){
+      progress(step.name);
+      try{await setDoc(step.ref,step.data,{merge:true})}
+      catch(e){throw new Error(`${step.name.replace('...','')} falhou: ${e?.code||e?.message||'erro desconhecido'}`)}
+    }
+    progress('Conferindo dados no Firebase...');
+    const [savedTrip,savedClient,savedLead]=await Promise.all([getDoc(tripRef),getDoc(clientRef),getDoc(leadRef)]);
+    if(!savedTrip.exists()||!savedClient.exists()||!savedLead.exists()||
+      String(savedTrip.data().clientId)!==String(clientId)||
+      String(savedClient.data().activeTripId)!==String(tripId)||
+      String(savedLead.data().tripId)!==String(tripId)){
+      throw new Error('A verificação não confirmou os vínculos entre pedido, cliente e viagem.');
+    }
+    return {tripId,clientId,leadId};
+  },
+  async saveTripParticipantsConfirmed(tripId,participants){
+    if(!currentUser || currentUser.uid!==ADMIN_UID)throw new Error('Entre com a conta ADM autorizada.');
+    if(!tripId||!Array.isArray(participants))throw new Error('Dados dos participantes inválidos.');
+    const tripRef=doc(firestore,'trips',String(tripId));
+    try{await setDoc(tripRef,{participants,updatedAt:serverTimestamp()},{merge:true});}
+    catch(e){throw new Error('Falha na gravação Firebase ('+(e?.code||'sem código')+'): '+(e?.message||'verifique permissões e conexão'));}
+    const snap=await getDocFromServer(tripRef);
+    if(!snap.exists())throw new Error('Viagem não encontrada no Firebase.');
+    const saved=snap.data().participants||[];
+    if(JSON.stringify(saved)!==JSON.stringify(participants))throw new Error('Participantes divergentes após salvar no Firebase.');
+    return true;
+  },
+  async saveTripClimateConfirmed(tripId,climateContent){
+    if(!currentUser || currentUser.uid!==ADMIN_UID)throw new Error('Entre com a conta ADM autorizada.');
+    const tripRef=doc(firestore,'trips',String(tripId));
+    await setDoc(tripRef,{climateContent,climateSource:'destination-curation',climateGeneratedAt:new Date().toISOString(),updatedAt:serverTimestamp()},{merge:true});
+    const snap=await getDocFromServer(tripRef);
+    if(!snap.exists()||JSON.stringify(snap.data().climateContent||[])!==JSON.stringify(climateContent))throw new Error('Curadoria não confirmada no Firebase.');
+    return true;
+  },
+  // Persistência pontual MultiPaís, sem reescrever roteiro, pagamentos ou conteúdo legado.
+  async saveTripCountryClimateConfirmed(tripId,climateByCountry){
+    if(!currentUser || currentUser.uid!==ADMIN_UID)throw new Error('Entre com a conta ADM autorizada.');
+    if(!tripId || !climateByCountry || typeof climateByCountry!=='object')throw new Error('Conteúdo por país inválido.');
+    const cleaned=JSON.parse(JSON.stringify(climateByCountry));
+    const tripRef=doc(firestore,'trips',String(tripId));
+    await setDoc(tripRef,{climateByCountry:cleaned,updatedAt:serverTimestamp()},{merge:true});
+    const snap=await getDocFromServer(tripRef);
+    if(!snap.exists() || JSON.stringify(snap.data().climateByCountry||{})!==JSON.stringify(cleaned))
+      throw new Error('Os conteúdos por país não foram confirmados no Firebase.');
+    return true;
+  },
+  async syncNow(){
+    if(!currentUser) throw new Error("Faça login primeiro.");
+    return syncAll(window.IPAData?.getAll?.());
+  }
+};
+
+window.dispatchEvent(new CustomEvent("ipa-firebase-service-loaded"));
