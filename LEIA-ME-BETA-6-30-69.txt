@@ -1,0 +1,11 @@
+INDO POR AÍ — Beta 6.30.69
+
+Formulário de planos pagos: destinos adicionados dinamicamente; país, cidade, chegada e saída obrigatórios; resumo de países, cidades e dias calculados; dados de datas preservados em stages.arrivalDate/departureDate. As etapas com ao menos 1 dia seguem o gerador existente.
+
+Free: mantido o fluxo de 1 país, 1 cidade, até 3 dias e ritmo Equilibrado.
+
+Compatibilidade: travelLeads antigos continuam no formato original. Nenhuma mudança em coleções do Firebase, pagamentos ou Mochilito.
+
+LIMITE ATUAL: o gerador existente é orientado por dias por cidade. Mudanças de terminal no mesmo dia são tratadas no módulo de deslocamentos; etapas com chegada e saída na mesma data devem ser ajustadas no ADM.
+
+LIMPEZA: documentação das versões anteriores foi consolidada neste arquivo. Ícones e arquivos com nomes repetidos foram preservados por segurança até validar suas referências em produção. Backup dos readmes em arquivo separado, não incluído na publicação.
