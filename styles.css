@@ -2068,3 +2068,46 @@ body.hidden-nav .bottom-nav{display:none!important;}
 }
 
 .ipa-admin-integrated .ipa77-unstarted-stages{display:grid;gap:10px;padding:14px;border:1px solid #d0e7e4;border-radius:12px;background:#f5fbf9;margin-bottom:15px}.ipa-admin-integrated .ipa77-unstarted-stages>div{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px}.ipa-admin-integrated .ipa77-unstarted-stages button{min-height:38px;border-radius:10px;font-size:13px}
+
+
+/* Beta 6.30.78 — visual do roteiro mais limpo e destaque para deslocamentos */
+.ipa-admin-integrated .ipa77-unstarted-stages{display:grid!important;gap:14px!important;padding:18px!important;border:1px solid #d6e7e5!important;border-radius:22px!important;background:linear-gradient(180deg,#fbfefd 0%,#f1f8f7 100%)!important;box-shadow:0 10px 24px rgba(6,65,74,.05)!important;margin:0 0 18px!important}
+.ipa-admin-integrated .ipa77-unstarted-head b{display:block;font-size:21px;color:#083d4e;margin-bottom:4px}
+.ipa-admin-integrated .ipa77-unstarted-head small{display:block;color:#6f8689;font-size:13px;line-height:1.45}
+.ipa-admin-integrated .ipa77-unstarted-grid{display:grid;gap:12px}
+.ipa-admin-integrated .ipa77-unstarted-card{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;background:#fff;border:1px solid #dcebea;border-radius:18px;padding:14px 16px;box-shadow:0 8px 16px rgba(7,61,73,.05)}
+.ipa-admin-integrated .ipa77-unstarted-card strong{display:block;font-size:18px;color:#073d49;line-height:1.2}
+.ipa-admin-integrated .ipa77-unstarted-card small{display:block;color:#6d8286;font-size:12px;margin-top:4px}
+.ipa-admin-integrated .ipa77-unstarted-card .btn{min-height:44px;border-radius:14px!important;padding:10px 14px!important;white-space:nowrap}
+.ipa-admin-integrated .admin-day-expanded{background:linear-gradient(180deg,#ffffff 0%,#f8fcfc 100%)!important;border:1px solid #d8e8e7!important;border-radius:24px!important;padding:18px!important;box-shadow:0 10px 24px rgba(7,61,73,.06)!important;margin-top:14px!important}
+.ipa-admin-integrated .admin-day-title{display:grid!important;grid-template-columns:56px minmax(0,1fr)!important;gap:12px 14px!important;align-items:start!important}
+.ipa-admin-integrated .admin-day-title>strong{grid-column:1!important;grid-row:1/span 2!important;width:56px!important;height:56px!important;border-radius:18px!important;font-size:24px!important;background:linear-gradient(180deg,#0b6d77,#083d49)!important;box-shadow:0 8px 18px rgba(7,61,73,.2)!important}
+.ipa-admin-integrated .admin-day-title>span{grid-column:2!important;min-width:0!important;display:block!important}
+.ipa-admin-integrated .admin-day-title>span b{display:block!important;font-size:29px!important;line-height:1.05!important;color:#083d4e!important;margin:0 0 5px!important}
+.ipa-admin-integrated .admin-day-title>span small{display:block!important;color:#6f8488!important;font-size:13px!important;line-height:1.45!important}
+.ipa-admin-integrated .admin-day-title>.ipa-admin-day-country,.ipa-admin-integrated .admin-day-title>.ipa77-day-generation,.ipa-admin-integrated .admin-day-title>.ipa70-daytrip-btn,.ipa-admin-integrated .admin-day-title>[data-ipa70-generate-daytrip],.ipa-admin-integrated .admin-day-title>.admin-add-place-btn{grid-column:2!important;justify-self:start!important;margin:0!important;max-width:none!important}
+.ipa-admin-integrated .admin-day-title>.ipa-admin-day-country{min-width:220px;border-radius:14px;border:1px solid #d7e8e7;background:#fff;padding:11px 14px;color:#083d4e;font-weight:700}
+.ipa-admin-integrated .ipa77-day-generation{display:grid!important;grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important;gap:10px!important;width:100%!important;padding:8px!important;border:1px solid #d6eae7!important;border-radius:18px!important;background:#eef8f7!important}
+.ipa-admin-integrated .ipa77-day-generation .btn{min-height:46px!important;border-radius:14px!important;padding:10px 12px!important;font-size:14px!important;line-height:1.25!important;box-shadow:none!important}
+.ipa-admin-integrated .admin-day-title>.ipa70-daytrip-btn,.ipa-admin-integrated .admin-day-title>[data-ipa70-generate-daytrip],.ipa-admin-integrated .admin-day-title>.admin-add-place-btn{min-height:44px!important;border-radius:14px!important;padding:10px 14px!important;font-size:14px!important;font-weight:800!important}
+.ipa-admin-integrated .admin-day-title>.admin-add-place-btn{background:#dbf1ee!important;color:#0a6f79!important;border:1px solid #c6e5e1!important}
+.ipa-admin-integrated .admin-day-title>.ipa70-daytrip-btn{background:#eef7ed!important;color:#1f7860!important;border:1px solid #d4eadc!important}
+.ipa-admin-integrated .ipa64-day-target{margin:16px 0 12px!important;border-radius:18px!important;padding:14px 16px!important}
+.ipa-admin-integrated .ipa64-day-target b{font-size:16px!important}
+.ipa-admin-integrated .ipa64-day-target small{font-size:12px!important;line-height:1.45!important}
+.ipa-admin-integrated .ipa67-place-list{padding-left:0!important;margin-top:12px!important;gap:12px!important}
+.ipa-admin-integrated .ipa67-stop-card{padding:16px!important;border-radius:20px!important;border:1px solid #dce8ea!important;box-shadow:0 8px 18px rgba(7,61,73,.045)!important;background:linear-gradient(180deg,#fff 0%,#fbfefe 100%)!important}
+.ipa-admin-integrated .ipa67-stop-head{display:grid!important;grid-template-columns:36px minmax(0,1fr)!important;gap:12px!important;align-items:start!important}
+.ipa-admin-integrated .ipa67-stop-number{width:36px!important;height:36px!important;border-radius:12px!important;background:#083d4e!important;color:#fff!important;display:grid!important;place-items:center!important;font-weight:900!important}
+.ipa-admin-integrated .ipa67-stop-info b{font-size:20px!important;line-height:1.18!important;color:#083d4e!important}
+.ipa-admin-integrated .ipa67-stop-info small{font-size:12px!important;line-height:1.45!important;color:#698084!important}
+.ipa-admin-integrated .ipa67-stop-info em{display:block;margin-top:6px;color:#0b7b83;font-style:normal;font-size:12px;line-height:1.45}
+.ipa-admin-integrated .ipa67-stop-travel{display:flex!important;flex-wrap:wrap!important;gap:8px!important}
+.ipa-admin-integrated .ipa67-stop-travel .ipa67-action{min-height:38px!important;border-radius:12px!important;padding:8px 12px!important;background:#eef7f8!important;border:1px solid #d6eaed!important;color:#075667!important}
+.ipa-admin-integrated .ipa67-stop-actions{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:8px!important;border-top:1px solid #ebf2f3!important;padding-top:12px!important}
+.ipa-admin-integrated .ipa67-stop-actions .ipa67-action{min-height:40px!important;border-radius:12px!important;background:#fff!important;border:1px solid #dae8ea!important;color:#075667!important;padding:8px 10px!important}
+.ipa-admin-integrated .ipa67-stop-actions .ipa67-delete{background:#fff7f6!important;color:#ab4d46!important;border-color:#f0dad7!important}
+.ipa-admin-integrated .ipa67-stop-actions .ipa67-action span{font-size:12px!important}
+.during-place-list>.ipa-transport-leg .btn.btn-primary{display:none!important}
+.during-place-list>.ipa-transport-leg .btn.btn-light{border-radius:12px!important}
+@media(max-width:720px){.ipa-admin-integrated .ipa77-unstarted-card{grid-template-columns:minmax(0,1fr)!important}.ipa-admin-integrated .ipa77-unstarted-card .btn{width:100%}.ipa-admin-integrated .admin-day-expanded{padding:14px!important;border-radius:20px!important}.ipa-admin-integrated .admin-day-title{grid-template-columns:48px minmax(0,1fr)!important;gap:10px 10px!important}.ipa-admin-integrated .admin-day-title>strong{width:48px!important;height:48px!important;font-size:21px!important;border-radius:15px!important}.ipa-admin-integrated .admin-day-title>span b{font-size:24px!important}.ipa-admin-integrated .ipa77-day-generation{grid-template-columns:minmax(0,1fr)!important}.ipa-admin-integrated .ipa67-stop-actions{grid-template-columns:repeat(2,minmax(0,1fr))!important}}
