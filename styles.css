@@ -2247,7 +2247,7 @@ body.hidden-nav .bottom-nav{display:none!important;}
  .ipa81-trip-editor .ipa81-day-secondary>button{flex:1 1 135px!important}
 }
 
-/* Beta 6.30.84 — País → Cidade → Hospedagem → Dias */
+/* Beta 6.30.85 — País → Cidade → Hospedagem → Dias */
 .ipa84-city-nav{background:linear-gradient(180deg,#fff,#f6fbfa);border:1px solid #d7e8e7;border-radius:22px;padding:18px;margin:16px 0;box-shadow:0 9px 22px rgba(3,58,70,.045);display:grid;gap:12px;min-width:0}
 .ipa84-city-nav-heading h2{font-size:21px;margin:5px 0;color:#073e4c}.ipa84-city-nav-heading small{color:#617b83;font-size:13px}
 .ipa84-country-group{border:1px solid #e0eeed;border-radius:17px;padding:13px;background:#fff;display:grid;gap:9px;min-width:0}
@@ -2262,3 +2262,11 @@ body.hidden-nav .bottom-nav{display:none!important;}
 .ipa84-timeline-row b{display:block;color:#073e4c;font-size:13px;line-height:1.4}.ipa84-timeline-row small{display:block;color:#73858a;font-size:11px;line-height:1.4;margin-top:2px}
 .ipa84-admin-city-nav,.ipa81-trip-editor>.ipa84-city-nav{width:100%}
 @media(max-width:560px){.ipa84-city-nav{padding:12px}.ipa84-country-group{padding:11px}.ipa84-city-buttons{grid-template-columns:repeat(2,minmax(0,1fr))}.ipa84-timeline-row{grid-template-columns:1fr;gap:4px}.ipa84-city-choice{padding:10px!important}}
+
+/* Beta 6.30.85 — guias de catálogo e cidades por país */
+.ipa84-client-city-nav .ipa84-country-group,.ipa84-admin-city-nav .ipa84-country-group{margin-top:10px}
+.ipa84-city-nav .ipa84-city-buttons{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.ipa84-city-choice{min-width:0;overflow-wrap:anywhere}
+.ipa-transport-note{background:#e8f5f3;border:1px solid #c9e7e1;border-radius:12px;color:#08717c;padding:12px 14px;font-weight:700}
+.ipa-admin-integrated .ipa77-unstarted-card.is-started .ipa77-delete-stage{background:#fff4f2!important;color:#a6463c!important;border:1px solid #efd0ca!important;box-shadow:none!important}
+@media(max-width:650px){.ipa84-city-nav .ipa84-city-buttons{grid-template-columns:1fr}}

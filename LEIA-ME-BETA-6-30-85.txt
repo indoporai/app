@@ -1,0 +1,11 @@
+Indo por Aí — Beta 6.30.85
+
+Mudanças:
+1) Cliente: País selecionado → mostrar apenas cidades/etapas daquele país, preservando datas de visitas repetidas.
+2) Experiências por Aí: mostrar apenas as experiências cadastradas para a cidade ativa e país correspondente.
+3) ADM: nova guia Deslocamentos, com cadastro pelo Google Places e registro único de categoria Deslocamento.
+4) ADM: Lugares mostra apenas atrações; deslocamentos legados aparecem na nova guia pelo reconhecimento das categorias já salvas. Nenhum dado legado é excluído ou movido automaticamente no Firebase.
+5) Roteiro diário: campo de seleção separado em dois grupos, Lugares e Deslocamentos, sem alterar as referências já salvas.
+
+ATENÇÃO: separação lógica em duas guias com catálogo físico placeCatalog mantido para compatibilidade. Não é uma migração para uma coleção Firebase nova.
+Testar em homologação antes de publicar. Validar troca de país, datas repetidas e cadastros via Firebase.

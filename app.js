@@ -788,13 +788,13 @@ function bind(){
  setTimeout(()=>{ipaInitRealMap();ipaInitExploreRealMap();},60);
  setTimeout(()=>ipaBindCatalogTools(),0);
  document.querySelectorAll('[data-admin-new-place]').forEach(b=>b.onclick=()=>{
-  showModal(`<span class="eyebrow">BANCO DE LUGARES</span><h2>Novo lugar</h2>
+  showModal(`<span class="eyebrow">${adminSection==='transport'?'BANCO DE DESLOCAMENTOS':'BANCO DE LUGARES'}</span><h2>${adminSection==='transport'?'Novo deslocamento':'Novo lugar'}</h2>
   <label>Buscar no Google</label><div class="smart-place-search"><input id="catalogGoogleSearch" class="v2-concierge-input" autocomplete="off" placeholder="Ex.: Torre Eiffel, Museu do Louvre..."><button id="catalogOpenMaps" class="btn btn-light">Maps ↗</button></div>
   <div id="catalogPlaceSuggestions" class="place-suggestions"><small>Digite pelo menos 2 letras. Ao escolher um resultado, nome, endereço, cidade e país serão preenchidos.</small></div>
-  <div class="planner-grid"><label>Nome<input id="catalogName" class="v2-concierge-input" placeholder="Nome do lugar"></label><label>Categoria<select id="catalogCategory" class="v2-concierge-input"><option>Atração</option><option>Gastronomia</option><option>Museu</option><option>Natureza</option><option>Compras</option><option>Experiência</option><option>Vida noturna</option><option>Outro</option><option>Deslocamento · Aeroporto</option><option>Deslocamento · Estação de trem</option><option>Deslocamento · Rodoviária</option><option>Deslocamento · Terminal marítimo</option><option>Deslocamento · Outro</option></select></label><label>Cidade<input id="catalogCity" class="v2-concierge-input"></label><label>País<input id="catalogCountry" class="v2-concierge-input"></label></div>
+  <div class="planner-grid"><label>Nome<input id="catalogName" class="v2-concierge-input" placeholder="Nome do lugar"></label>${adminSection==='transport'?'<input id="catalogCategory" type="hidden" value="Deslocamento">':'<label>Categoria<select id="catalogCategory" class="v2-concierge-input"><option>Atração</option><option>Gastronomia</option><option>Museu</option><option>Natureza</option><option>Compras</option><option>Experiência</option><option>Vida noturna</option><option>Outro</option></select></label>'}<label>Cidade<input id="catalogCity" class="v2-concierge-input"></label><label>País<input id="catalogCountry" class="v2-concierge-input"></label></div>
   <label>Endereço<input id="catalogAddress" class="v2-concierge-input" placeholder="Preenchido pelo Google ou manualmente"></label>
   <div class="planner-grid"><label>Custo por pessoa<input id="catalogCost" type="number" min="0" step=".01" class="v2-concierge-input"></label><label>Moeda<select id="catalogCurrency" class="v2-concierge-input"><option>EUR</option><option>BRL</option><option>USD</option></select></label><label>Duração (min)<input id="catalogDuration" type="number" min="15" step="15" value="120" class="v2-concierge-input"></label><label>Prioridade<select id="catalogPriority" class="v2-concierge-input"><option>Recomendado</option><option>Imperdível</option><option>Opcional</option></select></label></div>
-  <label>Interesses relacionados</label><div class="planner-interests" id="catalogInterests">${IPA_INTERESTS.map(x=>`<label><input type="checkbox" value="${x}"> ${x}</label>`).join('')}</div>
+  ${adminSection==='transport'?'<p class="ipa-transport-note">Categoria: Deslocamento · cadastro reutilizável no roteiro.</p>':`<label>Interesses relacionados</label><div class="planner-interests" id="catalogInterests">${IPA_INTERESTS.filter(x=>x!=='Deslocamento').map(x=>`<label><input type="checkbox" value="${x}"> ${x}</label>`).join('')}</div>`}
   <div class="planner-grid"><label class="route-pro-check"><input id="catalogKids" type="checkbox" checked> 👶 Bom com crianças</label><label>Reserva<select id="catalogReservation" class="v2-concierge-input"><option>Não exige</option><option>Recomendada</option><option>Obrigatória</option></select></label></div>
   <label>Dica Indo por Aí<textarea id="catalogTip" class="rating-text" placeholder="O que torna esse lugar especial?"></textarea></label>
   <div id="catalogPhotoPreview" class="ipa-photo-search-preview">📷 A foto principal aparecerá aqui quando disponível na busca.</div><input id="catalogPhotoUrl" type="hidden"><input id="catalogPlaceId" type="hidden"><input id="catalogMapsUrl" type="hidden"><input id="catalogLat" type="hidden"><input id="catalogLng" type="hidden">
@@ -832,8 +832,8 @@ function bind(){
     const name=v('#catalogName');if(!name){toast('Informe ou selecione o nome do lugar');return}
     const city=v('#catalogCity'),country=v('#catalogCountry');if(!city||!country){toast('Informe cidade e país');return}
     const dup=ipaFindCatalogDuplicates(name,city);if(dup.length&&!confirm(`Possível local já cadastrado: “${dup[0].name}” em ${dup[0].city}.\n\nDeseja cadastrar mesmo assim?`))return;
-    const interests=[...document.querySelectorAll('#catalogInterests input:checked')].map(x=>x.value);
-    const payload={name,category:v('#catalogCategory'),city,country,address:v('#catalogAddress'),cost:Number(v('#catalogCost')||0),currency:v('#catalogCurrency'),durationMinutes:Number(v('#catalogDuration')||120),priority:v('#catalogPriority'),interests,kidsFriendly:!!document.querySelector('#catalogKids')?.checked,reservation:v('#catalogReservation'),tip:v('#catalogTip'),photoUrl:v('#catalogPhotoUrl'),placeId:v('#catalogPlaceId'),mapsUrl:v('#catalogMapsUrl'),lat:Number(v('#catalogLat'))||null,lng:Number(v('#catalogLng'))||null};
+    const transport=adminSection==='transport';const interests=transport?['Deslocamento']:[...document.querySelectorAll('#catalogInterests input:checked')].map(x=>x.value);
+    const payload={name,category:transport?'Deslocamento':v('#catalogCategory'),city,country,address:v('#catalogAddress'),cost:Number(v('#catalogCost')||0),currency:v('#catalogCurrency'),durationMinutes:Number(v('#catalogDuration')||120),priority:v('#catalogPriority'),interests,kidsFriendly:!!document.querySelector('#catalogKids')?.checked,reservation:v('#catalogReservation'),tip:v('#catalogTip'),photoUrl:v('#catalogPhotoUrl'),placeId:v('#catalogPlaceId'),mapsUrl:v('#catalogMapsUrl'),lat:Number(v('#catalogLat'))||null,lng:Number(v('#catalogLng'))||null};
     try{
      if(!window.IPAFirebase?.user){toast('Entre com seu login ADM antes de salvar.');return}
      if(typeof window.IPAFirebase.createCatalogPlace!=='function')throw new Error('Serviço Firebase desatualizado. Atualize a página.');
@@ -841,7 +841,7 @@ function bind(){
      const place={...payload,id:'catalog-'+Date.now()+'-'+Math.random().toString(36).slice(2,8),createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()};
      await window.IPAFirebase.createCatalogPlace(place);
      IPAData.addCatalogPlace(place);
-     toast('Lugar salvo e confirmado no Firebase ✓');modal.close();adminSection='places';render();
+     toast('Cadastro salvo e confirmado no Firebase ✓');modal.close();render();
     }catch(e){console.error('Falha ao cadastrar lugar',e);toast('Não foi possível cadastrar: '+(e.message||'Erro de conexão com Firebase'));save.disabled=false;save.textContent='Tentar salvar novamente'}
    };
   },0);
@@ -1013,8 +1013,8 @@ function bind(){
  document.querySelectorAll('[data-ipa-client-country]').forEach(b=>b.onclick=()=>{
   const t=activeTrip();if(!t)return;
   const c=b.dataset.ipaClientCountry===IPA_ALL_COUNTRIES?IPA_ALL_COUNTRIES:ipaTripCountries(t).find(x=>ipaNormText(x)===ipaNormText(b.dataset.ipaClientCountry));if(!c)return;
-  try{localStorage.setItem(ipaCountryClimateKey(t),c)}catch(e){}
-  state.tripDay=Number(ipaScopedDays(t,c)[0]?.day||0);
+  try{localStorage.setItem(ipaCountryClimateKey(t),c);const nextStage=tripStages(t).find(st=>ipaSameCountry(st.country,c));if(nextStage)localStorage.setItem(ipa84StageStorageKey(t),nextStage.id)}catch(e){}
+  state.tripDay=Number(ipa84StageEntries(t,ipa84SelectedStage(t))[0]?.day||0);
   render();
  });
  document.querySelectorAll('[data-ipa-admin-country]').forEach(b=>b.onclick=()=>{
@@ -1867,7 +1867,7 @@ function bind(){
    const [tripId,day]=b.dataset.adminAddPlace.split(':');
    const trip=adminData().trips.find(t=>t.id===tripId);
    showModal(`<span class="eyebrow">ROTEIRO INTELIGENTE · DIA ${day}</span><h2>Adicionar lugar ou dica</h2>
-   <label>Selecionar atração ou transporte do Banco de Lugares</label><select id="routeCatalogPlace" class="v2-concierge-input"><option value="">Escolher uma atração, aeroporto, estação ou terminal...</option>${(adminData().placeCatalog||[]).map(p=>`<option value="${ipaEscape(p.id)}">${ipaEscape(p.name)} · ${ipaEscape(p.city||'')}</option>`).join('')}</select>
+   <label>Selecionar item dos bancos de Lugares ou Deslocamentos</label><select id="routeCatalogPlace" class="v2-concierge-input"><option value="">Escolha um item cadastrado...</option><optgroup label="📍 Lugares">${(adminData().placeCatalog||[]).filter(p=>!ipa76IsTransportCatalogPlace(p)).map(p=>`<option value="${ipaEscape(p.id)}">${ipaEscape(p.name)} · ${ipaEscape(p.city||'')}</option>`).join('')}</optgroup><optgroup label="🚆 Deslocamentos">${(adminData().placeCatalog||[]).filter(ipa76IsTransportCatalogPlace).map(p=>`<option value="${ipaEscape(p.id)}">${ipaEscape(p.name)} · ${ipaEscape(p.city||'')}</option>`).join('')}</optgroup></select>
    <small class="route-helper">Ao selecionar, os dados da sua curadoria são carregados automaticamente. Você também pode buscar outro lugar no Google abaixo.</small>
    <label>Buscar lugar no Google</label><div class="smart-place-search"><input id="routePlaceName" class="v2-concierge-input" autocomplete="off" placeholder="Ex.: Torre Eiffel, Café de Flore..."><button id="openGoogleSearch" class="btn btn-light">Maps ↗</button></div>
    <div id="placeSuggestions" class="place-suggestions"><small>Comece digitando para buscar um lugar diferente.</small></div>
@@ -1904,7 +1904,7 @@ function bind(){
    },0);
  });
  document.querySelectorAll('[data-admin-new-template]').forEach(b=>b.onclick=()=>{
-   const d=adminData(),places=d.placeCatalog||[];
+   const d=adminData(),places=(d.placeCatalog||[]).filter(p=>!ipa76IsTransportCatalogPlace(p));
    showModal(`<span class="eyebrow">ROTEIRO CURADO</span><h2>Montar roteiro com meus lugares</h2>
    <div class="planner-grid"><label>Nome do roteiro<input id="templateName" class="v2-concierge-input" placeholder="Ex.: Paris Essencial"></label><label>Destino<input id="templateDestination" class="v2-concierge-input" placeholder="Ex.: Paris"></label><label>Dias<input id="templateDays" type="number" min="1" max="30" value="3" class="v2-concierge-input"></label><label>Orçamento por pessoa<input id="templateBudget" type="number" min="0" step="10" class="v2-concierge-input" placeholder="Ex.: 500"></label></div>
    <label>Descrição<input id="templateDescription" class="v2-concierge-input" placeholder="Resumo do roteiro"></label>
@@ -2067,11 +2067,11 @@ function bind(){
  document.querySelectorAll('[data-admin-resend-access]').forEach(b=>b.onclick=async()=>{const d=adminData(),c=d.clients.find(x=>x.id===b.dataset.adminResendAccess);if(!c?.email)return toast('Cliente sem e-mail');const tripId=c.activeTripId||c.lastInvitedTripId||'';const trip=tripId?d.trips.find(t=>t.id===tripId):null;if(!trip)return toast('Vincule uma viagem ao cliente antes de reenviar');if(trip.published!==true)return toast('Publique a viagem antes de reenviar o acesso');try{await window.IPAFirebase.syncNow();await window.IPAFirebase.sendCustomClientInvite(c.email,c.id,trip.id,c.name||'Viajante');IPAData.updateClientById(c.id,{activeTripId:trip.id,lastInvitedTripId:trip.id,accessNotifiedAt:new Date().toISOString()});await window.IPAFirebase.syncNow();toast('Convite personalizado reenviado com a viagem vinculada ✓')}catch(e){console.error(e);toast('Convite personalizado não enviado: '+(e.message||'erro')+'. Confira o backend e tente novamente.');}});
  document.querySelectorAll('[data-admin-edit-place]').forEach(b=>b.onclick=()=>{
   const p=adminData().placeCatalog.find(x=>x.id===b.dataset.adminEditPlace);if(!p)return;
-  showModal(`<span class="eyebrow">BANCO DE LUGARES</span><h2>Editar lugar</h2>
-  <div class="planner-grid"><label>Nome<input id="epName" class="v2-concierge-input" value="${ipaEscape(p.name||'')}"></label><label>Categoria<select id="epCategory" class="v2-concierge-input">${['Atração','Gastronomia','Museu','Natureza','Compras','Experiência','Vida noturna','Outro','Deslocamento · Aeroporto','Deslocamento · Estação de trem','Deslocamento · Rodoviária','Deslocamento · Terminal marítimo','Deslocamento · Outro'].map(x=>`<option ${x===(p.category||'Atração')?'selected':''}>${x}</option>`).join('')}</select></label><label>Cidade<input id="epCity" class="v2-concierge-input" value="${ipaEscape(p.city||'')}"></label><label>País<input id="epCountry" class="v2-concierge-input" value="${ipaEscape(p.country||'')}"></label></div>
+  showModal(`<span class="eyebrow">${ipa76IsTransportCatalogPlace(p)?'BANCO DE DESLOCAMENTOS':'BANCO DE LUGARES'}</span><h2>Editar ${ipa76IsTransportCatalogPlace(p)?'deslocamento':'lugar'}</h2>
+  <div class="planner-grid"><label>Nome<input id="epName" class="v2-concierge-input" value="${ipaEscape(p.name||'')}"></label><label>Categoria<select id="epCategory" class="v2-concierge-input">${(ipa76IsTransportCatalogPlace(p)?['Deslocamento']:['Atração','Gastronomia','Museu','Natureza','Compras','Experiência','Vida noturna','Outro']).map(x=>`<option ${ipa76IsTransportCatalogPlace(p)||x===(p.category||'Atração')?'selected':''}>${x}</option>`).join('')}</select></label><label>Cidade<input id="epCity" class="v2-concierge-input" value="${ipaEscape(p.city||'')}"></label><label>País<input id="epCountry" class="v2-concierge-input" value="${ipaEscape(p.country||'')}"></label></div>
   <label>Endereço<input id="epAddress" class="v2-concierge-input" value="${ipaEscape(p.address||'')}"></label>
   <div class="planner-grid"><label>Custo por pessoa<input id="epCost" type="number" min="0" step=".01" class="v2-concierge-input" value="${Number(p.cost||0)}"></label><label>Moeda<select id="epCurrency" class="v2-concierge-input">${['EUR','BRL','USD'].map(x=>`<option ${x===(p.currency||'EUR')?'selected':''}>${x}</option>`).join('')}</select></label><label>Duração (min)<input id="epDuration" type="number" min="15" step="15" class="v2-concierge-input" value="${Number(p.durationMinutes||120)}"></label><label>Prioridade<select id="epPriority" class="v2-concierge-input">${['Recomendado','Imperdível','Opcional'].map(x=>`<option ${x===(p.priority||'Recomendado')?'selected':''}>${x}</option>`).join('')}</select></label></div>
-  <label>Interesses relacionados</label><div class="planner-interests" id="epInterests">${IPA_INTERESTS.map(x=>`<label><input type="checkbox" value="${x}" ${(p.interests||[]).includes(x)?'checked':''}> ${x}</label>`).join('')}</div>
+  <label>Interesses relacionados</label><div class="planner-interests" id="epInterests">${IPA_INTERESTS.filter(x=>x!=='Deslocamento'||ipa76IsTransportCatalogPlace(p)).map(x=>`<label><input type="checkbox" value="${x}" ${(p.interests||[]).includes(x)?'checked':''}> ${x}</label>`).join('')}</div>
   <div class="planner-grid"><label class="route-pro-check"><input id="epKids" type="checkbox" ${p.kidsFriendly!==false?'checked':''}> 👶 Bom com crianças</label><label>Reserva<select id="epReservation" class="v2-concierge-input">${['Não exige','Recomendada','Obrigatória'].map(x=>`<option ${x===(p.reservation||'Não exige')?'selected':''}>${x}</option>`).join('')}</select></label></div>
   <label>URL da foto principal<input id="epPhotoUrl" class="v2-concierge-input" value="${ipaEscape(p.photoUrl||'')}" placeholder="Preenchida automaticamente pela busca"></label><div class="ipa-photo-search-preview">${ipaPlacePhotoHtml(p,'ipa-photo-preview')}</div>
   <label>Dica Indo por Aí<textarea id="epTip" class="rating-text">${ipaEscape(p.tip||'')}</textarea></label>
@@ -2080,7 +2080,7 @@ function bind(){
   setTimeout(()=>{const locate=document.querySelector('#epLocate');if(locate)locate.onclick=async()=>{locate.disabled=true;locate.textContent='Localizando...';try{const temp={...p,name:document.querySelector('#epName').value.trim(),city:document.querySelector('#epCity').value.trim(),country:document.querySelector('#epCountry').value.trim(),address:document.querySelector('#epAddress').value.trim()};await ipaLocateCatalogPlace(temp);if(window.IPAFirebase?.user)await window.IPAFirebase.syncNow();modal.close();render();toast('Localização atualizada ✓')}catch(e){toast(e.message||'Não foi possível localizar');locate.disabled=false;locate.textContent='Atualizar localização'}};document.querySelector('#epSave').onclick=async()=>{
     const v=id=>document.querySelector(id)?.value?.trim?.()||'';const name=v('#epName'),city=v('#epCity'),country=v('#epCountry');if(!name||!city||!country){toast('Informe nome, cidade e país');return}
     const interests=[...document.querySelectorAll('#epInterests input:checked')].map(x=>x.value);
-    IPAData.updateCatalogPlace(p.id,{name,category:v('#epCategory'),city,country,address:v('#epAddress'),cost:Number(v('#epCost')||0),currency:v('#epCurrency'),durationMinutes:Number(v('#epDuration')||120),priority:v('#epPriority'),interests,kidsFriendly:!!document.querySelector('#epKids')?.checked,reservation:v('#epReservation'),photoUrl:v('#epPhotoUrl'),tip:v('#epTip')});
+    IPAData.updateCatalogPlace(p.id,{name,category:ipa76IsTransportCatalogPlace(p)?'Deslocamento':v('#epCategory'),city,country,address:v('#epAddress'),cost:Number(v('#epCost')||0),currency:v('#epCurrency'),durationMinutes:Number(v('#epDuration')||120),priority:v('#epPriority'),interests,kidsFriendly:!!document.querySelector('#epKids')?.checked,reservation:v('#epReservation'),photoUrl:v('#epPhotoUrl'),tip:v('#epTip')});
     if(window.IPAFirebase?.user)await window.IPAFirebase.syncNow();modal.close();render();toast('Lugar atualizado no Firebase ✓');
   };},0);
  });
@@ -2504,16 +2504,18 @@ function ipaCountryStatusHtml(t){
  const all=ipaScopedDays(t,c);const unknown=(t.itinerary||[]).filter(day=>!ipaCountryOfDay(t,day));
  return `<div class="ipa-country-context-note">${countryFlag(c)} Visualizando apenas <b>${ipaEscape(c)}</b> · ${all.length} dia(s) identificado(s). ${unknown.length?`<small>${unknown.length} dia(s) aguardando identificação de país pelo ADM.</small>`:''}</div>`;
 }
-// Beta 6.30.84 — cidade como contexto central, independente do filtro cultural por país.
+// Beta 6.30.85 — cidade como contexto central, independente do filtro cultural por país.
 function ipa84StageStorageKey(t){return 'ipa-city-stage-'+String(t?.id||'trip')}
 function ipa84SelectedStage(t,admin=false){
  const stages=tripStages(t);if(!stages.length)return null;
  let chosen='';
  if(admin)chosen=window.ipa84AdminStageByTrip?.[t.id]||'';
  else try{chosen=localStorage.getItem(ipa84StageStorageKey(t))||''}catch(e){}
- const matched=stages.find(st=>String(st.id)===String(chosen));if(matched)return matched;
+ const country=admin?ipaAdminCountry(t):ipaSelectedCountry(t);
+ const eligible=stages.filter(st=>!country||ipaSameCountry(st.country,country));
+ const matched=eligible.find(st=>String(st.id)===String(chosen));if(matched)return matched;
  const now=new Date(),today=[now.getFullYear(),String(now.getMonth()+1).padStart(2,'0'),String(now.getDate()).padStart(2,'0')].join('-');
- return stages.find(st=>st.startDate&&st.endDate&&today>=st.startDate&&today<st.endDate)||stages.find(st=>st.startDate&&today<st.startDate)||stages[stages.length-1];
+ return eligible.find(st=>st.startDate&&st.endDate&&today>=st.startDate&&today<st.endDate)||eligible.find(st=>st.startDate&&today<st.startDate)||eligible[0]||stages[0];
 }
 function ipa84StageEntries(t,stage){return ipa70StageDayEntries(t).filter(e=>String(e.stageId)===String(stage?.id))}
 function ipa84DaysForStage(t,stage){
@@ -2535,9 +2537,9 @@ function ipa84StageTimelineHtml(t,stage,admin=false){
 }
 function ipa84CityNavigation(t,admin=false){
  const stages=tripStages(t),sel=ipa84SelectedStage(t,admin);if(!stages.length)return '';
- const countries=[];
- stages.forEach((st,i)=>{const country=st.country||'País não definido';let record=countries.find(x=>ipaNormText(x.country)===ipaNormText(country));if(!record){record={country,stages:[]};countries.push(record)}record.stages.push({st,i})});
- return `<section class="ipa84-city-nav ${admin?'ipa84-admin-city-nav':'ipa84-client-city-nav'}"><div class="ipa84-city-nav-heading"><span class="eyebrow">🌍 DESTINOS DA VIAGEM</span><h2>Escolha a cidade</h2><small>País → cidade → hospedagem e dias do roteiro</small></div>${countries.map(group=>`<div class="ipa84-country-group"><div class="ipa84-country-label">${countryFlagMarkup(group.country)} <b>${ipaEscape(group.country)}</b><small>${group.stages.length} ${group.stages.length===1?'etapa':'etapas'}</small></div><div class="ipa84-city-buttons">${group.stages.map(({st,i})=>`<button type="button" class="ipa84-city-choice ${sel&&String(st.id)===String(sel.id)?'active':''}" data-ipa84-select-stage="${ipaEscape(st.id)}" data-ipa84-admin="${admin?'1':'0'}" data-ipa84-trip="${ipaEscape(t.id)}" aria-pressed="${sel&&String(st.id)===String(sel.id)}"><span>📍 ${ipaEscape(st.destination)}</span><small>${ipaEscape(st.startDate||'')} ${st.endDate?'→ '+ipaEscape(st.endDate):''}</small></button>`).join('')}</div></div>`).join('')}</section>`;
+ const country=admin?ipaAdminCountry(t):ipaSelectedCountry(t);
+ const visible=stages.filter(st=>!country||ipaSameCountry(st.country,country));
+ return `<section class="ipa84-city-nav ${admin?'ipa84-admin-city-nav':'ipa84-client-city-nav'}"><div class="ipa84-city-nav-heading"><span class="eyebrow">🌍 DESTINOS DA VIAGEM</span><h2>Cidades de ${ipaEscape(country||'sua viagem')}</h2><small>Escolha uma etapa para abrir hospedagem, clima, experiências e roteiro.</small></div><div class="ipa84-country-group"><div class="ipa84-country-label">${countryFlagMarkup(country)} <b>${ipaEscape(country||'País')}</b><small>${visible.length} ${visible.length===1?'etapa':'etapas'}</small></div><div class="ipa84-city-buttons">${visible.map(st=>`<button type="button" class="ipa84-city-choice ${sel&&String(st.id)===String(sel.id)?'active':''}" data-ipa84-select-stage="${ipaEscape(st.id)}" data-ipa84-admin="${admin?'1':'0'}" data-ipa84-trip="${ipaEscape(t.id)}" aria-pressed="${sel&&String(st.id)===String(sel.id)}"><span>📍 ${ipaEscape(st.destination)}</span><small>${ipaEscape(st.startDate||'')} ${st.endDate?'→ '+ipaEscape(st.endDate):''}</small></button>`).join('')||'<small>Nenhuma cidade cadastrada neste país.</small>'}</div></div></section>`;
 }
 function ipa84HotelForStageDay(trip,dayNo,city){
  const stageEntry=ipa70StageDayEntries(trip).find(e=>Number(e.day)===Number(dayNo));
@@ -3492,14 +3494,13 @@ function ipaExperienceCityKey(city){
 function ipaExperiencesForTrip(trip){
  const d=ipaDB(),admin=state.profile==='admin'||ipaAdminPreviewAuthenticated();
  const all=admin?(d?.experiences||[]):ipaPublicExperiences;
- const country=ipaContextCountry(trip)||tripCountry(trip);
- const cities=[...tripStages(trip).filter(st=>!ipaContextCountry(trip)||ipaExperienceCountryKey(st.country)===ipaExperienceCountryKey(country)).map(st=>st.destination),...ipaScopedDays(trip).map(day=>ipaDayCity(trip,day)),tripDestination(trip)].filter(Boolean).map(ipaExperienceCityKey);
- const countries=ipaTripCountries(trip).map(ipaExperienceCountryKey);
+ const stage=ipa84SelectedStage(trip);
+ const country=stage?.country||ipaSelectedCountry(trip)||tripCountry(trip);
+ const city=ipaExperienceCityKey(stage?.destination||tripDestination(trip));
  return all.filter(x=>{
   if(x.active===false)return false;
-  const c=ipaExperienceCountryKey(x.country);
-  const matchesCountry=!c||c===ipaExperienceCountryKey(country)||(!ipaContextCountry(trip)&&countries.includes(c));
-  const matchesCity=!x.city||cities.includes(ipaExperienceCityKey(x.city));
+  const matchesCountry=!x.country||ipaExperienceCountryKey(x.country)===ipaExperienceCountryKey(country);
+  const matchesCity=!!x.city&&ipaExperienceCityKey(x.city)===city;
   return matchesCountry&&matchesCity;
  });
 }
@@ -3996,13 +3997,14 @@ function ipaBindCountryDashboards(){
  });
 }
 
-function adminPlaces(){
- const d=adminData(), places=d.placeCatalog||[];
+function adminTransport(){return adminPlaces(true)}
+function adminPlaces(transport=false){
+ const d=adminData(), places=(d.placeCatalog||[]).filter(p=>ipa76IsTransportCatalogPlace(p)===transport);
  const cities=[...new Set(places.map(p=>p.city).filter(Boolean))], countries=[...new Set(places.map(p=>p.country).filter(Boolean))], located=places.filter(p=>Number.isFinite(Number(p.lat))&&Number.isFinite(Number(p.lng))).length;
- return `<div class="ipa-admin-head"><div><span class="eyebrow">CURADORIA INDO POR AÍ</span><h1>Banco de Lugares</h1><p>Cadastre atrações e pontos de transporte reutilizáveis. Terminais não entram na seleção automática de atrações.</p></div><button class="btn btn-primary" data-admin-new-place>+ Novo lugar</button></div>
+ return `<div class="ipa-admin-head"><div><span class="eyebrow">CURADORIA INDO POR AÍ</span><h1>${transport?'Banco de Deslocamentos':'Banco de Lugares'}</h1><p>${transport?'Cadastre aeroportos, estações, rodoviárias e terminais. Registros antigos permanecem no Firebase e aparecem aqui automaticamente.':'Cadastre apenas atrações, museus, restaurantes e passeios para o motor de roteiros.'}</p></div><button class="btn btn-primary" data-admin-new-place>+ ${transport?'Novo deslocamento':'Novo lugar'}</button></div>
  <div class="catalog-summary catalog-summary-visual"><div><span>📍</span><strong>${places.length}</strong><small>Lugares</small></div><div><span>🌎</span><strong>${countries.length}</strong><small>Países</small></div><div><span>🏙️</span><strong>${cities.length}</strong><small>Destinos</small></div><div><span>🎯</span><strong>${places.length?Math.round(located/places.length*100):0}%</strong><small>Geolocalizados <em>${located}/${places.length}</em></small></div></div>
  ${ipaCountryDashboard(places,'places')}
- <section class="ipa-admin-panel"><div class="section-head"><div><span class="eyebrow">CATÁLOGO DE LOCAIS</span><h2>Atrações e pontos de transporte cadastrados</h2></div></div>
+ <section class="ipa-admin-panel"><div class="section-head"><div><span class="eyebrow">CATÁLOGO DE LOCAIS</span><h2>${transport?'Terminais e deslocamentos cadastrados':'Atrações e passeios cadastrados'}</h2></div></div>
  <div class="catalog-toolbar"><label class="catalog-search"><span>🔎</span><input id="catalogSearch" class="v2-concierge-input" placeholder="Pesquisar nome, cidade, país ou categoria..."></label><select id="catalogGeoFilter" class="v2-concierge-input"><option value="all">Todos os lugares</option><option value="missing">⚠️ Sem localização</option><option value="located">📍 Localização confirmada</option></select><button class="btn btn-light" id="catalogLocateMissing">📍 Localizar pendentes</button></div><div class="ipa-photo-auto-note"><button type="button" class="btn btn-light" id="catalogPhotoTest" data-no-save-feedback>🔍 Testar imagem do Google</button><small>Teste de diagnóstico disponível caso alguma foto deixe de aparecer. Novas fotos são incorporadas aos cadastros pela busca.</small><div id="catalogPhotoSyncReport" class="ipa-photo-sync-report" hidden></div></div><div class="ipa-photo-auto-note"><strong>📸 Fotos automáticas ativas</strong><small>Novos lugares já trazem imagem na busca. O roteiro do cliente também reaproveita a foto salva no Banco de Lugares.</small></div><div id="catalogPhotoProgress" class="ipa-photo-job" aria-live="polite" hidden></div><small class="ipa-photo-batch-note">${places.filter(p=>!p.photoUrl).length} lugares sem foto no catálogo. Quando um local novo for buscado no Google Places, a foto principal será vinculada automaticamente.</small>
  <div id="catalogDuplicateHint" class="catalog-search-hint"></div>
  <div class="catalog-grid" id="catalogGrid">${places.map(p=>{const geo=Number.isFinite(Number(p.lat))&&Number.isFinite(Number(p.lng));return `<article class="catalog-card" data-catalog-card data-catalog-id="${ipaEscape(p.id)}" data-country="${ipaEscape(p.country||'Sem país')}" data-city="${ipaEscape(p.city||p.destination||'Sem destino')}" data-search="${ipaEscape(`${p.name||''} ${p.city||''} ${p.country||''} ${p.category||''}`.toLowerCase())}" data-geo="${geo?'located':'missing'}"><div><span class="chip">${p.category||'Experiência'}</span>${p.priority==='Imperdível'?'<span class="chip orange">Imperdível</span>':''}<span class="chip ${geo?'geo-ok':'geo-missing'}">${geo?'📍 Localização confirmada':'⚠️ Localização pendente'}</span></div>${ipaPlacePhotoHtml(p,'ipa-catalog-thumbnail')}<h3>${ipaEscape(p.name)}</h3><p>${ipaEscape([p.city,p.country].filter(Boolean).join(', '))}</p><div class="catalog-meta"><b>${ipaCatalogMoney(p.cost,p.currency)}</b><span>${Number(p.durationMinutes||120)} min</span></div><small>${(p.interests||[]).join(' · ')}</small>${p.tip?`<em>💡 ${ipaEscape(p.tip)}</em>`:''}<div class="lead-actions">${!geo?`<button class="btn btn-light" data-admin-locate-place="${p.id}">📍 Atualizar localização</button>`:''}<button class="btn btn-light" data-admin-edit-place="${p.id}">✏️ Editar</button><button class="btn btn-light" data-admin-delete-place="${p.id}">🗑️ Excluir</button></div></article>`}).join('')||'<div class="smart-empty"><b>Seu banco ainda está vazio.</b><small>Cadastre os primeiros lugares para o app começar a montar roteiros personalizados.</small></div>'}</div></section>`;
@@ -4611,13 +4613,13 @@ function adminIntegratedView(){
  if(adminSection==='concierge')adminSection='dashboard';
  const service=window.IPAFirebase;
  if(!service?.user) return adminLoginView();
- const views={dashboard:adminDashboard,leads:adminLeads,concierge:adminConcierge,clients:adminClients,trips:adminTrips,places:adminPlaces,hotels:adminHotels,templates:adminTemplates,finance:adminFinance,live:adminLive,partners:adminPartners,experiences:adminExperiences,settings:adminSettings};
+ const views={dashboard:adminDashboard,leads:adminLeads,concierge:adminConcierge,clients:adminClients,trips:adminTrips,places:adminPlaces,transport:adminTransport,hotels:adminHotels,templates:adminTemplates,finance:adminFinance,live:adminLive,partners:adminPartners,experiences:adminExperiences,settings:adminSettings};
  return `<div class="ipa-admin-integrated">
    <div class="ipa-admin-bar">
     <div><b>Indo por Aí</b><small>BUSINESS</small></div>
     <div class="firebase-admin-actions">${adminCloudBadge()}<button data-firebase-sync>↻ Sincronizar</button><button data-firebase-logout>Sair</button><button data-admin-exit>← Voltar</button></div>
    </div>
-   <div class="ipa-admin-nav">${[['dashboard','⌂','Dashboard'],['leads','📩','Pedidos'],['clients','👤','Clientes'],['trips','✈️','Viagens'],['places','📍','Lugares'],['hotels','🏨','Hospedagens'],['experiences','✨','Experiências'],['templates','🗺️','Roteiros'],['finance','💳','Financeiro'],['live','🔴','Live'],['partners','☆','Parceiros'],['settings','⚙️','Configurações']].map(([k,i,l])=>`<button data-admin-section="${k}" class="${adminSection===k?'active':''}">${i}<span>${l}</span>${k==='concierge'&&ipaConciergePendingCount()?`<b class="ipa-notification-count" aria-label="${ipaConciergePendingCount()} atendimentos pendentes">${ipaConciergePendingCount()}</b>`:''}${k==='leads'&&(adminData().travelLeads||[]).filter(x=>(x.status||'Novo')==='Novo').length?`<b class="ipa-notification-count">${(adminData().travelLeads||[]).filter(x=>(x.status||'Novo')==='Novo').length}</b>`:''}</button>`).join('')}</div>
+   <div class="ipa-admin-nav">${[['dashboard','⌂','Dashboard'],['leads','📩','Pedidos'],['clients','👤','Clientes'],['trips','✈️','Viagens'],['places','📍','Lugares'],['transport','🚆','Deslocamentos'],['hotels','🏨','Hospedagens'],['experiences','✨','Experiências'],['templates','🗺️','Roteiros'],['finance','💳','Financeiro'],['live','🔴','Live'],['partners','☆','Parceiros'],['settings','⚙️','Configurações']].map(([k,i,l])=>`<button data-admin-section="${k}" class="${adminSection===k?'active':''}">${i}<span>${l}</span>${k==='concierge'&&ipaConciergePendingCount()?`<b class="ipa-notification-count" aria-label="${ipaConciergePendingCount()} atendimentos pendentes">${ipaConciergePendingCount()}</b>`:''}${k==='leads'&&(adminData().travelLeads||[]).filter(x=>(x.status||'Novo')==='Novo').length?`<b class="ipa-notification-count">${(adminData().travelLeads||[]).filter(x=>(x.status||'Novo')==='Novo').length}</b>`:''}</button>`).join('')}</div>
    <div class="ipa-admin-content">${(views[adminSection]||adminDashboard)()}</div>
    ${ipaAiiWidgetHtml()}
   </div>`;
@@ -4625,7 +4627,7 @@ function adminIntegratedView(){
 
 
 let ipaProspectPlan='';
-const IPA_INTERESTS=['Gastronomia','Cultura','História','Natureza','Compras','Família','Vida noturna','Romance','Arte','Experiências','Deslocamento'];
+const IPA_INTERESTS=['Gastronomia','Cultura','História','Natureza','Compras','Família','Vida noturna','Romance','Arte','Experiências'];
 function ipaPlannerForm(plan=''){
  const chosen=plan||ipaProspectPlan||'';const isFree=chosen==='Free';
  return `<span class="eyebrow">QUERO VIAJAR</span><h2>Conte como você quer viajar</h2><p>Suas respostas serão enviadas ao Indo por Aí. Nossa curadoria prepara a sugestão internamente e entra em contato com você.</p>
