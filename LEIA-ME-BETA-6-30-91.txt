@@ -1,0 +1,1 @@
+Beta 6.30.91 — correção restrita a Subir, Descer, Editar e Excluir no roteiro ADM. Maps e Deslocamento intactos. Verificar em navegador com login Firebase antes de produção.

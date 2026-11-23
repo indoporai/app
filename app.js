@@ -6015,6 +6015,30 @@ function showAdminPreview(){
  showModal(`<div class="v2-admin-preview"><span class="eyebrow">Modo administrador</span><h2>Portugal 2026</h2><div class="v2-admin-metrics"><div><strong>32</strong><small>viajantes</small></div><div><strong>29</strong><small>online</small></div><div><strong>6</strong><small>avisos</small></div></div><div class="v2-admin-actions"><button onclick="toast('Aviso enviado ao grupo');modal.close()">📣 Enviar aviso</button><button onclick="toast('Van marcada como a caminho');modal.close()">🚐 Atualizar van</button><button onclick="toast('Roteiro aberto para edição');modal.close()">🗓️ Editar roteiro</button><button onclick="window.location.href='live-real.html'">🔴 Iniciar Live</button></div></div>`);
 }
 
+/* Beta 6.30.91 — somente os quatro controles de ordenação/edição das paradas ADM.
+   Captura o clique antes dos delegadores gerais e recupera o bind do cartão
+   caso a lista tenha sido recriada após uma edição ou sincronização.
+   Nenhuma rotina ou evento de Maps/Deslocamento é modificado. */
+if(!window.__ipaAdminPlaceActions63091){
+ window.__ipaAdminPlaceActions63091=true;
+ document.addEventListener('click',function(event){
+  const button=event.target?.closest?.('[data-admin-place-move], [data-admin-place-edit], [data-admin-place-delete]');
+  if(!button || !button.closest('.ipa-admin-days') || button.disabled)return;
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  try{
+   // bind() popula os manipuladores originais. Não substituímos sua lógica
+   // (confirmação de exclusão, modal de edição e gravação no Firebase).
+   if(typeof button.onclick!=='function')bind();
+   if(typeof button.onclick==='function')button.onclick.call(button,event);
+   else toast('Não foi possível ativar esta ação. Reabra a viagem.');
+  }catch(error){
+   console.error('Ação da parada do roteiro ADM',error);
+   toast('Não foi possível executar a ação: '+(error?.message||'erro'));
+  }
+ },true);
+}
+
 /* Beta 6.29.16 — Hospedagens Google + geolocalização + preço por viagem */
 
 // Catálogo público de experiências; recarrega quando um novo cliente abre o app.
