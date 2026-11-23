@@ -6053,23 +6053,34 @@ if(!window.__ipaAdminPlaceActions63094){
   const day=trip?.itinerary?.find(d=>Number(d.day)===dayNumber);
   if(!day||!Number.isInteger(index)||index<0||index>=(day.places||[]).length){toast('Parada não encontrada. Atualize a viagem.');return;}
   const action=btn.hasAttribute('data-admin-place-move')?'move':btn.hasAttribute('data-admin-place-delete')?'delete':'edit';
+  if(window.__ipaRouteSaving95?.has(tripId)){toast('Salvando alteração anterior…');return;}
   const before=trip.itinerary||[];
   const current=day.places[index];
   const place=typeof current==='string'?{name:current}:({...current});
   async function save(nextPlaces,ok){
-   btn.disabled=true;
    const next=before.map(d=>Number(d.day)===dayNumber?{...d,places:nextPlaces}:d);
+   if(!window.IPAFirebase?.user || typeof window.IPAFirebase.saveTripItineraryFast!=='function'){
+    toast('Faça login no ADM para salvar no Firebase.');return;
+   }
+   // O botão responde imediatamente; a gravação é confirmada em segundo plano.
+   window.__ipaRouteSaving95=window.__ipaRouteSaving95||new Set();
+   if(window.__ipaRouteSaving95.has(tripId)){toast('Aguarde a confirmação da alteração anterior.');return;}
+   window.__ipaRouteSaving95.add(tripId);
    try{
-    if(!window.IPAFirebase?.user||typeof window.IPAFirebase.syncNow!=='function')throw Error('Faça login no ADM para salvar no Firebase.');
-    IPAData.updateTrip(tripId,{itinerary:next});
-    await window.IPAFirebase.syncNow();
+    IPAData.updateTripItineraryFastLocal(tripId,next);
     const y=window.scrollY;
     view.innerHTML=adminTripEditor(tripId);bind();window.scrollTo(0,y);
+    toast('Alteração aplicada · salvando…');
+    await window.IPAFirebase.saveTripItineraryFast(tripId,next);
     toast(ok);
    }catch(e){
-    IPAData.updateTrip(tripId,{itinerary:before});
-    view.innerHTML=adminTripEditor(tripId);bind();
-    console.error('Controles da parada ADM',e);toast('Não foi possível salvar: '+(e?.message||e));
+    IPAData.updateTripItineraryFastLocal(tripId,before);
+    const y=window.scrollY;
+    view.innerHTML=adminTripEditor(tripId);bind();window.scrollTo(0,y);
+    console.error('Controles da parada ADM',e);
+    toast('Não foi possível salvar. A alteração foi desfeita: '+(e?.message||e));
+   }finally{
+    window.__ipaRouteSaving95.delete(tripId);
    }
   }
   if(action==='move'){

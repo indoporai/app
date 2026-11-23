@@ -206,7 +206,7 @@ function scheduleSync(data){
 }
 
 window.addEventListener("ipa-data-updated",event=>{
-  if(event.detail?.source==="cloud") return;
+  if(event.detail?.source==="cloud" || event.detail?.source==="route-fast") return;
   if(currentUser?.uid===ADMIN_UID){
     scheduleSync(event.detail?.data);
   }
@@ -1134,6 +1134,17 @@ window.IPAFirebase = {
     const snap=await getDocFromServer(tripRef);
     if(!snap.exists() || JSON.stringify(snap.data().climateByCountry||{})!==JSON.stringify(cleaned))
       throw new Error('Os conteúdos por país não foram confirmados no Firebase.');
+    return true;
+  },
+  // Beta 6.30.95: grava apenas o roteiro alterado, sem sincronizar todo o CRM.
+  async saveTripItineraryFast(tripId,itinerary){
+    if(!currentUser || currentUser.uid!==ADMIN_UID)throw new Error('Entre no ADM para salvar.');
+    if(!tripId || !Array.isArray(itinerary))throw new Error('Roteiro inválido.');
+    const ref=doc(firestore,'trips',String(tripId));
+    await setDoc(ref,{itinerary,updatedAt:serverTimestamp()},{merge:true});
+    const snap=await getDocFromServer(ref);
+    if(!snap.exists() || JSON.stringify(snap.data().itinerary||[])!==JSON.stringify(itinerary))
+      throw new Error('A alteração ainda não foi confirmada no Firebase.');
     return true;
   },
   async syncNow(){
