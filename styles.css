@@ -2170,3 +2170,17 @@ body.hidden-nav .bottom-nav{display:none!important;}
   .ipa-admin-integrated .ipa67-stop-number{width:34px!important;height:34px!important}
   .ipa-admin-integrated .ipa67-stop-info b{font-size:19px!important}
 }
+
+/* Beta 6.30.80: bandeiras locais compatíveis com desktop (sem dependência de emoji/FlagCDN) */
+.ipa-flag-picture{display:inline-flex;align-items:center;justify-content:center;width:100%;height:100%;min-width:0}
+.ipa-flag-picture img{display:block;width:38px;height:28px;max-width:100%;object-fit:cover;border-radius:5px;border:1px solid rgba(10,50,60,.10);box-shadow:0 2px 6px rgba(5,50,60,.10)}
+.ipa-flag-fallback{display:none;font-size:26px}
+.trip-country-flag .ipa-flag-picture img{width:34px;height:26px}
+.ipa-admin-integrated .ipa80-city-identity{display:flex!important;align-items:center!important;gap:13px!important;min-width:0!important}
+.ipa-admin-integrated .ipa80-city-flag{flex:0 0 46px!important;width:46px!important;height:38px!important;display:flex!important;align-items:center!important;justify-content:center!important;border-radius:11px!important;background:#eff7f6!important;border:1px solid #e0eded!important}
+.ipa-admin-integrated .ipa80-city-details{min-width:0!important}
+.ipa-admin-integrated .ipa80-city-details strong{display:block!important;font-size:19px!important;color:#073d49!important}
+.ipa-admin-integrated .ipa80-city-details small{display:block!important;margin-top:4px!important;color:#748589!important;font-size:12px!important}
+/* Destinos compactos, evitando botões gigantes na versão web */
+@media (min-width:861px){.ipa-admin-integrated .ipa77-unstarted-card{grid-template-columns:minmax(0,1fr) auto!important;gap:15px!important}.ipa-admin-integrated .ipa77-unstarted-card .btn{min-width:0!important;width:auto!important;max-width:220px!important;font-size:13px!important;padding:9px 14px!important;min-height:40px!important;box-shadow:none!important}}
+@media (max-width:860px){.ipa-admin-integrated .ipa77-unstarted-card .btn{min-width:0!important}}

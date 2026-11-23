@@ -2376,10 +2376,10 @@ function countryFlag(country){
  return map[String(country||"").trim()]||"🌍";
 }
 function countryFlagCode(country){
- const map={"Portugal":"pt","Brasil":"br","Espanha":"es","França":"fr","Itália":"it","Reino Unido":"gb","Inglaterra":"gb","Estados Unidos":"us","Argentina":"ar","Alemanha":"de","Holanda":"nl","Países Baixos":"nl","Suíça":"ch","Áustria":"at","Grécia":"gr","Irlanda":"ie","Bélgica":"be","Croácia":"hr","Japão":"jp","Canadá":"ca","México":"mx","Chile":"cl","Uruguai":"uy","Marrocos":"ma","Morocco":"ma","Vaticano":"va","Cidade do Vaticano":"va","Estado da Cidade do Vaticano":"va","Santa Sé":"va","Luxemburgo":"lu","Luxembourg":"lu","Luxemburg":"lu","Grão-Ducado de Luxemburgo":"lu"};
+ const map={"Portugal":"pt","Brasil":"br","Espanha":"es","França":"fr","Itália":"it","Reino Unido":"gb","Inglaterra":"gb-eng","Estados Unidos":"us","Argentina":"ar","Alemanha":"de","Holanda":"nl","Países Baixos":"nl","Suíça":"ch","Áustria":"at","Grécia":"gr","Irlanda":"ie","Bélgica":"be","Croácia":"hr","Japão":"jp","Canadá":"ca","México":"mx","Chile":"cl","Uruguai":"uy","Marrocos":"ma","Morocco":"ma","Vaticano":"va","Cidade do Vaticano":"va","Estado da Cidade do Vaticano":"va","Santa Sé":"va","Luxemburgo":"lu","Luxembourg":"lu","Luxemburg":"lu","Grão-Ducado de Luxemburgo":"lu"};
  return map[String(country||"").trim()]||"";
 }
-function countryFlagMarkup(country){const code=countryFlagCode(country);return code?`<img src="https://flagcdn.com/40x30/${code}.png" alt="${ipaEscape(country)}" loading="lazy" referrerpolicy="no-referrer">`:countryFlag(country)}
+function countryFlagMarkup(country){const code=countryFlagCode(country),local=["pt","ie","nl","lu","gb-eng","gb","br","es","fr","it","de","be","ch","at","ma","va","us","ca"].includes(code);if(!local)return countryFlag(country);return `<span class="ipa-flag-picture"><img src="/assets/flags/${code}.svg" alt="Bandeira de ${ipaEscape(country)}" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='inline'"><span class="ipa-flag-fallback" aria-hidden="true">${countryFlag(country)}</span></span>`}
 function tripCountry(t){
  if(t?.country)return t.country;
  const txt=String(t?.destination||"");
@@ -4302,7 +4302,7 @@ function ipa70StageScheduleBlocks(trip,entries){
 function ipa77MissingStagesPanel(trip){
  const stages=tripStages(trip),entries=ipa70StageDayEntries(trip),existing=new Set((trip.itinerary||[]).map(d=>Number(d.day)));
  const missing=stages.map((st,i)=>({st,i,days:entries.filter(e=>String(e.stageId)===String(st.id))})).filter(x=>x.days.length&&!x.days.some(e=>existing.has(Number(e.day))));
- return missing.length?`<div class="ipa77-unstarted-stages"><div class="ipa77-unstarted-head"><b>Destinos aguardando criação dos dias</b><small>Gere cada cidade quando estiver pronta para começar a montar o roteiro.</small></div><div class="ipa77-unstarted-grid">${missing.map(x=>`<article class="ipa77-unstarted-card"><div><strong>${ipaEscape(x.st.destination)}</strong><small>${ipaEscape(x.st.country||'')} · ${x.days.length} dia(s)</small></div><button type="button" class="btn btn-primary" data-ipa70-generate-stage="${ipaEscape(trip.id)}:${x.i}">✨ Gerar esta cidade</button></article>`).join('')}</div></div>`:'';
+ return missing.length?`<div class="ipa77-unstarted-stages"><div class="ipa77-unstarted-head"><b>Destinos aguardando criação dos dias</b><small>Gere cada cidade quando estiver pronta para começar a montar o roteiro.</small></div><div class="ipa77-unstarted-grid">${missing.map(x=>`<article class="ipa77-unstarted-card"><div class="ipa80-city-identity"><span class="ipa80-city-flag">${countryFlagMarkup(x.st.country||'')}</span><div class="ipa80-city-details"><strong>${ipaEscape(x.st.destination)}</strong><small>${ipaEscape(x.st.country||'')} · ${x.days.length} dia(s)</small></div></div><button type="button" class="btn btn-primary" data-ipa70-generate-stage="${ipaEscape(trip.id)}:${x.i}">✨ Gerar esta cidade</button></article>`).join('')}</div></div>`:'';
 }
 function ipa77DayGenerationControls(trip,day){
  const stages=tripStages(trip),entries=ipa70StageDayEntries(trip);
@@ -4326,7 +4326,7 @@ function adminTripEditor(id){
  const country=tripCountry(t),flag=countryFlag(country);
  const stages=tripStages(t), countries=[...new Set(stages.map(st=>(st.country||'').trim()).filter(Boolean))];
  if(!countries.length&&country)countries.push(country);
- const flags=countries.slice(0,5).map(x=>`<span class="trip-country-flag" title="${ipaEscape(x)}">${countryFlag(x)}</span>`).join('');
+ const flags=countries.slice(0,5).map(x=>`<span class="trip-country-flag" title="${ipaEscape(x)}">${countryFlagMarkup(x)}</span>`).join('');
  const extra=countries.length>5?`<span class="trip-country-more">+${countries.length-5}</span>`:'';
  return `<div class="ipa-admin-editor-head trip-editor-hero"><button data-admin-section="trips">← Todas as viagens</button><div class="trip-editor-identity"><span class="eyebrow">${ipaEscape(c?.name||'VIAGEM')}</span><h1>${ipaEscape(t.name)}</h1><div class="trip-country-flags">${flags}${extra}</div><p>📍 ${ipaEscape(tripDestination(t))}${country?', '+ipaEscape(country):''}</p>${c?`<small>👤 ${ipaEscape(c.name)}</small>`:''}</div><button class="btn btn-light trip-editor-preview" data-client-preview="${t.id}" data-client-preview-client="${t.clientId}">👁 Ver como cliente</button></div>
  <section class="ipa-admin-panel ipa-rename-trip"><div class="section-head"><div><span class="eyebrow">IDENTIFICAÇÃO</span><h2>Nome da viagem</h2></div></div><p>Este é o nome que o viajante verá no aplicativo.</p><div class="ipa-rename-trip-fields"><input aria-label="Nome da viagem" data-admin-trip-name-input="${ipaEscape(t.id)}" maxlength="120" value="${ipaEscape(t.name||'')}"><button class="btn btn-primary" data-admin-rename-trip="${ipaEscape(t.id)}">Salvar nome</button></div></section>
