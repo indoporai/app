@@ -1,0 +1,11 @@
+Indo por Aí — Beta 6.30.92
+
+NOVIDADE: Seleção das cidades diretamente abaixo da seleção de países na tela de edição da viagem no ADM.
+- Mudança de país troca também a etapa/cidade ativa.
+- A cidade ativa governa dias/roteiro, cartão de transporte, hospedagens e documentos com dados de localização.
+- Itens legados sem cidade definida continuam visíveis para classificação; não foram modificados no banco.
+- Entre no Clima mantém conteúdo por país (modelo vigente).
+- Google Maps e Deslocamento não foram alterados.
+- Financeiro, participantes e Mochilito continuam compartilhados pela viagem.
+
+Validação técnica: verificação de sintaxe JavaScript. Testes no navegador com Firebase são necessários antes da produção.

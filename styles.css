@@ -2297,3 +2297,14 @@ body.hidden-nav .bottom-nav{display:none!important;}
 .ipa88-push-optin button{max-width:100%;white-space:normal}
 .ipa88-journey-card .flight-route>span{font-size:26px;line-height:1.2}
 @media(max-width:620px){.ipa88-journey-card .flight-details{grid-template-columns:repeat(2,minmax(0,1fr))}.ipa88-push-panel{max-width:100%}}
+
+/* 6.30.92 — cidade ativa logo abaixo do país no ADM; não altera Mapas. */
+.ipa92-city-selector{margin-top:20px;padding-top:16px;border-top:1px solid #d8e9ea}
+.ipa92-city-selector-head{display:flex;flex-direction:column;gap:4px;color:#064d60;margin-bottom:12px}
+.ipa92-city-selector-head small{font-size:13px;color:#5d7480}
+.ipa92-city-options{display:flex;flex-wrap:wrap;gap:10px}
+.ipa92-city-option{border:2px solid #b7dade;border-radius:15px;background:#fff;color:#00566a;padding:12px 17px;display:flex;flex-direction:column;align-items:flex-start;gap:4px;cursor:pointer;font:inherit;min-width:120px}
+.ipa92-city-option strong{font-weight:750}
+.ipa92-city-option small{font-size:11px;color:inherit;opacity:.8}
+.ipa92-city-option.active,.ipa92-city-option[aria-pressed="true"]{background:#045b6d;border-color:#045b6d;color:#fff}
+.ipa92-city-option:focus-visible{outline:3px solid #fdc750;outline-offset:3px}
