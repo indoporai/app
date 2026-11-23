@@ -1,0 +1,22 @@
+INDO POR AÍ — BETA 6.30.81
+Correção estrutural do editor de dias do ADM
+
+Causa encontrada:
+O editor de uma viagem era substituído diretamente no DOM, sem o contêiner
+'.ipa-admin-integrated' usado pelos estilos das versões anteriores.
+Assim, as regras visuais praticamente não alcançavam os elementos da tela.
+
+Alterações:
+- Editor agora tem contêiner de estilo próprio quando renderizado diretamente.
+- Cabeçalho do dia separado dos comandos de geração e ações secundárias.
+- Botões de Regenerar, Limpar IA, Bate e volta e Adicionar item com largura
+  natural, quebra responsiva e alinhamento sem sobreposição.
+- Locais de cada dia permanecem em cards com ações compactas.
+- Bandeiras dos países exibidas por SVG local; fallback de emoji.
+- Nenhuma modificação intencional no motor de roteiros, Firestore ou pagamentos.
+- Versão do cache e referência dos arquivos atualizadas.
+
+IMPORTANTE:
+Os testes cobrem análise estrutural, sintaxe JS, integridade do ZIP e
+referências locais. Testes visuais com Firebase publicado e em dispositivos
+reais ainda são necessários. Faça deploy primeiro no ambiente de testes.

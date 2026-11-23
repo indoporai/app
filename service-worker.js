@@ -1,16 +1,16 @@
-const CACHE = "indo-por-ai-v2-beta-6-30-80-flags-web";
+const CACHE = "indo-por-ai-v2-beta-6-30-81-flags-web";
 const CORE = [
   "./",
   "index.html",
-  "styles.css?v=v2-beta-6-30-80",
-  "app.js?v=v2-beta-6-30-80",
-  "data-service.js?v=v2-beta-6-30-80",
-  "firebase-service.js?v=v2-beta-6-30-80",
+  "styles.css?v=v2-beta-6-30-81",
+  "app.js?v=v2-beta-6-30-81",
+  "data-service.js?v=v2-beta-6-30-81",
+  "firebase-service.js?v=v2-beta-6-30-81",
   "admin.html",
-  "admin.js?v=v2-beta-6-30-80",
+  "admin.js?v=v2-beta-6-30-81",
   "admin.css",
   "manifest.webmanifest?v=63049",
-  "pwa-install.js?v=v2-beta-6-30-80",
+  "pwa-install.js?v=v2-beta-6-30-81",
   "assets/apple-touch-icon-6347.png",
   "assets/icon-192-6347.png",
   "assets/icon-512-6347.png",
