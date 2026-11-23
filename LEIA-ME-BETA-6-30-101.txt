@@ -1,0 +1,4 @@
+Beta 6.30.101 — isolamentos por cidade e diagnóstico de upload.
+Mudanças: documentos e hospedagens mantêm a etapa selecionada durante cadastro; upload de documentos termina com erro claro após 90 s em vez de ficar indefinidamente bloqueado; contadores da visão de cidade não somam registros de outros destinos.
+Não altera Maps, Deslocamento, identidade visual ou funcionalidades externas.
+Validar com sessão ADM Firebase e regras de Storage.

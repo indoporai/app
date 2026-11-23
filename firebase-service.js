@@ -31,7 +31,7 @@ import {
   runTransaction,
   arrayUnion
 } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-firestore.js";
-import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-storage.js";
+import { getStorage, ref as storageRef, uploadBytes, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-storage.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyD_EYtJ3h_WDvga2eV8LKEiCpDaT8gSEiM",
@@ -748,7 +748,16 @@ window.IPAFirebase = {
     if(!currentUser || currentUser.uid!==ADMIN_UID)throw new Error("Somente o ADM pode enviar documentos.");
     const safe=(file.name||"documento").replace(/[^a-zA-Z0-9._-]/g,"_");
     const path=`documents/${clientId}/${tripId}/${Date.now()}-${safe}`;
-    const snap=await uploadBytes(storageRef(storage,path),file,{contentType:file.type||"application/octet-stream"});
+    const task=uploadBytesResumable(storageRef(storage,path),file,{contentType:file.type||"application/octet-stream"});
+    const snap=await new Promise((resolve,reject)=>{
+      let finished=false;
+      const timer=setTimeout(()=>{
+        if(finished)return;
+        finished=true;task.cancel();
+        reject(Object.assign(new Error("O upload excedeu 90 segundos. Verifique conexão e permissões do Firebase Storage."),{code:"storage/retry-limit-exceeded"}));
+      },90000);
+      task.on("state_changed",null,err=>{if(finished)return;finished=true;clearTimeout(timer);reject(err)},()=>{if(finished)return;finished=true;clearTimeout(timer);resolve(task.snapshot)});
+    });
     return {url:await getDownloadURL(snap.ref),path};
   },
 
