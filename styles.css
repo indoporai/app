@@ -2288,3 +2288,12 @@ body.hidden-nav .bottom-nav{display:none!important;}
 .ipa87-admin-actions{text-align:right}.ipa87-admin-actions .btn{border-radius:12px;font-size:12px;padding:8px 12px}
 .ipa87-logistics-empty{color:#71868a;font-size:13px;margin:0}
 @media(max-width:600px){.ipa87-logistics-panel{padding:14px}.ipa87-logistics-title .btn,.ipa87-go{width:100%}.ipa87-logistics-title{align-items:stretch}}
+
+/* Beta 6.30.88 — cards inteligentes e central de push */
+.ipa88-push-panel label{display:block;margin:12px 0 6px;font-weight:650}
+.ipa88-push-status{padding:12px 14px;border:1px solid #cde4e6;border-radius:12px;background:#f0faf9;color:#085663}
+.ipa88-push-panel textarea{display:block;width:100%;min-height:105px;resize:vertical}
+.ipa88-push-optin small{display:block;margin-top:10px;color:#567078}
+.ipa88-push-optin button{max-width:100%;white-space:normal}
+.ipa88-journey-card .flight-route>span{font-size:26px;line-height:1.2}
+@media(max-width:620px){.ipa88-journey-card .flight-details{grid-template-columns:repeat(2,minmax(0,1fr))}.ipa88-push-panel{max-width:100%}}

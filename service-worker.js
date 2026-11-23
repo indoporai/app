@@ -1,16 +1,17 @@
-const CACHE = "indo-por-ai-v2-beta-6-30-87-logistics";
+const CACHE = "indo-por-ai-v2-beta-6-30-88-journey-push";
 const CORE = [
   "./",
   "index.html",
-  "styles.css?v=v2-beta-6-30-85",
-  "app.js?v=v2-beta-6-30-85",
-  "data-service.js?v=v2-beta-6-30-85",
-  "firebase-service.js?v=v2-beta-6-30-85",
+  "styles.css?v=v2-beta-6-30-88",
+  "app.js?v=v2-beta-6-30-88",
+  "push-config.js?v=v2-beta-6-30-88",
+  "data-service.js?v=v2-beta-6-30-88",
+  "firebase-service.js?v=v2-beta-6-30-88",
   "admin.html",
-  "admin.js?v=v2-beta-6-30-85",
+  "admin.js?v=v2-beta-6-30-88",
   "admin.css",
-  "manifest.webmanifest?v=63085",
-  "pwa-install.js?v=v2-beta-6-30-85",
+  "manifest.webmanifest?v=63088",
+  "pwa-install.js?v=v2-beta-6-30-88",
   "assets/apple-touch-icon-6347.png",
   "assets/icon-192-6347.png",
   "assets/icon-512-6347.png",
@@ -55,4 +56,23 @@ self.addEventListener("fetch", event => {
     return;
   }
   event.respondWith(caches.match(event.request).then(cached=>cached||fetch(event.request)));
+});
+
+// Firebase Messaging uses the same existing PWA service worker registration.
+// No push is requested automatically: the client must click "Ativar notificações".
+try {
+ importScripts('https://www.gstatic.com/firebasejs/12.17.1/firebase-app-compat.js',
+               'https://www.gstatic.com/firebasejs/12.17.1/firebase-messaging-compat.js');
+ firebase.initializeApp({apiKey:'AIzaSyD_EYtJ3h_WDvga2eV8LKEiCpDaT8gSEiM',authDomain:'indo-por-ai-app.firebaseapp.com',projectId:'indo-por-ai-app',messagingSenderId:'140345034738',appId:'1:140345034738:web:6b0dc70f830f56d45ecd6b'});
+ firebase.messaging();
+} catch(e) { console.warn('FCM em segundo plano não inicializado:',e); }
+self.addEventListener('notificationclick', event=>{
+ event.notification.close();
+ const link=event.notification.data?.url||'/';
+ const destination=new URL(link,self.location.origin);
+ if(destination.origin!==self.location.origin)return;
+ event.waitUntil(clients.matchAll({type:'window',includeUncontrolled:true}).then(wins=>{
+  for(const win of wins){if(win.url.startsWith(self.location.origin)){win.focus();return win.navigate(destination.href)}}
+  return clients.openWindow(destination.href);
+ }));
 });

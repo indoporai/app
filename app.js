@@ -140,7 +140,7 @@ document.addEventListener('click', event => {
 
 
 setTimeout(()=>document.querySelector('#splash').classList.add('hide'),1800);
-if('serviceWorker' in navigator) navigator.serviceWorker.register('./service-worker.js?v=63052', {updateViaCache:'none'});
+if('serviceWorker' in navigator) navigator.serviceWorker.register('./service-worker.js?v=63088', {updateViaCache:'none'});
 function money(n){return new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(n)}
 function timeFmt(s){const m=String(Math.floor(s/60)).padStart(2,'0'),sec=String(s%60).padStart(2,'0');return `${m}:${sec}`}
 function setProfile(profile){
@@ -2185,13 +2185,43 @@ function bind(){
      toast('Participante excluído e confirmado ✓');view.innerHTML=adminTripEditor(tripId);bind();
    }catch(e){console.error(e);toast('Erro ao excluir participante: '+(e?.code||e?.message||'erro desconhecido'));b.disabled=false}
  });
+ document.querySelector('#ipa88TransportType')?.addEventListener('change',e=>{
+  const m=ipa88TransportMode({transportType:e.target.value});
+  const labels={airline:'Companhia / empresa',flightNumber:m.number,terminal:m.terminal,gate:m.gate,seat:m.seat};
+  for(const [key,text] of Object.entries(labels)){const label=document.querySelector(`[data-ipa88-transport-label="${key}"]`);if(label)label.firstChild.textContent=text;}
+ });
+ document.querySelector('#ipa88TransportType')?.dispatchEvent(new Event('change'));
+ const pushButton=document.querySelector('#ipa88PushSend');
+ if(pushButton)pushButton.onclick=async()=>{
+  const result=document.querySelector('#ipa88PushResult');const title=document.querySelector('#ipa88PushTitle').value.trim(),body=document.querySelector('#ipa88PushBody').value.trim();
+  const target=document.querySelector('#ipa88PushTarget').value,tripId=document.querySelector('#ipa88PushTrip').value;
+  const link=document.querySelector('#ipa88PushUrl').value.trim()||'/';
+  if(!title||!body)return toast('Preencha título e mensagem.');
+  if(!link.startsWith('/')||link.startsWith('//'))return toast('Informe um caminho interno válido, iniciando por /.');
+  if(!confirm(`Enviar a notificação para ${target==='all'?'todos os clientes autorizados':'a viagem selecionada'}?`))return;
+  pushButton.disabled=true;result.textContent='Solicitando envio seguro ao servidor...';
+  try{const response=await window.IPAFirebase.sendPushNotification({title,body,target,tripId:target==='trip'?tripId:'',link});
+    result.textContent=`Envio concluído pelo servidor: ${response.sent||0} confirmado(s), ${response.failed||0} falha(s) de ${response.total||0} dispositivo(s).`;
+    toast('Resposta do servidor recebida ✓');
+  }catch(e){result.textContent='Não foi possível enviar: '+(e.message||e);toast('Push não enviado.');}
+  finally{pushButton.disabled=false;}
+ };
+ document.querySelector('#ipa88EnablePush')?.addEventListener('click',async e=>{
+  const btn=e.currentTarget;btn.disabled=true;
+  try{await window.IPAFirebase.enablePushNotifications(activeTrip()?.id||'');toast('Notificações ativadas neste dispositivo ✓');btn.textContent='🔔 Notificações ativadas';}
+  catch(err){toast('Não foi possível ativar: '+(err.message||err));btn.disabled=false;}
+ });
  document.querySelectorAll('[data-admin-save-flight]').forEach(b=>b.onclick=async()=>{
-   const flight={};document.querySelectorAll('[data-flight-field]').forEach(x=>flight[x.dataset.flightField]=x.value.trim());
-   const current=(adminData().trips||[]).find(x=>x.id===b.dataset.adminSaveFlight);
-   const country=current&&ipaAdminCountry(current);
-   if(country){IPAData.updateTrip(current.id,{flightsByCountry:{...(current.flightsByCountry||{}),[country]:flight}})}else{IPAData.updateTrip(b.dataset.adminSaveFlight,{flight});}
-   if(window.IPAFirebase?.user)await window.IPAFirebase.syncNow();
-   toast('Dados do voo atualizados ✓');view.innerHTML=adminTripEditor(b.dataset.adminSaveFlight);bind();
+  const tripId=b.dataset.adminSaveFlight,current=(adminData().trips||[]).find(x=>x.id===tripId);
+  if(!current)return toast('Viagem não encontrada.');
+  const stage=ipa84SelectedStage(current,true);if(!stage)return toast('Selecione uma cidade antes de cadastrar o trecho.');
+  const card={};document.querySelectorAll('[data-flight-field]').forEach(x=>card[x.dataset.flightField]=x.value.trim());
+  card.stageKey=ipa88StageKey(stage);card.country=stage.country||'';card.city=stage.destination||'';
+  const previous=Array.isArray(current.journeyCards)?current.journeyCards:[];
+  const next=[...previous.filter(x=>String(x.stageKey)!==card.stageKey),card];
+  b.disabled=true;
+  try{IPAData.updateTrip(tripId,{journeyCards:next});if(!window.IPAFirebase?.user)throw Error('Faça login como ADM.');await window.IPAFirebase.syncNow();toast('Cartão do trecho salvo ✓');view.innerHTML=adminTripEditor(tripId);bind();}
+  catch(error){IPAData.updateTrip(tripId,{journeyCards:previous});toast('Não foi possível salvar o cartão no Firebase: '+(error.message||error));b.disabled=false;}
  });
 
  document.querySelectorAll('[data-admin-delete-document]').forEach(b=>b.onclick=async()=>{
@@ -3374,16 +3404,31 @@ function ipaPostcardAsset(destination){
  return 'assets/postcard-generic-6347.webp';
 }
 function ipaPostcardStyle(city){return `style="--ipa-city-art:url('${ipaPostcardAsset(city)}')"`;}
+// Beta 6.30.88 — cartão por etapa, preservando os dados legados de voo.
+const IPA_TRANSPORT_MODES={plane:{icon:'✈️',name:'Avião',number:'Número do voo',terminal:'Terminal',gate:'Portão',seat:'Assento'},train:{icon:'🚆',name:'Trem',number:'Número do trem',terminal:'Estação / terminal',gate:'Plataforma',seat:'Vagão / assento'},bus:{icon:'🚌',name:'Ônibus',number:'Número da viagem',terminal:'Rodoviária / terminal',gate:'Plataforma',seat:'Poltrona'},boat:{icon:'⛴️',name:'Barco',number:'Número da travessia',terminal:'Porto / terminal',gate:'Portão de embarque',seat:'Assento / cabine'}};
+function ipa88TransportMode(f){return IPA_TRANSPORT_MODES[f?.transportType]||IPA_TRANSPORT_MODES.plane;}
+function ipa88StageKey(st){return String(st?.id||[st?.country||'',st?.destination||'',st?.startDate||''].join('|'));}
+function ipa88CurrentCard(t,admin=false){
+ const stage=ipa84SelectedStage(t,admin);const key=ipa88StageKey(stage);
+ const card=(t.journeyCards||[]).find(x=>String(x.stageKey)===key);
+ if(card)return card;
+ const country=stage?.country||ipaContextCountry(t);
+ const legacy=Object.entries(t.flightsByCountry||{}).find(([k])=>ipaSameCountry(k,country))?.[1]||((!country||ipaSameCountry(ipaTripCountries(t)[0],country))?t.flight:null);
+ // Antigos dados do voo só aparecem na primeira etapa correspondente do país.
+ const sameCountry=tripStages(t).filter(x=>ipaSameCountry(x.country,country));
+ return sameCountry[0]&&ipa88StageKey(sameCountry[0])===key?(legacy||{}):{};
+}
+function ipa88TransportCardHtml(t,card){
+ const f=card||{},m=ipa88TransportMode(f);
+ if(!Object.keys(f).length||!Object.values(f).some(Boolean))return '';
+ const date=f.date?new Date(f.date+'T12:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'}):'--/--';
+ return `<section class="section ipa88-journey-card"><div class="section-head"><div><span class="eyebrow">${m.icon} SEU ${m.name.toUpperCase()}</span><h2>Cartão de embarque inteligente</h2></div><span class="chip green">Dados do ADM</span></div><div class="smart-flight-card ipa-flight-postcard" ${ipaPostcardStyle(f.destination||tripDestination(t))}><div class="flight-top"><div><small>${ipaEscape(f.airline||'Companhia / empresa')}</small><b>${ipaEscape(f.flightNumber||f.title||m.name)}</b></div><strong>${ipaEscape(date)}</strong></div><div class="flight-route"><div><small>ORIGEM</small><b>${ipaEscape(f.origin||'---')}</b></div><span aria-label="${m.name}">${m.icon}</span><div><small>DESTINO</small><b>${ipaEscape(f.destination||tripDestination(t))}</b></div></div><div class="flight-details"><div><small>HORÁRIO</small><b>${ipaEscape(f.time||'--:--')}</b></div><div><small>${ipaEscape(m.terminal.toUpperCase())}</small><b>${ipaEscape(f.terminal||'-')}</b></div><div><small>${ipaEscape(m.gate.toUpperCase())}</small><b>${ipaEscape(f.gate||'-')}</b></div><div><small>${ipaEscape(m.seat.toUpperCase())}</small><b>${ipaEscape(f.seat||'-')}</b></div></div>${f.notes?`<p>${ipaEscape(f.notes)}</p>`:''}</div></section>`;
+}
 function flightWalletSection(t,d){
- const flight=ipaVisibleFlight(t);
+ const card=ipa88CurrentCard(t);
+ if(Object.values(card).some(Boolean))return ipa88TransportCardHtml(t,card);
  const docs=ipaVisibleDocuments(t,d).filter(x=>x.type==='Passagem aérea');
- if(!Object.keys(flight).length&&!docs.length)return "";
- const f=Object.keys(flight).length?flight:(docs[0]||{});
- return `<section class="section"><div class="section-head"><div><span class="eyebrow">✈️ SEU VOO</span><h2>Cartão de embarque inteligente</h2></div><span class="chip green">Dados do ADM</span></div>
- <div class="smart-flight-card ipa-flight-postcard" ${ipaPostcardStyle(f.destination||tripDestination(t))}><div class="flight-top"><div><small>${f.airline||'Companhia'}</small><b>${f.flightNumber||f.title||'Voo'}</b></div><strong>${f.date?new Date(f.date+'T12:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'}):'--/--'}</strong></div>
- <div class="flight-route"><div><small>ORIGEM</small><b>${f.origin||'---'}</b></div><span>✈</span><div><small>DESTINO</small><b>${f.destination||tripDestination(t)}</b></div></div>
- <div class="flight-details"><div><small>HORÁRIO</small><b>${f.time||'--:--'}</b></div><div><small>TERMINAL</small><b>${f.terminal||'-'}</b></div><div><small>PORTÃO</small><b>${f.gate||'-'}</b></div><div><small>ASSENTO</small><b>${f.seat||'-'}</b></div></div>
- ${f.notes?`<p>${f.notes}</p>`:''}</div></section>`;
+ return docs.length?ipa88TransportCardHtml(t,docs[0]):'';
 }
 const ipaWeatherCache=new Map();
 function ipaWeatherCode(code){
@@ -3481,41 +3526,20 @@ function ipaDestinationForMaps(place,trip){
 }
 function ipaOpenNavigationForPlace(place,trip){
  if(!place)return;
+ // Beta 6.30.89: sem tela intermediária; Google Maps oferece os modos disponíveis.
  const destination=ipaDestinationForMaps(place,trip);
- const modes=[['walking','🚶','A pé'],['transit','🚆','Transporte público'],['driving','🚗','Carro'],['bicycling','🚲','Bicicleta']];
- showModal(`<span class="eyebrow">📍 NAVEGAÇÃO</span><h2>Ir até ${ipaEscape(place.name||'este lugar')}</h2><p>Escolha como deseja ir. Vamos pedir sua localização <strong>apenas quando você tocar em Traçar rota</strong>. Ela não será salva no aplicativo.</p><div class="ipa-navigation-mode-grid">${modes.map((m,i)=>`<label class="ipa-navigation-mode"><input type="radio" name="ipa-nav-mode" value="${m[0]}" ${i===1?'checked':''}><span>${m[1]} ${m[2]}</span></label>`).join('')}</div><button id="ipaRouteFromGPS" class="btn btn-primary btn-block" type="button">📍 Traçar rota da minha localização</button><button id="ipaRouteWithoutGPS" class="btn btn-light btn-block" type="button">Abrir Maps sem usar meu GPS neste app</button><small id="ipaNavigationStatus" role="status" class="ipa-navigation-status">O Google Maps mostrará as opções atuais de trajeto e transporte, quando disponíveis.</small>`);
- const getMode=()=>modalContent.querySelector('input[name="ipa-nav-mode"]:checked')?.value||'transit';
- const routeURL=(mode,origin)=>'https://www.google.com/maps/dir/?api=1&destination='+encodeURIComponent(destination)+'&travelmode='+encodeURIComponent(mode)+(origin?'&origin='+encodeURIComponent(origin):'');
- const openRoute=(mode,useGPS)=>{
-  // Não pré-abre uma janela do Maps enquanto o GPS pede permissão.
-  // Pré-abertura + troca de endereço entre domínios criava uma janela intermediária
-  // em navegadores/PWAs móveis; o usuário acabava vendo uma página branca com X.
-  // O link final fica pronto para um único toque explícito (sem pop-up vazio).
-  ipaSaveClientPage();
-  const status=modalContent.querySelector('#ipaNavigationStatus');
-  const launch=origin=>{
-   const url=routeURL(mode,origin);
-   const previous=modalContent.querySelector('#ipaFinalMapsLink');
-   if(previous)previous.remove();
-   const link=document.createElement('a');
-   link.id='ipaFinalMapsLink';link.className='btn btn-primary btn-block ipa-direct-maps-link';
-   link.href=url;link.target='_blank';link.rel='noopener noreferrer external';
-   link.textContent='🗺️ Abrir rota no Google Maps ↗';
-   link.addEventListener('click',()=>{ipaSaveClientPage();try{modal.close()}catch(_){}});
-   if(status){status.textContent=origin?'Localização encontrada! Toque abaixo para abrir a rota diretamente no Google Maps.':'Toque abaixo para abrir a rota. O Google Maps poderá usar sua localização atual.';status.after(link)}
-   else modalContent.appendChild(link);
-  };
-  if(!useGPS||!navigator.geolocation){launch('');return;}
-  if(status)status.textContent='📍 Obtendo localização atual com sua autorização...';
-  navigator.geolocation.getCurrentPosition(
-   pos=>launch(pos.coords.latitude.toFixed(6)+','+pos.coords.longitude.toFixed(6)),
-   ()=>launch(''),
-   {enableHighAccuracy:true,timeout:12000,maximumAge:0}
-  );
- };
- modalContent.querySelector('#ipaRouteFromGPS').onclick=()=>openRoute(getMode(),true);
- modalContent.querySelector('#ipaRouteWithoutGPS').onclick=()=>openRoute(getMode(),false);
+ const url='https://www.google.com/maps/dir/?api=1&destination='+encodeURIComponent(destination);
+ ipaSaveClientPage();
+ const link=document.createElement('a');
+ link.href=url;
+ link.target='_blank';
+ link.rel='noopener noreferrer external';
+ link.style.display='none';
+ document.body.appendChild(link);
+ link.click();
+ link.remove();
 }
+
 function ipaAdminEditTransport(tripId,dayNo,fromIndex){
  const t=adminData().trips.find(x=>String(x.id)===String(tripId)),day=t?.itinerary?.find(d=>Number(d.day)===Number(dayNo));
  const places=normalizedPlaces(day),from=places[fromIndex],to=places[fromIndex+1];if(!from||!to)return;
@@ -3654,7 +3678,7 @@ ${tripModule('itinerary')?`<section class="section ipa-before-itinerary"><div cl
 </section>
 ${ipaVisibleDocuments(t,ipaDB()).length?`<section class="section"><div class="section-head"><div><span class="eyebrow">CARTEIRA DA VIAGEM</span><h2>Seus documentos</h2></div></div><div class="travel-wallet">${ipaVisibleDocuments(t,ipaDB()).map(x=>`<div><span>${x.type==='Passagem aérea'?'✈️':x.type.includes('Hospedagem')?'🏨':x.type.includes('trem')?'🚆':x.type.includes('ônibus')?'🚌':x.type.includes('Ingresso')?'🎟️':x.type.includes('Seguro')?'🛡️':'📄'}</span><div><b>${x.title}</b><small>${[x.date,x.time,x.terminal&&('Terminal '+x.terminal),x.gate&&('Portão '+x.gate),x.locator&&('Localizador '+x.locator)].filter(Boolean).join(' · ')}</small></div>${x.url?`<button data-external-route="${x.url}">Abrir</button>`:''}</div>`).join('')}</div></section>`:''}
 ${(ipaDB().recommendations||[]).filter(x=>x.tripId===t.id&&ipaRecordInCountry(t,x)).length?`<section class="section"><div class="section-head"><div><span class="eyebrow">INDO POR AÍ NETWORK</span><h2>Recomendados para você</h2></div></div><div class="network-client-grid">${(ipaDB().recommendations||[]).filter(x=>x.tripId===t.id&&ipaRecordInCountry(t,x)).slice(0,6).map(x=>`<div><span>💡</span><b>${x.name}</b><small>${x.category||'Dica'} · ${x.address||tripDestination(t)}</small><p>${x.smartTip||'Selecionado pela rede Indo por Aí.'}</p><button data-map="${x.address||x.name}">Maps ↗</button></div>`).join('')}</div></section>`:''}
-${flightWalletSection(t,d)}
+${!state.previewFromAdmin?`<section class="section ipa88-push-optin"><div class="section-head"><div><span class="eyebrow">🔔 ALERTAS DE VIAGEM</span><h2>Notificações do Indo por Aí</h2></div></div><p>Receba avisos importantes da viagem no seu celular, se você permitir.</p><button type="button" class="btn btn-light" id="ipa88EnablePush" ${!ipa88PushConfigured()?'disabled title="Integração de push aguardando configuração"':''}>🔔 Ativar notificações neste dispositivo</button><small>É necessário instalar o app na Tela de Início no iPhone. Você pode desativar nas configurações do aparelho.</small></section>`:""}${flightWalletSection(t,d)}
 ${hotelStaySection(t)}
 ${ipaExperienceCardsHtml(t)}
 ${climateSection(t)}
@@ -3710,6 +3734,21 @@ function ipaAdminTripsTravelingHtml(){
 function ipaAdminInstagramConfig(){
  const d=adminData(),count=Math.max(0,Number(d.instagramFollowers)||26000);
  return `<section class="ipa-admin-panel"><div class="section-head"><div><span class="eyebrow">COMUNIDADE INDO POR AÍ</span><h2>Instagram</h2></div></div><p>Atualize a quantidade de seguidores exibida na página inicial, sem alterar o layout.</p><label for="ipaInstagramFollowers">Seguidores atuais</label><div class="ipa-instagram-admin-controls"><input id="ipaInstagramFollowers" type="number" min="0" max="999999999" step="1" value="${count}" class="v2-concierge-input"><button type="button" class="btn btn-primary" id="ipaSaveInstagramFollowers">Salvar número</button></div><small>Perfil: @indo.por.ai.com.a.gente · Exibição arredondada em milhares</small></section>`;
+}
+// Push FCM: UI separada, envio sempre feito em Worker com autenticação ADM.
+function ipa88PushConfigured(){return !!(window.IPA_PUSH_CONFIG?.workerUrl&&window.IPA_PUSH_CONFIG?.vapidPublicKey);}
+function adminPushNotifications(){
+ const trips=adminData().trips||[];
+ return `<div class="ipa-admin-head"><div><span class="eyebrow">INDO POR AÍ BUSINESS</span><h1>🔔 Notificações Push</h1><p>Dispare avisos para clientes que ativaram as notificações no aplicativo.</p></div></div>
+ <section class="ipa-admin-panel ipa88-push-panel"><h2>Enviar notificação</h2>
+ <p class="ipa88-push-status">${ipa88PushConfigured()?'🟢 Configuração do push preenchida · disponibilidade do serviço será verificada no envio.':'🟠 Aguardando configuração: informe a chave VAPID e o endereço do Worker em push-config.js e configure os segredos no Cloudflare.'}</p>
+ <label>Destinatários<select id="ipa88PushTarget" class="v2-concierge-input"><option value="all">Todos os dispositivos autorizados</option><option value="trip">Clientes de uma viagem</option></select></label>
+ <label>Viagem<select id="ipa88PushTrip" class="v2-concierge-input">${trips.map(t=>`<option value="${ipaEscape(t.id)}">${ipaEscape(t.name||t.destination||'Viagem')}</option>`).join('')}</select></label>
+ <label>Título<input id="ipa88PushTitle" maxlength="100" class="v2-concierge-input" placeholder="Ex.: Seu roteiro foi atualizado"></label>
+ <label>Mensagem<textarea id="ipa88PushBody" maxlength="280" class="rating-text" placeholder="Escreva o aviso para os clientes"></textarea></label>
+ <label>Abrir ao tocar (caminho dentro do app)<input id="ipa88PushUrl" class="v2-concierge-input" value="/" placeholder="/"></label>
+ <button type="button" class="btn btn-primary" id="ipa88PushSend" ${!ipa88PushConfigured()?'disabled':''}>🔔 Disparar push</button>
+ <small id="ipa88PushResult" role="status">Os destinatários precisam autorizar as notificações. Não armazenamos credenciais do servidor no navegador.</small></section>`;
 }
 function adminSettings(){return `<div class="ipa-admin-head"><div><span class="eyebrow">INDO POR AÍ BUSINESS</span><h1>Configurações</h1><p>Indicadores e comunicação da marca.</p></div></div>${ipaAdminInstagramConfig()}`;}
 function adminDashboard(){const d=adminData(),open=d.payments.filter(p=>p.status!=='Pago').reduce((s,p)=>s+Number(p.amount||0),0);return `<div class="ipa-admin-head"><div><span class="eyebrow">INDO POR AÍ BUSINESS</span><h1>Dashboard</h1><p>Gerencie clientes, viagens e receita em um só lugar.</p></div><button class="btn btn-primary" data-admin-new-trip>+ Nova viagem</button></div><div class="ipa-admin-metrics">${adminMetric('👤','Clientes',d.clients.length,'ativos')}${adminMetric('✈️','Viagens',d.trips.length,'cadastradas')}${adminMetric('💳','Em aberto',adminMoney(open),'a receber')}${adminMetric('🔴','Live',d.trips.filter(t=>t.modules?.live).length,'habilitadas')}</div>${ipaAdminTripsTravelingHtml()}<section class="ipa-admin-panel"><div class="section-head"><div><span class="eyebrow">OPERAÇÃO</span><h2>Viagens</h2></div><button class="btn btn-light" data-admin-section="trips">Ver todas</button></div>${adminTripList()}</section>`}
@@ -4476,11 +4515,12 @@ function adminTripEditor(id){
  <section class="ipa-admin-panel"><div class="section-head"><div><span class="eyebrow">👥 PARTICIPANTES</span><h2>Quem vai nessa viagem?</h2></div><button class="btn btn-light" data-admin-add-participant="${t.id}">+ Participante</button></div>
  <p>Cada viajante pode ter login próprio. O roteiro é compartilhado; assento, memórias, avaliações e progresso são individuais.</p>
  <div class="participant-list">${(t.participants||[]).map((p,i)=>`<div><span>${p.minor?'🧒':'👤'}</span><div><b>${p.name}</b><small>${p.email||'Vinculado ao responsável'} · ${p.seat?`Assento ${p.seat} · `:''}${p.status==='accepted'?'✓ Aceito':'⏳ Pendente'}</small></div><button type="button" class="btn btn-light participant-delete-btn" data-admin-delete-participant="${ipaEscape(p.id)}" data-participant-trip="${ipaEscape(t.id)}" aria-label="Excluir ${ipaEscape(p.name||'participante')}">🗑 Excluir</button></div>`).join('')||'<small>Nenhum acompanhante cadastrado ainda.</small>'}</div></section>
- <section class="ipa-admin-panel" id="ipaCountryFlight"><div class="section-head"><div><span class="eyebrow">✈️ DADOS DO VOO</span><h2>Informação controlada pelo ADM ${ipaTripCountries(t).length>1?"· "+ipaEscape(ipaAdminCountry(t)):""}</h2></div><span class="chip">Sem API externa</span></div>
- <p>Estes dados aparecem no cartão de voo do cliente. O assento geral pode ser substituído pelo assento individual do participante.</p>
- <div class="flight-admin-grid">${[['airline','Companhia'],['flightNumber','Número do voo'],['date','Data'],['origin','Origem'],['destination','Destino'],['time','Horário'],['terminal','Terminal'],['gate','Portão'],['seat','Assento']].map(([k,l])=>`<label>${l}<input data-flight-field="${k}" value="${ipaEscape((ipaTripCountries(t).length>1?(t.flightsByCountry?.[ipaAdminCountry(t)]||(ipaSameCountry(ipaAdminCountry(t),ipaTripCountries(t)[0])?t.flight:{})):t.flight)?.[k]||'')}" ${k==='date'?'type="date"':k==='time'?'type="time"':''}></label>`).join('')}</div>
- <label>Observações<textarea data-flight-field="notes" placeholder="Ex.: apresentação no portão 1h antes">${ipaEscape((ipaTripCountries(t).length>1?(t.flightsByCountry?.[ipaAdminCountry(t)]||(ipaSameCountry(ipaAdminCountry(t),ipaTripCountries(t)[0])?t.flight:{})):t.flight)?.notes||'')}</textarea></label>
- <button class="btn btn-primary" data-admin-save-flight="${t.id}">Salvar dados do voo</button></section>
+ <section class="ipa-admin-panel" id="ipaCountryFlight"><div class="section-head"><div><span class="eyebrow">✈️🚆🚌⛴️ CARTÃO DE EMBARQUE</span><h2>Transporte da etapa · ${ipaEscape(ipa84SelectedStage(t,true)?.destination||tripDestination(t))}</h2></div><span class="chip">Dados do ADM</span></div>
+ <p>Mantenha o mesmo cartão visual do cliente. Cada etapa, inclusive retornos à mesma cidade em outras datas, tem seu próprio cadastro.</p>
+ <label>Tipo de transporte<select id="ipa88TransportType" class="v2-concierge-input" data-flight-field="transportType">${Object.entries(IPA_TRANSPORT_MODES).map(([key,m])=>`<option value="${key}" ${ipa88CurrentCard(t,true).transportType===key?'selected':''}>${m.icon} ${m.name}</option>`).join('')}</select></label>
+ <div class="flight-admin-grid">${[['airline','Companhia / empresa'],['flightNumber','Número / código'],['date','Data'],['origin','Origem'],['destination','Destino'],['time','Horário'],['terminal','Terminal / estação'],['gate','Portão / plataforma'],['seat','Assento / poltrona']].map(([k,l])=>`<label data-ipa88-transport-label="${k}">${l}<input data-flight-field="${k}" value="${ipaEscape(ipa88CurrentCard(t,true)?.[k]||'')}" ${k==='date'?'type="date"':k==='time'?'type="time"':''}></label>`).join('')}</div>
+ <label>Observações<textarea data-flight-field="notes" placeholder="Ex.: apresentar-se 3 horas antes">${ipaEscape(ipa88CurrentCard(t,true)?.notes||'')}</textarea></label>
+ <button class="btn btn-primary" data-admin-save-flight="${t.id}">Salvar cartão do trecho</button></section>
  <section class="ipa-admin-panel ipa-save-to-clients" id="ipaTripPublicationCenter"><span class="eyebrow">ETAPA 2 DE 3 · VIAGENS</span><h2>Concluir cadastro da viagem</h2><p>Revise o roteiro, os destinos, as hospedagens, o financeiro, os documentos e os voos. Cada seção possui seu botão de salvar. Depois, confirme a sincronização e siga para Clientes, onde ficará a publicação.</p><div class="ipa-publication-actions"><button type="button" class="btn btn-light" data-client-preview="${ipaEscape(t.id)}" data-client-preview-client="${ipaEscape(t.clientId||'')}">👁 Prévia do cliente</button><button type="button" class="btn btn-primary" data-trip-save-to-clients="${ipaEscape(t.id)}">💾 Salvar e seguir para Clientes</button></div><small>Essa ação não aprova o acesso nem envia mensagens.</small></section>
  <div class="admin-publish-actions ipa-publish-cta"><h3>Financeiro da viagem</h3><p>A cobrança permanece independente da liberação do aplicativo.</p>
  <button class="btn btn-light btn-block" data-admin-charge-trip="${t.id}" data-charge-client="${t.clientId}">💳 Enviar cobrança ao cliente responsável</button>
@@ -4665,13 +4705,13 @@ function adminIntegratedView(){
  if(adminSection==='concierge')adminSection='dashboard';
  const service=window.IPAFirebase;
  if(!service?.user) return adminLoginView();
- const views={dashboard:adminDashboard,leads:adminLeads,concierge:adminConcierge,clients:adminClients,trips:adminTrips,places:adminPlaces,transport:adminTransport,hotels:adminHotels,templates:adminTemplates,finance:adminFinance,live:adminLive,partners:adminPartners,experiences:adminExperiences,settings:adminSettings};
+ const views={dashboard:adminDashboard,leads:adminLeads,concierge:adminConcierge,clients:adminClients,trips:adminTrips,places:adminPlaces,transport:adminTransport,hotels:adminHotels,templates:adminTemplates,finance:adminFinance,live:adminLive,partners:adminPartners,experiences:adminExperiences,push:adminPushNotifications,settings:adminSettings};
  return `<div class="ipa-admin-integrated">
    <div class="ipa-admin-bar">
     <div><b>Indo por Aí</b><small>BUSINESS</small></div>
     <div class="firebase-admin-actions">${adminCloudBadge()}<button data-firebase-sync>↻ Sincronizar</button><button data-firebase-logout>Sair</button><button data-admin-exit>← Voltar</button></div>
    </div>
-   <div class="ipa-admin-nav">${[['dashboard','⌂','Dashboard'],['leads','📩','Pedidos'],['clients','👤','Clientes'],['trips','✈️','Viagens'],['places','📍','Lugares'],['transport','🚆','Deslocamentos'],['hotels','🏨','Hospedagens'],['experiences','✨','Experiências'],['templates','🗺️','Roteiros'],['finance','💳','Financeiro'],['live','🔴','Live'],['partners','☆','Parceiros'],['settings','⚙️','Configurações']].map(([k,i,l])=>`<button data-admin-section="${k}" class="${adminSection===k?'active':''}">${i}<span>${l}</span>${k==='concierge'&&ipaConciergePendingCount()?`<b class="ipa-notification-count" aria-label="${ipaConciergePendingCount()} atendimentos pendentes">${ipaConciergePendingCount()}</b>`:''}${k==='leads'&&(adminData().travelLeads||[]).filter(x=>(x.status||'Novo')==='Novo').length?`<b class="ipa-notification-count">${(adminData().travelLeads||[]).filter(x=>(x.status||'Novo')==='Novo').length}</b>`:''}</button>`).join('')}</div>
+   <div class="ipa-admin-nav">${[['dashboard','⌂','Dashboard'],['leads','📩','Pedidos'],['clients','👤','Clientes'],['trips','✈️','Viagens'],['places','📍','Lugares'],['transport','🚆','Deslocamentos'],['hotels','🏨','Hospedagens'],['experiences','✨','Experiências'],['templates','🗺️','Roteiros'],['push','🔔','Notificações'],['finance','💳','Financeiro'],['live','🔴','Live'],['partners','☆','Parceiros'],['settings','⚙️','Configurações']].map(([k,i,l])=>`<button data-admin-section="${k}" class="${adminSection===k?'active':''}">${i}<span>${l}</span>${k==='concierge'&&ipaConciergePendingCount()?`<b class="ipa-notification-count" aria-label="${ipaConciergePendingCount()} atendimentos pendentes">${ipaConciergePendingCount()}</b>`:''}${k==='leads'&&(adminData().travelLeads||[]).filter(x=>(x.status||'Novo')==='Novo').length?`<b class="ipa-notification-count">${(adminData().travelLeads||[]).filter(x=>(x.status||'Novo')==='Novo').length}</b>`:''}</button>`).join('')}</div>
    <div class="ipa-admin-content">${(views[adminSection]||adminDashboard)()}</div>
    ${ipaAiiWidgetHtml()}
   </div>`;
@@ -5209,7 +5249,7 @@ function tripView(){
  const country=ipaContextCountry(t)||tripCountry(t),flag=country===IPA_ALL_COUNTRIES?'🌍':countryFlag(country);
  const rows=places.map((p,index)=>`<article class="itinerary-item dynamic-itinerary-item ipa-reorder-item ${p.personal?'ipa-personal-place-card':''}"><span class="ipa-order-number">${index+1}</span>${ipaPlacePhotoHtml(p,'ipa-itinerary-thumbnail')}<span class="itinerary-copy"><div class="ipa-itinerary-copy-head"><b>${ipaEscape(p.name)}${p.personal?' <em class="personal-route-inline">Sua descoberta</em>':''}</b>${p.category?`<span class="chip">${ipaEscape(p.category)}</span>`:''}</div><small class="ipa-itinerary-address">📍 ${ipaEscape(p.address||'Local do passeio')}</small>${p.note?`<div class="ipa-place-client-note"><strong>📝 Observação</strong><span>${ipaEscape(p.note)}</span></div>`:''}${(p.smartTip||p.tip)?`<div class="ipa-place-client-tip"><strong>💡 Dica Indo por Aí</strong><span>${ipaEscape(p.smartTip||p.tip)}</span></div>`:''}${ipaJourneyFeedbackHtml(t.id,day.day,p.id||index,p.name,(p.address||p.name)+', '+country)}</span><span class="ipa-move-controls"><button type="button" data-move-place="${index}:up" ${index===0?'disabled':''} aria-label="Subir passeio">↑</button><button type="button" data-move-place="${index}:down" ${index===places.length-1?'disabled':''} aria-label="Descer passeio">↓</button></span></article>`).join('');
  const route=ipaFullClientMapsUrl(places,t);
- return `${ipaTripSwitchSection()}${ipa84CityNavigation(t)}${ipa84StageTimelineHtml(t,ipa84SelectedStage(t))}<section class="hero personalized-trip-hero"><span class="eyebrow">Minha viagem</span><h1>${t.name} ${flag}</h1><p>${ipaCountryHeading(t)}, ${country===IPA_ALL_COUNTRIES?'Todos os destinos':country} · ${days.length} dias de roteiro</p><div class="hero-actions">${route?`<button class="btn btn-light" data-ipa-full-route="trip">Abrir rota no Google Maps</button>`:''}<button class="btn btn-primary" data-go="explore">Ver mapa do dia</button></div></section>
+ return `${ipaTripSwitchSection()}${ipa84CityNavigation(t)}${ipa84StageTimelineHtml(t,ipa84SelectedStage(t))}${!state.previewFromAdmin&&ipa88PushConfigured()?`<section class="section ipa88-push-optin"><span class="eyebrow">🔔 ALERTAS DA VIAGEM</span><p>Ative notificações de roteiros, mensagens e deslocamentos.</p><button type="button" class="btn btn-light" id="ipa88EnablePush">🔔 Ativar notificações</button></section>`:''}<section class="hero personalized-trip-hero"><span class="eyebrow">Minha viagem</span><h1>${t.name} ${flag}</h1><p>${ipaCountryHeading(t)}, ${country===IPA_ALL_COUNTRIES?'Todos os destinos':country} · ${days.length} dias de roteiro</p><div class="hero-actions">${route?`<button class="btn btn-light" data-ipa-full-route="trip">Abrir rota no Google Maps</button>`:''}<button class="btn btn-primary" data-go="explore">Ver mapa do dia</button></div></section>
  <section class="section itinerary-days"><div class="day-strip">${days.map(x=>`<button class="day-pill ${Number(x.day)===dayNumber?'active':''}" data-day="${x.day}"><small>Dia</small><strong>${x.day}</strong></button>`).join('')}</div></section>
  <section class="section"><div class="section-head"><div><span class="eyebrow">Roteiro do dia</span><h2>${ipaEscape(day.title)}</h2>${ipaDayCity(t,day)?`<small class="ipa-day-location">📍 ${ipaEscape(ipaDayCity(t,day))}</small>`:''}</div><span class="chip">${places.length} locais</span></div><div class="ipa-reorder-hint">Use as setas para mudar a ordem dos passeios. A rota acompanhará sua escolha.</div><div class="itinerary-list">${rows||'<p>Nenhum local cadastrado neste dia.</p>'}</div></section>`;
 }

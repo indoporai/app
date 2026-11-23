@@ -570,7 +570,31 @@ function ipaIsCurrentFreeTrip(tripId){
 function ipaIsCurrentFreeConcierge(){
  const data=window.IPAData?.getAll?.();return (data?.trips||[]).some(t=>t.plan==='Free'&&String(t.id)===String(data.activeTripId||''));
 }
+async function ipa88PushRequest(path,body){
+ const url=String(window.IPA_PUSH_CONFIG?.workerUrl||'').replace(/\/$/,'');
+ if(!/^https:\/\//.test(url))throw Error('Gateway push não configurado em push-config.js.');
+ if(!auth.currentUser)throw Error('Entre com sua conta no aplicativo.');
+ const r=await fetch(url+path,{method:'POST',headers:{'content-type':'application/json',authorization:'Bearer '+await auth.currentUser.getIdToken()},body:JSON.stringify(body)});
+ const result=await r.json().catch(()=>({}));if(!r.ok)throw Error(result.error||('Servidor de push respondeu '+r.status));return result;
+}
+async function ipa88EnablePushNotifications(tripId){
+ if(!('Notification' in window)||!('serviceWorker' in navigator)||!('PushManager' in window))throw Error('Este navegador não oferece suporte a notificações push.');
+ const vapidKey=String(window.IPA_PUSH_CONFIG?.vapidPublicKey||'');if(!vapidKey)throw Error('Chave Web Push (VAPID) ainda não configurada.');
+ const {getMessaging,getToken,isSupported:messagingSupported}=await import('https://www.gstatic.com/firebasejs/12.17.1/firebase-messaging.js');
+ if(!await messagingSupported())throw Error('Firebase Messaging não é compatível com este navegador.');
+ const permission=await Notification.requestPermission();if(permission!=='granted')throw Error('Permissão de notificações não concedida.');
+ let registration=await navigator.serviceWorker.getRegistration('./');
+ if(!registration)registration=await navigator.serviceWorker.register('./service-worker.js?v=63088');
+ await navigator.serviceWorker.ready;
+ const messaging=getMessaging(firebaseApp),token=await getToken(messaging,{vapidKey,serviceWorkerRegistration:registration});
+ if(!token)throw Error('Firebase não retornou o token deste dispositivo.');
+ const result=await ipa88PushRequest('/subscribe',{token,tripId});
+ if(!result.registered)throw Error('O servidor não confirmou o dispositivo.');
+ return result;
+}
 window.IPAFirebase = {
+  enablePushNotifications:ipa88EnablePushNotifications,
+  sendPushNotification:(data)=>ipa88PushRequest('/send',data),
   async ensureConciergeWelcome({tripId,clientId='',requesterName=''}){
     if(!currentUser||currentUser.uid===ADMIN_UID||!tripId||ipaIsCurrentFreeTrip(tripId))return null;
     // Existing clients keep their conversation untouched and receive no late welcome.
