@@ -1972,3 +1972,18 @@ body.hidden-nav .bottom-nav{display:none!important;}
 .ipa-admin-integrated .ipa67-delete{border-color:#f0d0cc!important;background:#fff8f7!important;color:#a23b35!important}
 .ipa-admin-integrated .ipa67-travel-button{font-size:13px!important}
 @media(max-width:390px){.ipa-admin-integrated .ipa67-trip-card{padding:12px}.ipa-admin-integrated .ipa67-stop-actions{gap:5px}.ipa-admin-integrated .ipa67-stop-actions .ipa67-action{font-size:11px!important;padding:7px 2px!important}.ipa-admin-integrated .ipa67-stop-card{padding:12px!important}}
+/* Beta 6.30.68: Planejamento de deslocamentos sem alterar os cards do roteiro */
+.ipa68-free-hidden[hidden]{display:none!important}
+.ipa68-free-promise,.ipa68-free-pace,.ipa68-free-heading{padding:14px 16px;margin:12px 0;border-radius:16px;background:#eaf6f3;color:#075667;display:flex;flex-direction:column;gap:5px}
+.ipa68-free-pace{display:block}.ipa68-field-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.ipa68-field-grid label{min-width:0;display:flex;flex-direction:column;gap:5px}.ipa68-field-grid input,.ipa68-field-grid select,.ipa68-block-modal input,.ipa68-block-modal select{width:100%;min-width:0;box-sizing:border-box;padding:12px;border:1px solid #cbdcda;border-radius:12px;background:#fff;color:#173b46}
+.ipa68-preflight,.ipa68-admin-transport{margin:18px 0;padding:16px;border-radius:18px;border:1px solid #cae0e0;background:#f5fbfa}.ipa68-smart-block{margin:12px 0;padding:14px;background:white;border:1px solid #d7e5e6;border-radius:16px}
+.ipa68-block-cards{display:grid;gap:12px}.ipa68-block-cards article{padding:15px;min-width:0;border:1px solid #d4e7e7;border-radius:16px;background:#fff;display:grid;gap:8px;overflow-wrap:anywhere}
+.ipa68-block-cards article p{margin:0}.ipa68-block-cards article small{color:#64808a}.ipa68-block-cards .btn{width:fit-content;max-width:100%}.ipa68-actions{display:flex;gap:8px;flex-wrap:wrap}.ipa68-client-blocks .ipa68-block-cards article{border-left:4px solid #ff781d}.ipa68-travel-head{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
+@media(max-width:600px){.ipa68-field-grid{grid-template-columns:1fr}.ipa68-block-modal{max-width:100%;overflow-x:hidden}}
+
+.ipa68-free-country .ipa-planner-country-heading{display:none!important}.ipa68-free-country .ipa-planner-city-index{display:none!important}.ipa68-free-country .ipa-planner-city-row{grid-template-columns:minmax(0,1fr) minmax(90px,.35fr)}@media(max-width:500px){.ipa68-free-country .ipa-planner-city-row{grid-template-columns:1fr 110px}}
+
+.ipa68-free-country [data-planner-city] label:last-child{display:none!important}.ipa68-free-country [data-planner-city]{display:block!important}.ipa68-free-country [data-planner-city] label{width:100%!important}
+
+.ipa68-goal-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;min-width:0}.ipa68-goal-row label{min-width:0}.ipa68-goal-row select{width:100%;min-width:0}@media(max-width:600px){.ipa68-goal-row{grid-template-columns:1fr}}

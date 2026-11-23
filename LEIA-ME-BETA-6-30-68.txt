@@ -1,0 +1,25 @@
+INDO POR AÍ — BETA 6.30.68 — TESTE MULTIDESTINOS
+
+Base: 6.30.67. Preservados os módulos existentes sem alterações intencionais.
+
+NOVIDADES
+1) Formulário Free simplificado: uma cidade, um país, até 3 dias, ritmo fixo Equilibrado. País e cidade começam vazios e são validados antes de enviar; o indicador não mostra ✓ sem os nomes. Planos pagos mantêm formulário MultiPaís.
+2) ADM > Viagens > Editar viagem > Chegadas e deslocamentos: inclusão, edição e exclusão de compromissos de viagem com meio de transporte, local de origem, destino, país de cada ponta, dia e horários locais. Registros separados do roteiro turístico.
+3) ADM > Viagens > Criar roteiro inteligente: informe os deslocamentos ANTES de gerar. Em viagens existentes MultiPaís/MultiCidade, selecione também a cidade de cada dia. O planejador reserva tempo dentro do período de passeios e atribui horários às atrações geradas, evitando períodos já ocupados.
+4) Cliente > Antes / Durante: painel com os trechos registrados; Google Maps para deslocamentos terrestres e locais. Voos e ferries são exibidos na linha do tempo sem falsa rota terrestre.
+5) Dia de transição: saída e chegada podem ocorrer no mesmo dia ou no dia seguinte, incluindo países diferentes. Horários de voo são locais, portanto diferenças de fuso não são utilizadas para inferir a duração real do voo.
+
+COMO TESTAR
+A. Faça backup/exportação dos dados e publique primeiro em ambiente de teste.
+B. Em uma viagem de teste, registre Dia 3: Hotel de Lisboa -> Aeroporto de Lisboa 09:00-10:00; Lisboa -> Aeroporto de Dublin 12:00-15:00 (voo); Aeroporto de Dublin -> Hotel 16:00-17:00. Verifique ambos os países no cliente.
+C. Registre voo Dia 3 23:00 -> Dia 4 01:00 e verifique a continuidade.
+D. Gere um roteiro teste e confira que as atrações não são marcadas durante deslocamentos. Confira o botão Maps do transfer.
+E. No Free, deixe país/cidade em branco (deve bloquear), preencha corretamente e teste 1 a 3 dias.
+
+LIMITAÇÕES E CUIDADOS
+- A duração é informada pelo ADM, não estimada por APIs de trânsito.
+- O planejador usa uma janela padrão diurna para atribuir horários às atrações; horários de funcionamento e fuso real dos voos devem ser revisados pelo ADM antes de publicar.
+- O fluxo de Pedidos externos existente não foi reescrito: os deslocamentos podem ser inseridos depois no editor da viagem.
+- Como a geração depende do catálogo de locais e de janelas estimadas, revise as atividades dos dias de conexão antes de publicar. Não é confirmação de voo, transferência ou reserva.
+- A gravação real no Firebase/Cloudflare e a interface no celular não puderam ser testadas neste ambiente.
+- Viajar Juntos mantém a configuração de segurança do Firebase pendente.
