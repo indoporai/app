@@ -1054,7 +1054,7 @@ window.IPAFirebase = {
     const lead=(d.travelLeads||[]).find(l=>String(l.id)===String(leadId));
     if(!trip||!client||!lead)throw new Error('Não foi possível localizar o pedido, a viagem ou o cliente.');
     if(String(trip.clientId)!==String(clientId))throw new Error('A viagem não está vinculada ao cliente selecionado.');
-    if(!Array.isArray(trip.itinerary)||!trip.itinerary.length)throw new Error('O roteiro precisa ter ao menos um dia.');
+    if(!Array.isArray(trip.stages)||!trip.stages.length)throw new Error('O pedido precisa conter pelo menos um destino.');
     // Evita criar uma segunda viagem quando o ADM precisar tentar outra vez.
     clearTimeout(syncTimer);
     const tripRef=doc(firestore,'trips',String(tripId));
@@ -1063,7 +1063,7 @@ window.IPAFirebase = {
     const steps=[
       {name:'Gravando viagem...',ref:tripRef,data:{...trip,sourceLeadId:leadId,updatedAt:serverTimestamp()}},
       {name:'Vinculando cliente...',ref:clientRef,data:{...client,activeTripId:tripId,lastConfiguredTripId:tripId,updatedAt:serverTimestamp()}},
-      {name:'Atualizando pedido...',ref:leadRef,data:{...lead,tripId,status:'Roteiro aprovado',updatedAt:serverTimestamp()}}
+      {name:'Atualizando pedido...',ref:leadRef,data:{...lead,tripId,status:'Encaminhado para Viagens',updatedAt:serverTimestamp()}}
     ];
     for(const step of steps){
       progress(step.name);

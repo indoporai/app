@@ -1,0 +1,23 @@
+INDO POR AÍ — BETA 6.30.70 — TESTE
+
+Base: Beta 6.30.69 completa.
+
+NOVO FLUXO ADM
+- Em Pedidos, botão Encaminhar para Viagens sem necessidade de roteiro pré-gerado.
+- O pedido original fica no histórico; vínculo existente não gera segunda viagem.
+- Viagens recebe estágios, cliente, plano e preferências do pedido.
+- Antes do motor, preencher deslocamentos/chegada de aeroporto ou estação ao hotel, com horários locais.
+- Geração por cidade/etapa; alteração de uma etapa preserva as demais e os deslocamentos.
+- Geração do bate e volta por dia usando a cidade visitada e janela de horários informada.
+- País inferido da cidade quando único no catálogo, ou pelo mapeamento seguro de cidades conhecidas.
+- Campos manuais de Destino/País principal removidos do painel; campos internos legados preservados.
+- Viajar Juntos: CSS com seleção em coluna única e checkbox alinhado.
+
+IMPORTANTE PARA TESTES
+- O gerador reutiliza o MOTOR DE CURADORIA EXISTENTE e o banco de lugares, não cria uma API de IA nova. Se Braga não existir no catálogo, será preciso abastecer o Banco de Lugares para obter atrações automáticas.
+- Campos travelBlocks.day/arrivalDay e itinerary.day usam o número do dia no roteiro. Cadastre os deslocamentos antes da geração e confira os dias em viagens antigas.
+- Geração respeita a chegada ao hotel quando o destino do bloco contém 'hotel', 'hospedagem', 'airbnb' ou 'apartamento'. Informe o nome do hotel explicitamente no destino para ativar a proteção de horário.
+- Quantidade de dias por etapa segue a diferença entre chegada e saída (noites) das datas cadastradas; saídas no mesmo dia são especiais, revise os horários.
+- Funcionalidade de Viajar Juntos depende das regras Firebase aplicadas no projeto.
+- Testes executados: sintaxe JavaScript e integridade ZIP. NÃO validado em produção Firebase/Cloudflare; testar antes de publicar a clientes.
+- Para atualizar cache do app instalado, publique todos os arquivos do ZIP, não apenas app.js.
