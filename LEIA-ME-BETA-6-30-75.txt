@@ -1,0 +1,21 @@
+INDO POR AÍ — BETA 6.30.75 — Paradas logísticas nos dias
+
+Base: Beta 6.30.74.
+
+IMPLEMENTADO
+- Deslocamentos do ADM (travelBlocks) convertidos em paradas visuais de partida/chegada, sem copiar ou modificar o banco de lugares.
+- Dia de embarque, voo informativo e dia de desembarque associados ao número do dia indicado no ADM.
+- Transfer aeroporto -> hospedagem da viagem aparece no roteiro com botão de navegação.
+- Roteiro do cliente, lista Rota Completa, mapa e visão de roteiro por cidade no ADM atualizados.
+- Rota por trechos quando há voo: não tenta traçar caminho rodoviário entre aeroportos em países diferentes.
+- Exclusão/edição de deslocamento refletida automaticamente nas paradas, sem duplicar dados.
+- Logística fora da meta de atrações e preservada ao limpar roteiro da IA.
+
+LIMITAÇÕES
+- Os dias de partida/chegada usam os números de dia informados nos deslocamentos. Confirme correspondência com datas da viagem e horários locais no ADM.
+- A rota do Google Maps depende dos endereços/Google Places corretos; horários de voo/trem não são calculados automaticamente.
+- Teste de ponta a ponta com Cloudflare e Firebase ainda necessário.
+- O roteiro não cria deslocamento casa -> aeroporto automaticamente: o botão de navegar ao aeroporto usa o local escolhido pelo cliente no Google Maps.
+
+ATUALIZAÇÃO
+Publique todo o conteúdo do ZIP em Cloudflare Pages (diretório raiz) e recarregue o PWA para renovar o cache da Beta 6.30.75.

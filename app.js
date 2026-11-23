@@ -1761,9 +1761,9 @@ function bind(){
  document.querySelectorAll('[data-firebase-sync]').forEach(b=>b.onclick=async()=>{toast('Sincronizando com Firebase...');try{await window.IPAFirebase.syncNow();toast('Firebase sincronizado')}catch(e){toast(e.message||'Erro ao sincronizar')}});
  document.querySelectorAll('[data-ipa-navigate-place]').forEach(b=>b.onclick=()=>{
   const t=activeTrip();if(!t)return;
-  const day=ipaScopedDays(t).find(d=>Number(d.day)===Number(state.tripDay))||ipaScopedDays(t)[0];
+  const day=ipa75ScopedDays(t).find(d=>Number(d.day)===Number(state.tripDay))||ipa75ScopedDays(t)[0];
   if(!day)return;
-  const official=normalizedPlaces(day);
+  const official=ipa75DayStops(t,day);
   const personal=ipaGetPersonalRoute(t,day.day).map((p,i)=>({id:p.id||`personal-${i}`,name:p.name||'Descoberta',address:p.address||'',lat:p.lat??p.latitude,lng:p.lng??p.longitude}));
   const place=[...official,...personal][Number(b.dataset.ipaNavigatePlace)];
   if(place)ipaOpenNavigationForPlace(place,t);
@@ -1771,13 +1771,13 @@ function bind(){
  document.querySelectorAll('[data-ipa-full-route]').forEach(b=>b.onclick=()=>{
   const t=activeTrip();if(!t)return;
   const kind=b.dataset.ipaFullRoute;
-  const days=ipaScopedDays(t);
+  const days=ipa75ScopedDays(t);
   const day=days.find(x=>Number(x.day)===Number(state.tripDay))||days[0];
-  if(kind==='trip'){ipaOpenFullMapsRoute(days.flatMap(normalizedPlaces),t,'Roteiro completo da viagem');return;}
+  if(kind==='trip'){showModal('<h2>Rotas por dia</h2><p>Para respeitar voos e mudanças de país, abra cada rota terrestre separadamente no dia correspondente.</p>'+days.map(d=>'<div class="ipa75-tripday"><button type="button" class="btn btn-light" data-ipa75-tripday="'+d.day+'">🗺️ Dia '+d.day+'</button></div>').join(''));modalContent.querySelectorAll('[data-ipa75-tripday]').forEach(btn=>btn.onclick=()=>ipa75OpenDayMaps(t,days.find(d=>Number(d.day)===Number(btn.dataset.ipa75Tripday))));return;}
   if(!day)return;
-  const official=normalizedPlaces(day);
+  const official=ipa75DayStops(t,day);
   const points=kind==='personal'?[...official,...ipaGetPersonalRoute(t,day.day)]:official;
-  ipaOpenFullMapsRoute(points,t,'Dia '+day.day+' · '+(kind==='personal'?'Sua rota completa':'Rota oficial'));
+  ipa75OpenDayMaps(t,day,kind==='personal'?ipaGetPersonalRoute(t,day.day):[]);
  });
  document.querySelectorAll('[data-external-route]').forEach(b=>b.onclick=()=>{
   const url=b.dataset.externalRoute;
@@ -1802,14 +1802,14 @@ function bind(){
  document.querySelectorAll('[data-ipa73-clear-stage]').forEach(b=>b.onclick=async()=>{
   const [id,index]=b.dataset.ipa73ClearStage.split(':');const trip=(adminData().trips||[]).find(t=>String(t.id)===id);if(!trip)return;
   const stage=tripStages(trip)[Number(index)];if(!stage)return;
-  const days=ipa70StageDayEntries(trip).filter(e=>String(e.stageId)===String(stage.id));const ids=new Set(days.map(e=>Number(e.day)));
-  const count=(trip.itinerary||[]).filter(d=>ids.has(Number(d.day))).reduce((n,d)=>n+(d.places||[]).filter(p=>p?.generatedByAI===true).length,0);
-  if(!count)return toast('Não há atrações marcadas como geradas pela IA para limpar.');
-  if(!confirm(`Apagar ${count} atrações geradas pela IA em ${stage.destination}? Paradas manuais, hotéis e deslocamentos serão preservados.`))return;
-  const before=trip.itinerary||[],next=before.map(d=>ids.has(Number(d.day))?{...d,places:(d.places||[]).filter(p=>p?.generatedByAI!==true)}:d);
-  b.disabled=true;
-  try{IPAData.updateTrip(id,{itinerary:next});if(!window.IPAFirebase?.user)throw Error('Conecte-se ao ADM.');await window.IPAFirebase.syncNow();const y=window.scrollY;view.innerHTML=adminTripEditor(id);bind();window.scrollTo(0,y);toast('Atrações da IA removidas ✓');}
-  catch(e){IPAData.updateTrip(id,{itinerary:before});b.disabled=false;toast('Não foi possível limpar: '+(e.message||e));}
+  const ids=new Set(ipa70StageDayEntries(trip).filter(e=>String(e.stageId)===String(stage.id)).map(e=>Number(e.day)));
+  const before=trip.itinerary||[],count=before.filter(d=>ids.has(Number(d.day))).reduce((n,d)=>n+(d.places||[]).filter(ipa74IsClearable).length,0);
+  if(!count)return toast('Não há atrações automáticas ou legadas para limpar neste destino.');
+  if(!confirm(`Limpar ${count} atrações automáticas/legadas de ${stage.destination}? Esta ação também remove atrações antigas sem marcação de origem. Lugares incluídos manualmente e compromissos fixos serão preservados. Confirme somente se deseja limpar o roteiro deste destino.`))return;
+  const next=before.map(d=>ids.has(Number(d.day))?{...d,places:(d.places||[]).filter(p=>!ipa74IsClearable(p))}:d);
+  b.disabled=true;b.textContent='Limpando e salvando…';
+  try{if(!window.IPAFirebase?.user||!window.IPAFirebase?.syncNow)throw Error('Sessão ADM não conectada.');IPAData.updateTrip(id,{itinerary:next});await window.IPAFirebase.syncNow();const y=window.scrollY;view.innerHTML=adminTripEditor(id);bind();window.scrollTo(0,y);toast(`${count} atrações removidas de ${stage.destination} ✓`);}
+  catch(e){IPAData.updateTrip(id,{itinerary:before});b.disabled=false;b.textContent='🧹 Limpar roteiro';toast('Não foi possível limpar: '+(e.message||e));}
  });
  document.querySelectorAll('[data-ipa70-daytrip]').forEach(b=>b.onclick=()=>{const [id,day]=b.dataset.ipa70Daytrip.split(':');ipa70DayTripModal(id,Number(day))});
  document.querySelectorAll('[data-ipa70-generate-daytrip]').forEach(b=>b.onclick=()=>{const [id,no]=b.dataset.ipa70GenerateDaytrip.split(':');const trip=adminData().trips.find(t=>String(t.id)===id),info=ipa70StageDayEntries(trip).find(e=>Number(e.day)===Number(no));const ix=tripStages(trip).findIndex(st=>String(st.id)===String(info?.stageId));if(ix<0)return toast('Etapa do dia não encontrada.');void ipa70GenerateStage(id,ix,Number(no));});
@@ -4047,7 +4047,91 @@ function ipa68BlocksHtml(trip,dayNo,country){
  if(!blocks.length)return '';
  return `<section class="section ipa68-client-blocks"><div class="section-head"><div><span class="eyebrow">🧳 DESLOCAMENTOS PLANEJADOS</span><h2>Chegadas, saídas e conexões</h2></div></div><div class="ipa68-block-cards">${blocks.map(b=>`<article><div class="ipa68-travel-head"><strong>${b.kind==='voo'?'✈️':b.kind==='trem'?'🚆':b.kind==='ferry'?'⛴️':b.kind==='onibus'?'🚌':'🚐'} ${ipaEscape(b.title||'Deslocamento')}</strong><small>Dia ${Number(b.day)} ${ipaEscape(b.time)} → Dia ${Number(b.arrivalDay)} ${ipaEscape(b.arrivalTime)}</small></div><p>${ipaEscape(b.origin||'Origem')} → ${ipaEscape(b.destination||'Destino')}</p><small>${ipaEscape(b.originCountry||'')}${b.destinationCountry?' → '+ipaEscape(b.destinationCountry):''} · Compromisso fixo do roteiro</small>${ipa68TransportLink(b)?`<button class="btn btn-light" type="button" data-external-route="${ipaEscape(ipa68TransportLink(b))}">📍 Abrir rota no Google Maps</button>`:''}</article>`).join('')}</div></section>`;
 }
-function ipa68AdminBlockPanel(t){return `<section class="ipa-admin-panel ipa68-admin-transport"><div class="section-head"><div><span class="eyebrow">✈️ ANTES DE GERAR O ROTEIRO</span><h2>Chegadas e deslocamentos</h2></div><button type="button" class="btn btn-primary" data-ipa68-add-block="${ipaEscape(t.id)}">+ Deslocamento</button></div><p>Cadastre terminais, hotéis, voos, trem, ônibus ou ferry com dias e horários. O período fica reservado e não vira atração.</p><div class="ipa68-block-cards">${ipa68TravelBlocks(t).map(b=>`<article><strong>${ipaEscape(b.title||'Deslocamento')}</strong><small>Dia ${Number(b.day)} ${ipaEscape(b.time)} → Dia ${Number(b.arrivalDay)} ${ipaEscape(b.arrivalTime)}</small><p>${ipaEscape(b.origin)} → ${ipaEscape(b.destination)}</p><div class="ipa68-actions"><button class="btn btn-light" data-ipa68-edit-block="${ipaEscape(t.id)}:${ipaEscape(b.id)}">✏️ Editar</button><button class="btn btn-light" data-ipa68-delete-block="${ipaEscape(t.id)}:${ipaEscape(b.id)}">🗑 Excluir</button></div></article>`).join('')||'<small>Nenhum deslocamento cadastrado.</small>'}</div></section>`}
+// Beta 6.30.75 — paradas logísticas derivadas dos deslocamentos, sem duplicar no banco de atrações.
+// O cadastro travelBlocks continua sendo a única fonte de verdade; edições/exclusões aparecem imediatamente.
+function ipa75TravelStopsForDay(trip,dayNo){
+ const raw=[],blocks=ipa68TravelBlocks(trip);
+ const normalize=(v)=>ipaNormText(String(v||'')).replace(/[^a-z0-9]/g,'');
+ const point=(b,side)=>{
+  const departure=side==='origin',name=departure?b.origin:(b.destinationHotelName||b.destination);
+  if(!name)return;
+  const day=Number(departure?b.day:b.arrivalDay),time=departure?b.time:b.arrivalTime;
+  if(day!==Number(dayNo))return;
+  const hotel=!departure&&(b.destinationType==='hotel'||!!b.destinationHotelId);
+  const kind=String(b.kind||'').toLowerCase(),terminal=/voo|trem|onibus|ferry/.test(kind);
+  const prefix=hotel?'🏨':kind==='voo'?'✈️':kind==='trem'?'🚆':kind==='onibus'?'🚌':kind==='ferry'?'⛴️':'📍';
+  const country=departure?b.originCountry:b.destinationCountry;
+  const lat=departure?b.originLat:b.destinationLat,lng=departure?b.originLng:b.destinationLng;
+  const address=String(departure?b.origin:b.destination).trim();
+  const placeId=departure?b.originPlaceId:b.destinationPlaceId;
+  const route=b.kind==='voo'?'':ipa68TransportLink(b);
+  raw.push({id:'ipa75-'+b.id+'-'+side,logistics:true,transportKind:kind,blockId:b.id,
+   name:(hotel?'🏨 '+(b.destinationHotelName||name):prefix+' '+name),address,locationName:name,
+   country:country||'',placeId:placeId||'',lat:lat??null,lng:lng??null,
+   category:hotel?'Hospedagem':terminal?'Terminal de transporte':'Deslocamento',
+   time:time||'',_sortTime:ipa68Minute(time)??720,_phase:departure?0:2,
+   mapsUrl:'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(address||name)+(placeId?'&query_place_id='+encodeURIComponent(placeId):''),
+   routeUrl:route,note:departure?'Local de partida do deslocamento':'Local de chegada do deslocamento',
+   isFlightTerminal:kind==='voo',isHotel:hotel});
+ };
+ for(const b of blocks){point(b,'origin');point(b,'destination');
+  if(b.kind==='voo'&&Number(b.day)===Number(dayNo))raw.push({id:'ipa75-'+b.id+'-flight',logistics:true,flightInfo:true,blockId:b.id,name:'🛫 '+(b.title||'Voo'),category:'Voo',note:(b.origin||'Origem')+' → '+(b.destination||'Destino')+' · chegada no dia '+b.arrivalDay,
+   time:b.time||'',_sortTime:ipa68Minute(b.time)??720,_phase:1});
+ }
+ // Aeroporto de chegada e origem do transfer representam o mesmo ponto físico; exibir apenas uma vez.
+ const seen=new Set();return raw.sort((a,b)=>a._sortTime-b._sortTime||a._phase-b._phase).filter(p=>{
+  if(p.flightInfo)return true;
+  const k=(p.placeId?'id:'+p.placeId:'name:'+normalize(p.address||p.locationName));
+  if(seen.has(k))return false;seen.add(k);return true;
+ });
+}
+function ipa75DayStops(trip,day){
+ const original=normalizedPlaces(day),logistics=ipa75TravelStopsForDay(trip,day.day);
+ if(!logistics.length)return original;
+ const nameKey=(p)=>ipaNormText(String(p.address||p.name||''));
+ const keys=new Set(logistics.filter(p=>!p.flightInfo).map(nameKey));
+ const places=original.filter(p=>!p.logistics&&!((ipa73IsFixedStop(p))&&keys.has(nameKey(p))));
+ // Atrações sem horário aparecem após a chegada/hotel e antes dos deslocamentos de saída à tarde.
+ const latestHotel=logistics.filter(p=>p.isHotel).reduce((m,p)=>Math.max(m,p._sortTime+30),0);
+ const earliestArrival=logistics.filter(p=>!p.flightInfo&&p._phase===2).reduce((m,p)=>Math.max(m,p._sortTime+15),0);
+ const activityStart=Math.max(12*60,latestHotel,earliestArrival);
+ const entries=places.map((p,i)=>({...p,_sortTime:Math.max(activityStart,ipa68Minute(p.time)??(activityStart+i*7))+i,_phase:3}));
+ const ordered=[...logistics,...entries].sort((a,b)=>a._sortTime-b._sortTime||a._phase-b._phase);
+ return ordered;
+}
+function ipa75ScopedDays(trip,country=ipaContextCountry(trip)){
+ const all=[...(trip?.itinerary||[])].map(d=>({...d}));
+ const entries=ipa70StageDayEntries(trip);
+ const byNo=new Map(all.map(d=>[Number(d.day),d]));
+ for(const b of ipa68TravelBlocks(trip))for(const [number,placeCountry] of [[Number(b.day),b.originCountry],[Number(b.arrivalDay),b.destinationCountry]]){
+  if(!Number.isInteger(number)||number<1||number>365||byNo.has(number))continue;
+  const entry=entries.find(e=>Number(e.day)===number);
+  const d={day:number,date:entry?.date||'',title:'Dia '+number+' · Deslocamentos',city:entry?.city||'',country:placeCountry||entry?.country||'',places:[],logisticsOnly:true};
+  byNo.set(number,d);all.push(d);
+ }
+ return all.filter(d=>{
+  if(!country||country===IPA_ALL_COUNTRIES)return true;
+  if(ipaSameCountry(ipaCountryOfDay(trip,d),country))return true;
+  // Um dia pode incluir embarque no Brasil e chegada ao país selecionado.
+  return ipa68TravelBlocks(trip).some(b=>(Number(b.day)===Number(d.day)&&ipaSameCountry(b.destinationCountry,country))||(Number(b.arrivalDay)===Number(d.day)&&ipaSameCountry(b.originCountry,country)));
+ }).sort((a,b)=>Number(a.day)-Number(b.day));
+}
+function ipa75ClientRoute(trip,day){
+ return ipa75DayStops(trip,day).filter(p=>!p.flightInfo);
+}
+function ipa75OpenDayMaps(trip,day,personal=[]){
+ const stops=ipa75DayStops(trip,day);
+ const segments=[];let current=[];
+ for(const p of stops){if(p.flightInfo){if(current.length)segments.push(current);current=[];continue;}current.push(p)}
+ if(current.length)segments.push(current);
+ // Não ligar aeroportos em países distintos por rota rodoviária.
+ for(let i=segments.length-1;i>=0;i--){if(!segments[i].length)segments.splice(i,1)}
+ if(!segments.length){toast('Nenhuma parada navegável para este dia.');return}
+ if(segments.length===1){ipaOpenFullMapsRoute([...segments[0],...personal],trip,'Dia '+day.day);return}
+ showModal('<span class="eyebrow">🗺️ ROTA DO DIA</span><h2>Trechos terrestres · Dia '+day.day+'</h2><p>Os trechos foram separados por voo. Abra um de cada vez; o Google Maps não traça rotas rodoviárias entre aeroportos de países diferentes.</p><div class="ipa-route-segments">'+segments.map((seg,i)=>'<article class="ipa-route-segment"><b>Trecho '+(i+1)+'</b><small>'+seg.map(p=>ipaEscape(p.locationName||p.name)).join(' → ')+'</small><button type="button" class="btn btn-primary btn-block" data-ipa75-segment="'+i+'">Abrir no Maps</button></article>').join('')+'</div>');
+ modalContent.querySelectorAll('[data-ipa75-segment]').forEach(btn=>btn.onclick=()=>ipaOpenFullMapsRoute(segments[Number(btn.dataset.ipa75Segment)],trip,'Trecho '+(Number(btn.dataset.ipa75Segment)+1)));
+}
+function ipa68AdminBlockPanel(t){return `<section class="ipa-admin-panel ipa68-admin-transport"><div class="section-head"><div><span class="eyebrow">✈️ ANTES DE GERAR O ROTEIRO</span><h2>Chegadas e deslocamentos</h2></div><button type="button" class="btn btn-primary" data-ipa68-add-block="${ipaEscape(t.id)}">+ Deslocamento</button></div><p>Cadastre terminais, hotéis, voos, trem, ônibus ou ferry com dias e horários. As paradas aparecem automaticamente no roteiro diário do cliente, sem contar como atrações. Compromissos fixos não são apagados pela IA.</p><div class="ipa68-block-cards">${ipa68TravelBlocks(t).map(b=>`<article><strong>${ipaEscape(b.title||'Deslocamento')}</strong><small>Dia ${Number(b.day)} ${ipaEscape(b.time)} → Dia ${Number(b.arrivalDay)} ${ipaEscape(b.arrivalTime)}</small><p>${ipaEscape(b.origin)} → ${ipaEscape(b.destination)}</p><div class="ipa68-actions"><button class="btn btn-light" data-ipa68-edit-block="${ipaEscape(t.id)}:${ipaEscape(b.id)}">✏️ Editar</button><button class="btn btn-light" data-ipa68-delete-block="${ipaEscape(t.id)}:${ipaEscape(b.id)}">🗑 Excluir</button></div></article>`).join('')||'<small>Nenhum deslocamento cadastrado.</small>'}</div>${[...new Set(ipa68TravelBlocks(t).flatMap(b=>[Number(b.day),Number(b.arrivalDay)]))].filter(n=>Number.isInteger(n)&&n>0).sort((a,b)=>a-b).map(n=>`<div class="ipa75-admin-block-day"><b>Dia ${n} · ${ipa75TravelStopsForDay(t,n).length} parada(s) logística(s)</b><small>${ipa75TravelStopsForDay(t,n).map(p=>ipaEscape(p.name)).join(' → ')}</small></div>`).join('')}</section>`}
 function ipa68BlockModal(tripId,blockId){
  const d=adminData(),trip=d.trips.find(x=>String(x.id)===String(tripId));if(!trip)return;
  const old=ipa68TravelBlocks(trip).find(b=>String(b.id)===String(blockId))||{};
@@ -4124,10 +4208,10 @@ function ipa70CityPlannerPanel(trip){
  const entries=ipa70StageDayEntries(trip),stages=tripStages(trip);
  return `<section class="ipa-admin-panel ipa70-city-planner" id="ipa70CityPlanner"><div class="section-head"><div><span class="eyebrow">✨ ETAPA 2 · GERAÇÃO CIDADE POR CIDADE</span><h2>Montagem por destino</h2></div></div><p><b>Antes de gerar:</b> cadastre acima o aeroporto ou estação, a chegada ao hotel e o transfer. A geração deve iniciar após o horário disponível no hotel; blocos de transporte não serão substituídos.</p><div class="ipa70-city-list">${stages.map((st,i)=>{
   const days=entries.filter(e=>String(e.stageId)===String(st.id));
-  const already=(trip.itinerary||[]).filter(day=>day.stageId===st.id||(days.some(e=>e.date&&e.date===day.date)&&ipaNormText(day.city)===ipaNormText(st.destination)));
+  const dayNumbers=new Set(days.map(e=>Number(e.day)));const already=(trip.itinerary||[]).filter(day=>dayNumbers.has(Number(day.day)));
   const preview=already.slice().sort((a,b)=>Number(a.day)-Number(b.day));
-  const aiCount=preview.reduce((n,d)=>n+(d.places||[]).filter(p=>p&&typeof p==='object'&&p.generatedByAI===true).length,0);
-  return `<article class="ipa70-city-card ipa73-city-card"><div class="ipa73-city-head"><b>${countryFlag(st.country)} ${ipaEscape(st.destination)} · ${ipaEscape(st.country||'País pendente')}</b><small>${days.length} dia(s) · ${ipaEscape(st.startDate||'')} até ${ipaEscape(st.endDate||'')} · ${already.length?'Roteiro iniciado':'Ainda não gerado'}</small></div><div class="ipa73-city-actions"><button type="button" class="btn btn-primary" data-ipa70-generate-stage="${ipaEscape(trip.id)}:${i}">${already.length?'↻ Regenerar cidade':'✨ Gerar esta cidade'}</button><button type="button" class="btn btn-light" data-ipa73-clear-stage="${ipaEscape(trip.id)}:${i}" ${!aiCount?'disabled':''}>🧹 Limpar roteiro da IA (${aiCount})</button></div><div class="ipa73-city-results">${preview.length?preview.map(day=>`<div class="ipa73-day-preview"><b>Dia ${day.day} · ${ipaEscape(day.dayTrip?.city||day.city||st.destination)}</b><small>📍 Partida: ${ipaEscape(day.routeOrigin||'Hospedagem / cidade-base')}</small>${(day.places||[]).length?`<ol>${normalizedPlaces(day).map(p=>`<li>${ipa73IsFixedStop(p)&&p.time?ipaEscape(p.time)+' · ':''}${ipaEscape(p.name||'Atração')}${p.generatedByAI===true?' <small>IA</small>':''}</li>`).join('')}</ol>`:'<small>Nenhuma atração neste dia.</small>'}</div>`).join(''):'<small>Gere esta cidade para visualizar o roteiro aqui.</small>'}</div></article>`;
+  const aiCount=preview.reduce((n,d)=>n+(d.places||[]).filter(ipa74IsClearable).length,0);
+  return `<article class="ipa70-city-card ipa73-city-card"><div class="ipa73-city-head"><b>${countryFlag(st.country)} ${ipaEscape(st.destination)} · ${ipaEscape(st.country||'País pendente')}</b><small>${days.length} dia(s) · ${ipaEscape(st.startDate||'')} até ${ipaEscape(st.endDate||'')} · ${already.length?'Roteiro iniciado':'Ainda não gerado'}</small></div><div class="ipa73-city-actions"><button type="button" class="btn btn-primary" data-ipa70-generate-stage="${ipaEscape(trip.id)}:${i}">${already.length?'↻ Regenerar cidade':'✨ Gerar esta cidade'}</button><button type="button" class="btn btn-light" data-ipa73-clear-stage="${ipaEscape(trip.id)}:${i}" ${!aiCount?'disabled':''}>🧹 Limpar roteiro (${aiCount})</button></div><div class="ipa73-city-results">${preview.length?preview.map(day=>`<div class="ipa73-day-preview"><b>Dia ${day.day} · ${ipaEscape(day.dayTrip?.city||day.city||st.destination)}</b><small>📍 Partida: ${ipaEscape(ipa70StartLocation(trip,day.day,day.baseCity||day.city)||'Hospedagem não vinculada')}</small>${ipa75DayStops(trip,day).length?`<ol>${ipa75DayStops(trip,day).map(p=>`<li>${ipa73IsFixedStop(p)&&p.time?ipaEscape(p.time)+' · ':''}${ipaEscape(p.name||'Atração')}${p.generatedByAI===true?' <small>IA</small>':''}</li>`).join('')}</ol>`:'<small>Nenhuma atração neste dia.</small>'}</div>`).join(''):'<small>Gere esta cidade para visualizar o roteiro aqui.</small>'}</div></article>`;
  }).join('')}</div><p class="ipa70-planner-warning">Ao regenerar, será solicitada confirmação. As outras cidades e os deslocamentos cadastrados serão preservados.</p></section>`;
 }
 function ipa70DayTripModal(tripId,dayNo){
@@ -4157,28 +4241,45 @@ async function ipa70GenerateStage(tripId,index,dayOnly){
  const generated=route.days.map((day,i)=>{const e=entries[i],old=(trip.itinerary||[]).find(x=>Number(x.day)===e.day),exc=old?.dayTrip;
   return {...day,day:e.day,date:e.date||old?.date||'',city:exc?.city||e.city,baseCity:e.city,routeOrigin:ipa70StartLocation(trip,e.day,e.city),country:e.country||ipa70CountryForCity(e.city),stageId:stage.id,dayTrip:exc||null,title:exc?.city?`Dia ${e.day} · Bate e volta a ${exc.city}`:`Dia ${e.day} · ${e.city}`,places:(day.places||[]).map((place,j)=>({...place,id:'ipa70-'+Date.now()+'-'+e.day+'-'+j,generatedByAI:true}))};
  });
- const safeGenerated=generated.map(d=>{const old=(trip.itinerary||[]).find(x=>Number(x.day)===Number(d.day));return {...d,places:[...(old?.places||[]).filter(p=>p?.generatedByAI!==true),...(d.places||[])]}});
+ const safeGenerated=generated.map(d=>{
+  const old=(trip.itinerary||[]).find(x=>Number(x.day)===Number(d.day));
+  const kept=(old?.places||[]).filter(p=>!ipa74IsClearable(p)); // Apenas inclusão manual e compromissos fixos
+  const used=new Set(kept.flatMap(p=>[ipa74PlaceKey(p),ipaNormText(p?.name||'')]));const target=Math.max(1,Math.min(10,Number(old?.attractionTarget)||Number(d.attractionTarget)||4));
+  let count=kept.filter(p=>!ipa73IsFixedStop(p)).length;
+  const additions=[];
+  for(const place of d.places||[]){const key=ipa74PlaceKey(place),name=ipaNormText(place?.name||'');if(used.has(key)||used.has(name)||count>=target)continue;used.add(key);used.add(name);additions.push(place);count++;}
+  return {...d,attractionTarget:target,places:[...kept,...additions]};
+ });
  const merged=[...(trip.itinerary||[]).filter(day=>!entries.some(e=>e.day===Number(day.day))),...safeGenerated].sort((a,b)=>Number(a.day)-Number(b.day));
  const previous=trip.itinerary;
  try{IPAData.updateTrip(tripId,{itinerary:merged,country:stages[0].country,destination:stages[0].destination});await window.IPAFirebase.syncNow();view.innerHTML=adminTripEditor(tripId);bind();toast(`${stage.destination}: ${generated.length} dias gerados e salvos ✓`)}catch(err){IPAData.updateTrip(tripId,{itinerary:previous});toast('Não foi possível confirmar a geração no Firebase: '+(err.message||err))}
 }
 function ipa73IsFixedStop(p){return /transfer|deslocamento|aeroporto|terminal|trem|ônibus|onibus|voo|ferry|reserva|check.?in|check.?out/i.test(String(p?.category||'')+' '+String(p?.kind||''));}
+// Beta 6.30.74 — hotéis por reserva/data/país, inclusive municípios vizinhos (Porto/Vila Nova de Gaia).
+function ipa74IsClearable(p){return !p?.manual&&!p?.manuallyAdded&&!p?.addedByAdmin&&!ipa73IsFixedStop(p);}
+function ipa74PlaceKey(p){const raw=String(typeof p==='string'?p:p?.placeId||p?.catalogPlaceId||p?.name||'');return ipaNormText(raw).replace(/[^a-z0-9]/g,'');}
+function ipa74HotelForDay(trip,dayNo,city){
+ const entries=ipa70StageDayEntries(trip),entry=entries.find(e=>Number(e.day)===Number(dayNo));
+ const country=entry?.country||tripCountry(trip),date=entry?.date||'';
+ const blocks=ipa68TravelBlocks(trip).filter(b=>Number(b.arrivalDay)<=Number(dayNo)&&(b.destinationHotelId||b.destinationType==='hotel'));
+ const arrival=blocks.length?blocks.slice().sort((a,b)=>Number(b.arrivalDay)-Number(a.arrivalDay)||ipa68Minute(b.arrivalTime)-ipa68Minute(a.arrivalTime))[0]:null;
+ const bookings=trip.hotelBookings||[],catalog=adminData().hotelCatalog||[];
+ const active=bookings.filter(h=>(!date||(!h.startDate||h.startDate<=date)&&(!h.endDate||date<h.endDate))&&(!country||!h.country||ipaSameCountry(h.country,country)));
+ const booking=(arrival?.destinationHotelId?bookings.find(h=>String(h.hotelId)===String(arrival.destinationHotelId)||String(h.id)===String(arrival.destinationHotelId)):null)||active.find(h=>ipaNormText(h.city)===ipaNormText(city))||active[0]||null;
+ const hotel=catalog.find(h=>String(h.id)===String(arrival?.destinationHotelId||booking?.hotelId||''))||catalog.find(h=>String(h.id)===String(booking?.hotelId||''))||null;
+ const coords=arrival&&Number.isFinite(Number(arrival.destinationLat))&&Number.isFinite(Number(arrival.destinationLng))&&arrival.destinationLat!=null&&arrival.destinationLng!=null?{lat:Number(arrival.destinationLat),lng:Number(arrival.destinationLng)}:{lat:hotel?.lat??hotel?.latitude,lng:hotel?.lng??hotel?.longitude};
+ const valid=coords.lat!=null&&coords.lng!=null&&Number.isFinite(Number(coords.lat))&&Number.isFinite(Number(coords.lng))&&Math.abs(Number(coords.lat))<=90&&Math.abs(Number(coords.lng))<=180;
+ const name=arrival?.destinationHotelName||booking?.hotelName||hotel?.name||(arrival?.destinationType==='hotel'?arrival.destination:'');
+ const address=hotel?.address||arrival?.destination||'';
+ return {name:name||'',address,lat:valid?Number(coords.lat):null,lng:valid?Number(coords.lng):null,booking,arrival};
+}
 function ipa73OriginPoint(trip,dayNo,city){
- const blocks=ipa68TravelBlocks(trip);
- const arrival=blocks.filter(b=>Number(b.arrivalDay)===Number(dayNo)&&(b.destinationType==='hotel'||b.destinationHotelId)).at(-1);
- const hotelBookings=trip.hotelBookings||[],catalog=adminData().hotelCatalog||[];
- const booking=hotelBookings.find(h=>ipaNormText(h.city)===ipaNormText(city));
- const hotel=catalog.find(h=>String(h.id)===String(arrival?.destinationHotelId||booking?.hotelId||''));
- const candidate=arrival&&Number.isFinite(Number(arrival.destinationLat))&&Number.isFinite(Number(arrival.destinationLng))?{lat:arrival.destinationLat,lng:arrival.destinationLng}:hotel;
- if(candidate&&Number.isFinite(Number(candidate.lat))&&Number.isFinite(Number(candidate.lng))&&Math.abs(Number(candidate.lat))<=90&&Math.abs(Number(candidate.lng))<=180)return {lat:Number(candidate.lat),lng:Number(candidate.lng),name:hotel?.name||arrival?.destination||city};
- return null; // sem coordenadas: não fingir otimização pela hospedagem
+ const hotel=ipa74HotelForDay(trip,dayNo,city);
+ return hotel.lat!==null&&hotel.lng!==null?{lat:hotel.lat,lng:hotel.lng,name:hotel.name||city}:null;
 }
 function ipa70StartLocation(trip,dayNo,city){
- const blocks=ipa68TravelBlocks(trip);
- const hotelArrival=blocks.filter(b=>Number(b.arrivalDay)===Number(dayNo)&&(!!b.destinationHotelId||b.destinationType==='hotel'||/hotel|hospedagem|airbnb|apartamento/i.test(String(b.destination||'')))).at(-1);
- if(hotelArrival)return hotelArrival.destination;
- const book=(trip.hotelBookings||[]).find(h=>ipaNormText(h.city)===ipaNormText(city));
- return book?.hotelName||book?.name||city;
+ const hotel=ipa74HotelForDay(trip,dayNo,city);
+ return hotel.name||hotel.address||'Hospedagem não vinculada';
 }
 function ipa70StageScheduleBlocks(trip,entries){
  const entryDays=entries.map(x=>x.day),offset=entryDays[0]-1;
@@ -4223,7 +4324,7 @@ function adminTripEditor(id){
  <section class="ipa-admin-panel"><span class="eyebrow">EXPERIÊNCIA DO CLIENTE</span><h2>O que aparece no app</h2><div class="ipa-admin-module-grid">${Object.entries(labels).map(([k,v])=>`<label class="${t.modules?.[k]?'on':''}"><div><b>${v}</b><small>${t.modules?.[k]?'Visível':'Oculto'}</small></div><input type="checkbox" data-admin-module="${k}" ${t.modules?.[k]?'checked':''}></label>`).join('')}</div></section>
  <section class="ipa-admin-panel" id="ipaCountryRoute"><div class="section-head"><div><span class="eyebrow">ROTEIRO INTELIGENTE</span><h2>Dias, lugares e dicas ${ipaTripCountries(t).length>1?'· '+ipaEscape(ipaAdminCountry(t)):''}</h2></div><button class="btn btn-light" data-admin-add-day="${t.id}">+ Adicionar dia</button></div>
  <div class="smart-route-banner"><span>✨</span><div><b>Dica Inteligente</b><small>Adicione atrações, aeroportos e transfers. Use ↑ ↓ para reordenar e Editar / Excluir para ajustar sem recriar o roteiro. As alterações são salvas no Firebase.</small></div></div>
- <div class="ipa-admin-days">${(ipaTripCountries(t).length>1?[...(ipaScopedDays(t,ipaAdminCountry(t))),...(t.itinerary||[]).filter(day=>!ipaCountryOfDay(t,day))]:(t.itinerary||[])).sort((a,b)=>a.day-b.day).map(day=>`<div class="admin-day-expanded"><div class="admin-day-title"><strong>${day.day}</strong><span><b>${day.title}</b><small>${day.date||''} · ${ipaCountryOfDay(t,day)?countryFlag(ipaCountryOfDay(t,day))+' '+ipaEscape(ipaCountryOfDay(t,day)):'⚠️ País não identificado'}</small></span>${ipaTripCountries(t).length>1&&!ipaCountryOfDay(t,day)?`<select class="ipa-admin-day-country" data-ipa-classify-day="${ipaEscape(t.id)}:${day.day}" aria-label="País do dia ${day.day}">${ipaTripCountries(t).map(c=>`<option value="${ipaEscape(c)}" ${ipaSameCountry(c,ipaCountryOfDay(t,day))?'selected':''}>${ipaEscape(c)}</option>`).join('')}<option value="" ${!ipaCountryOfDay(t,day)?'selected':''}>⚠️ Não identificado</option></select>`:''}<button type="button" class="btn btn-light ipa70-daytrip-btn" data-ipa70-daytrip="${ipaEscape(t.id)}:${day.day}">🚌 ${day.dayTrip?.city?"Bate e volta: "+ipaEscape(day.dayTrip.city):"Bate e volta"}</button>${day.dayTrip?.city?`<button type="button" class="btn btn-primary" data-ipa70-generate-daytrip="${ipaEscape(t.id)}:${day.day}">✨ Gerar atrações de ${ipaEscape(day.dayTrip.city)}</button>`:""}<button class="admin-add-place-btn" data-admin-add-place="${t.id}:${day.day}">+ Lugar / dica</button></div><div class="ipa64-day-target"><div><b>🎯 Atrações planejadas: ${Math.max(1,Math.min(10,Number(day.attractionTarget)||4))}</b><small>${normalizedPlaces(day).filter(p=>!(/transfer|deslocamento|aeroporto|refeiç|restaurante|café/i).test(String(p.category||''))).length} atrações no roteiro · Transfers e aeroportos não entram na meta</small></div><button type="button" data-admin-attraction-target="${ipaEscape(t.id)}:${day.day}">⚙ Ajustar meta</button></div><div class="admin-place-list ipa67-place-list">${normalizedPlaces(day).map((p,i)=>`<article class="ipa67-stop-card"><div class="ipa67-stop-head"><span class="ipa67-stop-number">${i+1}</span><div class="ipa67-stop-info"><b>${ipa73IsFixedStop(p)&&p.time?`${ipaEscape(p.time)} · `:''}${ipaEscape(p.name||'Parada')}</b><small>${ipaEscape(p.category||'📍 Atração')}</small><small class="ipa67-address">${ipaEscape(p.address||p.note||'')}</small>${p.smartTip?`<em>💡 ${ipaEscape(p.smartTip)}</em>`:''}</div></div><div class="ipa67-stop-travel">${p.mapsUrl?`<button type="button" class="ipa67-action ipa67-travel-button" data-external-route="${ipaEscape(p.mapsUrl)}" aria-label="Abrir ${ipaEscape(p.name)} no Google Maps">📍 Maps</button>`:''}${i<normalizedPlaces(day).length-1?`<button type="button" class="ipa67-action ipa67-travel-button" data-admin-transport="${ipaEscape(t.id)}:${day.day}:${i}">🚆 Deslocamento</button>`:''}</div><div class="ipa67-stop-actions"><button type="button" class="ipa67-action" data-admin-place-move data-trip="${ipaEscape(t.id)}" data-day="${day.day}" data-index="${i}" data-direction="-1" ${i===0?'disabled':''}>↑ <span>Subir</span></button><button type="button" class="ipa67-action" data-admin-place-move data-trip="${ipaEscape(t.id)}" data-day="${day.day}" data-index="${i}" data-direction="1" ${i===normalizedPlaces(day).length-1?'disabled':''}>↓ <span>Descer</span></button><button type="button" class="ipa67-action" data-admin-place-edit data-trip="${ipaEscape(t.id)}" data-day="${day.day}" data-index="${i}">✏️ <span>Editar</span></button><button type="button" class="ipa67-action ipa67-delete" data-admin-place-delete data-trip="${ipaEscape(t.id)}" data-day="${day.day}" data-index="${i}">🗑 <span>Excluir</span></button></div></article>`)
+ <div class="ipa-admin-days">${(ipaTripCountries(t).length>1?[...(ipaScopedDays(t,ipaAdminCountry(t))),...(t.itinerary||[]).filter(day=>!ipaCountryOfDay(t,day))]:(t.itinerary||[])).sort((a,b)=>a.day-b.day).map(day=>`<div class="admin-day-expanded"><div class="admin-day-title"><strong>${day.day}</strong><span><b>${day.title}</b><small>${day.date||''} · ${ipaCountryOfDay(t,day)?countryFlag(ipaCountryOfDay(t,day))+' '+ipaEscape(ipaCountryOfDay(t,day)):'⚠️ País não identificado'}</small></span>${ipaTripCountries(t).length>1&&!ipaCountryOfDay(t,day)?`<select class="ipa-admin-day-country" data-ipa-classify-day="${ipaEscape(t.id)}:${day.day}" aria-label="País do dia ${day.day}">${ipaTripCountries(t).map(c=>`<option value="${ipaEscape(c)}" ${ipaSameCountry(c,ipaCountryOfDay(t,day))?'selected':''}>${ipaEscape(c)}</option>`).join('')}<option value="" ${!ipaCountryOfDay(t,day)?'selected':''}>⚠️ Não identificado</option></select>`:''}<button type="button" class="btn btn-light ipa70-daytrip-btn" data-ipa70-daytrip="${ipaEscape(t.id)}:${day.day}">🚌 ${day.dayTrip?.city?"Bate e volta: "+ipaEscape(day.dayTrip.city):"Bate e volta"}</button>${day.dayTrip?.city?`<button type="button" class="btn btn-primary" data-ipa70-generate-daytrip="${ipaEscape(t.id)}:${day.day}">✨ Gerar atrações de ${ipaEscape(day.dayTrip.city)}</button>`:""}<button class="admin-add-place-btn" data-admin-add-place="${t.id}:${day.day}">+ Lugar / dica</button></div>${ipa75TravelStopsForDay(t,day.day).length?`<div class="ipa75-admin-day-logistics"><b>✈️ Paradas fixas deste dia</b>${ipa75TravelStopsForDay(t,day.day).map(p=>`<div class="ipa75-admin-fixed-stop"><strong>${ipaEscape(p.time||'')} · ${ipaEscape(p.name)}</strong><small>${ipaEscape(p.address||p.note||'')}</small>${p.mapsUrl?`<button type="button" class="btn btn-light" data-external-route="${ipaEscape(p.mapsUrl)}">📍 Maps</button>`:''}</div>`).join('')}</div>`:''}<div class="ipa64-day-target"><div><b>🎯 Atrações planejadas: ${Math.max(1,Math.min(10,Number(day.attractionTarget)||4))}</b><small>${normalizedPlaces(day).filter(p=>!(/transfer|deslocamento|aeroporto|refeiç|restaurante|café/i).test(String(p.category||''))).length} atrações no roteiro · Transfers e aeroportos não entram na meta</small></div><button type="button" data-admin-attraction-target="${ipaEscape(t.id)}:${day.day}">⚙ Ajustar meta</button></div><div class="admin-place-list ipa67-place-list">${normalizedPlaces(day).map((p,i)=>`<article class="ipa67-stop-card"><div class="ipa67-stop-head"><span class="ipa67-stop-number">${i+1}</span><div class="ipa67-stop-info"><b>${ipa73IsFixedStop(p)&&p.time?`${ipaEscape(p.time)} · `:''}${ipaEscape(p.name||'Parada')}</b><small>${ipaEscape(p.category||'📍 Atração')}</small><small class="ipa67-address">${ipaEscape(p.address||p.note||'')}</small>${p.smartTip?`<em>💡 ${ipaEscape(p.smartTip)}</em>`:''}</div></div><div class="ipa67-stop-travel">${p.mapsUrl?`<button type="button" class="ipa67-action ipa67-travel-button" data-external-route="${ipaEscape(p.mapsUrl)}" aria-label="Abrir ${ipaEscape(p.name)} no Google Maps">📍 Maps</button>`:''}${i<normalizedPlaces(day).length-1?`<button type="button" class="ipa67-action ipa67-travel-button" data-admin-transport="${ipaEscape(t.id)}:${day.day}:${i}">🚆 Deslocamento</button>`:''}</div><div class="ipa67-stop-actions"><button type="button" class="ipa67-action" data-admin-place-move data-trip="${ipaEscape(t.id)}" data-day="${day.day}" data-index="${i}" data-direction="-1" ${i===0?'disabled':''}>↑ <span>Subir</span></button><button type="button" class="ipa67-action" data-admin-place-move data-trip="${ipaEscape(t.id)}" data-day="${day.day}" data-index="${i}" data-direction="1" ${i===normalizedPlaces(day).length-1?'disabled':''}>↓ <span>Descer</span></button><button type="button" class="ipa67-action" data-admin-place-edit data-trip="${ipaEscape(t.id)}" data-day="${day.day}" data-index="${i}">✏️ <span>Editar</span></button><button type="button" class="ipa67-action ipa67-delete" data-admin-place-delete data-trip="${ipaEscape(t.id)}" data-day="${day.day}" data-index="${i}">🗑 <span>Excluir</span></button></div></article>`)
 .join('')||'<small>Nenhum local neste dia.</small>'}</div></div>`).join('')||'<p>Comece adicionando o primeiro dia.</p>'}</div>
  <div class="network-tip-list">${(d.recommendations||[]).filter(r=>r.tripId===t.id).map(r=>`<div><span>💡</span><div><b>${r.category||'Dica'} · ${r.name}</b><small>${r.address||''}</small><em>${r.smartTip||'Indo por Aí recomenda'}</em></div></div>`).join('')||'<small>Nenhuma dica extra cadastrada.</small>'}</div></section>
  <section class="ipa-admin-panel" id="ipaCountryClimate"><div class="section-head"><div><span class="eyebrow">✨ ANTES · ENTRE NO CLIMA</span><h2>Conteúdo ${ipaTripCountries(t).length>1?'de '+ipaEscape(ipaAdminCountry(t)):'do destino'}</h2></div><button class="btn btn-primary" data-admin-generate-climate="${t.id}">✨ Preparar conteúdo</button></div>${ipaCountrySelectorHtml(t,true)}<p>Filmes, playlists, livros, expressões, gastronomia e curiosidades. ${ipaTripCountries(t).length>1?'Cada país tem conteúdo independente. O roteiro e o financeiro permanecem únicos.':'O conteúdo personalizado existente permanece preservado.'}</p><div class="climate-admin-grid">${(ipaTripCountries(t).length>1?ipaClimateCountryRows(t,window.ipaAdminClimateCountryByTrip?.[t.id]||ipaTripCountries(t)[0]):climateForTrip(t)).map((x,i)=>`<div><span>${x[0]}</span><small>${x[1]}</small><b>${ipaEscape(x[2])}</b><p>${ipaEscape(x[3])}</p>${ipaStreamButtons(x)}<button class="btn btn-light" data-admin-edit-climate="${t.id}:${i}">✏️ Editar</button></div>`).join('')}</div></section>
@@ -4762,8 +4863,9 @@ async function ipaLoadGoogleMaps(){
  return ipaMapsPromise;
 }
 async function ipaGeocodeMapPlace(maps,p,country){
+ if(p.lat!=null&&p.lng!=null&&Number.isFinite(Number(p.lat))&&Number.isFinite(Number(p.lng))&&Math.abs(Number(p.lat))<=90&&Math.abs(Number(p.lng))<=180)return new maps.LatLng(Number(p.lat),Number(p.lng));
  const geocoder=new maps.Geocoder();
- const query=[p.address||p.name,country].filter(Boolean).join(', ');
+ const query=[p.address||p.locationName||p.name,p.country||country].filter(Boolean).join(', ');
  return new Promise(resolve=>geocoder.geocode({address:query},(results,status)=>resolve(status==='OK'?results?.[0]?.geometry?.location:null)));
 }
 function ipaLatLngLiteral(pos){return {lat:Number(typeof pos.lat==='function'?pos.lat():pos.lat),lng:Number(typeof pos.lng==='function'?pos.lng():pos.lng)}}
@@ -4794,9 +4896,9 @@ async function ipaDrawRoadRoute(maps,map,positions,el){
 async function ipaInitExploreRealMap(){
  const el=document.querySelector('#ipaExploreRealMap');if(!el)return;
  const t=activeTrip();if(!t)return;
- const days=ipaScopedDays(t);
+ const days=ipa75ScopedDays(t);
  const day=days.find(x=>Number(x.day)===Number(state.tripDay))||days[0];if(!day)return;
- const official=normalizedPlaces(day).map((p,i)=>({...p,_kind:'official',_label:String.fromCharCode(65+i)}));
+ const official=ipa75ClientRoute(t,day).map((p,i)=>({...p,_kind:'official',_label:String.fromCharCode(65+i)}));
  const personal=ipaGetPersonalRoute(t,day.day).map((p,i)=>({...p,_kind:'personal',_label:'✨',id:p.id||p.placeId||`personal-${i}`}));
  const places=[...official,...personal],country=ipaContextCountry(t)||tripCountry(t);
  try{
@@ -4804,16 +4906,16 @@ async function ipaInitExploreRealMap(){
   for(const p of places){const pos=await ipaGeocodeMapPlace(maps,p,country);if(!pos)continue;located.push({...p,pos});bounds.extend(pos);const marker=new maps.Marker({map,position:pos,label:p._kind==='official'?{text:p._label,color:'#fff',fontWeight:'800'}:undefined,title:p.name});if(p._kind==='personal')marker.setIcon({path:maps.SymbolPath.CIRCLE,scale:11,fillColor:'#ff8a3d',fillOpacity:1,strokeColor:'#fff',strokeWeight:3});const info=new maps.InfoWindow({content:`<div class="ipa-map-info"><b>${ipaEscape(p.name||'Local')}</b><small>${p._kind==='personal'?'✨ Sua descoberta':'Roteiro oficial'}</small><p>${ipaEscape(p.address||p.note||'')}</p></div>`});marker.addListener('click',()=>info.open({map,anchor:marker}))}
   if(!located.length){el.innerHTML='<div class="ipa-map-empty">Não consegui localizar os pontos deste dia.</div>';return}
   map.fitBounds(bounds,55);maps.event.addListenerOnce(map,'bounds_changed',()=>{const z=map.getZoom();if(z>15)map.setZoom(15);if(z<11)map.setZoom(11)});
-  const officialLocated=located.filter(x=>x._kind==='official');if(officialLocated.length>1)await ipaDrawRoadRoute(maps,map,officialLocated.map(x=>x.pos),el);
+  const officialLocated=located.filter(x=>x._kind==='official');if(officialLocated.length>1&&!officialLocated.some(x=>x.isFlightTerminal))await ipaDrawRoadRoute(maps,map,officialLocated.map(x=>x.pos),el);
   if(navigator.geolocation)navigator.geolocation.getCurrentPosition(pos=>new maps.Marker({map,position:{lat:pos.coords.latitude,lng:pos.coords.longitude},title:'Você está aqui',icon:{path:maps.SymbolPath.CIRCLE,scale:8,fillColor:'#1976d2',fillOpacity:1,strokeColor:'#fff',strokeWeight:3}}),()=>{}, {enableHighAccuracy:true,timeout:5000,maximumAge:60000});
  }catch(e){console.error(e);el.innerHTML=`<div class="ipa-map-empty"><b>Mapa indisponível</b><small>${ipaEscape(e.message||'Tente novamente.')}</small></div>`}
 }
 async function ipaInitRealMap(){
  const el=document.querySelector('#ipaRealMap');if(!el)return;
  const t=activeTrip();if(!t)return;
- const days=ipaScopedDays(t);
+ const days=ipa75ScopedDays(t);
  const day=days.find(x=>Number(x.day)===Number(state.tripDay))||days[0];if(!day)return;
- const official=normalizedPlaces(day).map((p,i)=>({...p,_kind:'official',_label:String.fromCharCode(65+i)}));
+ const official=ipa75ClientRoute(t,day).map((p,i)=>({...p,_kind:'official',_label:String.fromCharCode(65+i)}));
  const personal=ipaGetPersonalRoute(t,day.day).map((p,i)=>({...p,_kind:'personal',_label:'✨',id:p.id||p.placeId||`personal-${i}`}));
  const places=[...official,...personal],country=tripCountry(t);
  try{
@@ -4838,7 +4940,7 @@ async function ipaInitRealMap(){
    });
    // Rota real pelas ruas na ordem oficial A → B → C → D.
    const officialLocated=located.filter(x=>x._kind==='official');
-   if(officialLocated.length>1)await ipaDrawRoadRoute(maps,map,officialLocated.map(x=>x.pos),el);
+   if(officialLocated.length>1&&!officialLocated.some(x=>x.isFlightTerminal))await ipaDrawRoadRoute(maps,map,officialLocated.map(x=>x.pos),el);
    // Localização atual, se o viajante autorizar.
    if(navigator.geolocation)navigator.geolocation.getCurrentPosition(pos=>{
      const here={lat:pos.coords.latitude,lng:pos.coords.longitude};
@@ -4849,11 +4951,11 @@ async function ipaInitRealMap(){
 function duringView(){
  const t=activeTrip();
  if(!t)return `${ipaParticipantBadge(t)}<section class="section"><h2>Viagem não encontrada</h2><p>Não há uma viagem ativa para este cliente.</p></section>`;
- const days=ipaScopedDays(t);
+ const days=ipa75ScopedDays(t);
  const todayISO=new Date().toISOString().slice(0,10);
  const day=days.find(x=>Number(x.day)===Number(state.tripDay))||days.find(x=>x.date===todayISO)||days[0]||{day:0,title:'Nenhum roteiro cadastrado para este país',places:[]};
  state.tripDay=Number(day.day||0);
- const officialPlaces=normalizedPlaces(day);
+ const officialPlaces=ipa75DayStops(t,day);
  const personalPlaces=ipaGetPersonalRoute(t,day.day).map((p,i)=>({
    id:p.id||`personal-${i}`,name:p.name||'Descoberta',address:p.address||'',time:p.time||'',
    note:p.note||'✨ Adicionado por você nas Dicas Inteligentes',personal:true,placeId:p.placeId||p.id||'',duration:p.duration||'',experienceId:p.experienceId||''
@@ -4863,9 +4965,9 @@ function duringView(){
  return `${ipaCountrySelectorHtml(t)}${ipaCountryStatusHtml(t)}<section class="hero during-personalized-hero"><span class="eyebrow">Durante a viagem</span><h1>${ipaCountryHeading(t)} ${flag}</h1><p>${t.name} · Dia ${day.day}${day.title?` · ${day.title}`:''}</p><div class="hero-actions">${route?`<button class="btn btn-light" data-ipa-full-route="day">Abrir rota</button>`:''}${tripModule('live')?`<button class="btn btn-primary" id="realLiveBtn">🔴 Live</button>`:''}</div></section>
  ${modeCard()}
  ${ipaExperienceCardsHtml(t)}
- ${ipa68BlocksHtml(t,null,country)}
+
  <section class="section ipa-top-day-tabs"><div class="section-head"><h2>Escolha o dia do roteiro</h2></div><div class="day-strip" aria-label="Dias da viagem">${days.map(x=>`<button type="button" class="day-pill ${Number(x.day)===Number(day.day)?'active':''}" data-day="${x.day}" aria-pressed="${Number(x.day)===Number(day.day)}"><small>Dia</small><strong>${x.day}</strong></button>`).join('')}</div></section>
- <section class="section"><div class="section-head"><div><span class="eyebrow">Roteiro real</span><h2>${day.title||`Dia ${day.day}`}</h2></div><span class="chip">${places.length} locais</span></div><div class="during-place-list">${places.map((p,i)=>`<article class="during-place-card ${p.personal?'during-place-personal':''}"><div class="ipa-during-stop-kicker">📍 PARADA ${String(i+1).padStart(2,'0')} ${ipa73IsFixedStop(p)&&p.time?`<span>· ${ipaEscape(p.time)}</span>`:''}</div><div class="during-place-number">${i+1}</div>${ipaPlacePhotoHtml(p,'ipa-during-thumbnail')}<div class="during-place-main">${ipa73IsFixedStop(p)&&p.time?`<small>${ipaEscape(p.time)}</small>`:''}<div class="during-place-title" data-journey-title="${ipaEscape([t.id,day.day,p.id||i].join(':'))}"><b>${p.name}</b></div></div><div class="during-place-details"><p>${ipaEscape(p.address||'Programado no roteiro')}</p>${p.note?`<div class="ipa-place-client-note"><strong>📝 Observação</strong><span>${ipaEscape(p.note)}</span></div>`:''}${(p.smartTip||p.tip)?`<div class="ipa-place-client-tip"><strong>💡 Dica Indo por Aí</strong><span>${ipaEscape(p.smartTip||p.tip)}</span></div>`:''}${ipaJourneyFeedbackHtml(t.id,day.day,p.id||i,p.name,(p.address||p.name)+', '+country)}<button type="button" class="ipa-navigate-place" data-ipa-navigate-place="${i}">📍 Ir até este lugar</button></div></article>${i<places.length-1?ipaTransportBetween(t,p,places[i+1]):''}`).join('')||'<p>Nenhum local cadastrado para este dia.</p>'}</div></section>
+ <section class="section"><div class="section-head"><div><span class="eyebrow">Roteiro real</span><h2>${day.title||`Dia ${day.day}`}${day.date?' · '+ipaEscape(day.date.split('-').reverse().join('/')):''}</h2></div><span class="chip">${places.length} locais</span></div><div class="during-place-list">${places.map((p,i)=>`<article class="during-place-card ${p.personal?'during-place-personal':''}"><div class="ipa-during-stop-kicker">📍 PARADA ${String(i+1).padStart(2,'0')} ${(p.logistics||ipa73IsFixedStop(p))&&p.time?`<span>· ${ipaEscape(p.time)}</span>`:''}</div><div class="during-place-number">${i+1}</div>${ipaPlacePhotoHtml(p,'ipa-during-thumbnail')}<div class="during-place-main">${(p.logistics||ipa73IsFixedStop(p))&&p.time?`<small>${ipaEscape(p.time)}</small>`:''}<div class="during-place-title" data-journey-title="${ipaEscape([t.id,day.day,p.id||i].join(':'))}"><b>${p.name}</b></div></div><div class="during-place-details"><p>${ipaEscape(p.address||'Programado no roteiro')}</p>${p.note?`<div class="ipa-place-client-note"><strong>📝 Observação</strong><span>${ipaEscape(p.note)}</span></div>`:''}${(p.smartTip||p.tip)?`<div class="ipa-place-client-tip"><strong>💡 Dica Indo por Aí</strong><span>${ipaEscape(p.smartTip||p.tip)}</span></div>`:''}${p.logistics?'':ipaJourneyFeedbackHtml(t.id,day.day,p.id||i,p.name,(p.address||p.name)+', '+country)}${p.flightInfo?'':`<button type="button" class="ipa-navigate-place" data-ipa-navigate-place="${i}">📍 Ir até este lugar</button>`}${p.routeUrl?`<button type="button" class="ipa75-route-leg" data-external-route="${ipaEscape(p.routeUrl)}">🗺️ Abrir trecho terrestre</button>`:''}</div></article>${i<places.length-1&&!p.logistics&&!places[i+1].logistics?ipaTransportBetween(t,p,places[i+1]):''}`).join('')||'<p>Nenhum local cadastrado para este dia.</p>'}</div></section>
  <section class="section ipa-real-map-section"><div class="section-head"><div><span class="eyebrow">MAPA DO DIA</span><h2>Seu roteiro no mapa</h2></div><span class="chip">A → B → C${places.length>3?' → D':''}</span></div><div id="ipaRealMap" class="ipa-real-map"><div class="ipa-map-loading">🗺️ Carregando mapa...</div></div><div class="ipa-map-legend"><span><i class="official"></i> Roteiro oficial</span><span><i class="personal"></i> Dica adicionada</span><span><i class="current"></i> Você</span></div></section>
 `;
 }
@@ -4980,10 +5082,10 @@ function ipaPersonalRouteBlock(t,day,official){
 function exploreView(){
  const t=activeTrip();
  if(!t)return `<section class="section"><h2>Mapa indisponível</h2></section>`;
- const days=ipaScopedDays(t);
+ const days=ipa75ScopedDays(t);
  const dayNumber=state.tripDay&&days.some(x=>Number(x.day)===Number(state.tripDay))?Number(state.tripDay):Number(days[0]?.day||1);
  const day=days.find(x=>Number(x.day)===dayNumber)||{day:1,title:"Roteiro",places:[]};
- const places=normalizedPlaces(day);
+ const places=ipa75DayStops(t,day);
  const route=googleMapsRouteUrl(day,t);
  const personal=ipaGetPersonalRoute(t,day.day);
  const completeRoute=ipaPersonalMapsUrl(places,personal,t);
@@ -4997,7 +5099,7 @@ function exploreView(){
  <div id="smartTipsResults" class="smart-tips-results"><div class="smart-loading"><span>✨</span><div><b>Buscando sugestões para ${ipaCountryHeading(t)}…</b><small>Selecionamos lugares fora do roteiro do dia.</small></div></div></div></section>
  ${admTips.length?`<section class="section"><div class="section-head"><div><span class="eyebrow">CURADORIA INDO POR AÍ</span><h2>Dicas cadastradas pelo ADM</h2></div></div><div class="smart-tips-results">${admTips.slice(0,6).map(p=>smartTipCard(p,t,places)).join('')}</div></section>`:''}
  <section class="section"><div class="section-head"><div><span class="eyebrow">ROTA COMPLETA</span><h2>Locais do Dia ${day.day}</h2></div><span class="chip">${totalPoints} pontos</span></div>
- <div class="route-summary dynamic-route-summary"><div class="route-line"></div>${places.map((p,i)=>`<div class="route-stop"><span>${String.fromCharCode(65+i)}</span><div><b>${p.name}</b><small>${ipa73IsFixedStop(p)&&p.time?ipaEscape(p.time):''}${p.address?` · ${ipaEscape(p.address)}`:''} · roteiro oficial</small></div></div>`).join('')}${ipaPersonalRouteBlock(t,day,places)}</div>
+ <div class="route-summary dynamic-route-summary"><div class="route-line"></div>${places.map((p,i)=>`<div class="route-stop"><span>${i+1}</span><div><b>${ipaEscape(p.name)}</b><small>${(p.logistics||ipa73IsFixedStop(p))&&p.time?ipaEscape(p.time):''}${p.address?` · ${ipaEscape(p.address)}`:''} · ${p.logistics?'deslocamento fixo':'roteiro oficial'}</small></div>${p.logistics&&!p.flightInfo?`<button type="button" data-external-route="${ipaEscape(p.mapsUrl)}">📍 Ir até aqui</button>`:''}</div>`).join('')}${ipaPersonalRouteBlock(t,day,places)}</div>
  <div class="personal-route-actions">${route?`<button class="btn btn-secondary btn-block" data-ipa-full-route="day">Abrir rota oficial</button>`:''}${completeRoute&&personal.length?`<button class="btn btn-primary btn-block" data-ipa-full-route="personal">Abrir minha rota completa no Google Maps</button>`:''}</div></section>`;
 }
 function smartTipCard(p,t,official){

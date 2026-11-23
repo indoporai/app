@@ -2013,3 +2013,16 @@ body.hidden-nav .bottom-nav{display:none!important;}
 
 /* Beta 6.30.73: resultado no próprio card, sem reduzir área de edição */
 .ipa73-city-card{display:flex;flex-direction:column;align-items:stretch}.ipa73-city-actions{display:flex;flex-wrap:wrap;gap:8px}.ipa73-city-results{width:100%;display:grid;gap:8px}.ipa73-day-preview{padding:12px;border:1px solid #dce9e9;border-radius:12px;background:#fff;display:grid;gap:5px}.ipa73-day-preview>small{color:#53777e}.ipa73-day-preview ol{margin:4px 0 0;padding-left:22px}.ipa73-day-preview li{padding:3px 0;overflow-wrap:anywhere}.ipa73-day-preview li small{font-size:11px;color:#087f89}.ipa73-city-actions button{flex:1;min-width:155px}@media(max-width:680px){.ipa73-city-actions{display:grid;grid-template-columns:minmax(0,1fr)}.ipa73-city-actions button{width:100%}}
+
+/* Beta 6.30.75: paradas logísticas oficiais sincronizadas dos deslocamentos */
+.ipa75-admin-day-logistics{padding:12px;margin:10px 0;border:1px solid rgba(6,104,119,.25);border-radius:12px;background:rgba(13,131,138,.055);display:grid;gap:8px}
+.ipa75-admin-day-logistics>b{color:#075667;font-size:13px}
+.ipa75-admin-fixed-stop{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:#fff;border-radius:9px;padding:9px 10px;min-width:0}
+.ipa75-admin-fixed-stop strong{font-size:13px;min-width:0;overflow-wrap:anywhere}
+.ipa75-admin-fixed-stop small{flex:1 1 100%;overflow-wrap:anywhere;color:#586b72}
+.ipa75-admin-fixed-stop button{font-size:12px;padding:5px 9px}
+.ipa75-admin-block-day{margin-top:10px;padding:10px;border-radius:10px;background:#f5f9fa;display:flex;flex-direction:column;gap:5px;overflow-wrap:anywhere}
+.ipa75-admin-block-day small{font-size:12px;color:#596e75}
+.ipa75-route-leg{display:block;width:100%;border:1px solid #087f89;border-radius:9px;background:#fff;color:#075667;padding:10px;margin-top:8px;font-weight:700}
+.route-stop button[data-external-route]{font-size:12px;border:1px solid #087f89;background:white;border-radius:8px;padding:6px;color:#075667;white-space:nowrap}
+@media(max-width:600px){.ipa75-admin-fixed-stop{display:grid;grid-template-columns:1fr}.route-stop button[data-external-route]{white-space:normal}}
