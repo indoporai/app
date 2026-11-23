@@ -1,0 +1,3 @@
+Beta 6.30.84 — navegação país/cidade/dias no ADM e cliente.
+Hospedagem vinculada por data/cidade, clima da cidade selecionada, geração sem repetições em etapas da mesma cidade.
+Atenção: validação em Firebase e navegador publicado ainda necessária; teste em homologação.

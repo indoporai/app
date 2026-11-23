@@ -1,0 +1,1 @@
+Beta 6.30.83 — deduplicação de atrações por Google Place ID e nome normalizado, no mesmo dia e entre dias da mesma cidade. Paradas fixas e manuais preservadas. Para roteiros antigos com duplicações, revisar ou refazer a geração antes de publicar.
