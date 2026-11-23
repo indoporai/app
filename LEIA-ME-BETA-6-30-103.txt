@@ -1,0 +1,22 @@
+INDO POR AÍ — BETA 6.30.103 — CONSOLIDADO VISUAL ADM
+Base: Beta 6.30.102 (upload de documentos diagnosticado).
+
+Ajustes desta edição:
+- Cabeçalho de viagem, bandeiras SVG locais e identidade visual responsiva.
+- Cliente + participantes no mesmo painel; compartilhamento com seleção múltipla recolhível.
+- Recursos visíveis no app em lista recolhível.
+- Destinos/etapas em linhas compactas; escolha de país e etapa em dois selects.
+- Resumo dos módulos por destino em lista compacta, com conteúdo cultural contado por país.
+- Hospedagens, logística, roteiro, documentos, cartão de transporte e conclusão padronizados.
+- Hospedagem por dia agrupada visualmente em períodos consecutivos de mesmo local.
+- Navegação duplicada de cidades removida somente no ADM; mantida no cliente.
+- Seleção redundante em Entre no clima removida, aproveitando país principal.
+- Feedback global revisado: aviso de demora após 45s, sem falsa confirmação de salvamento.
+- Cache PWA e URLs de assets atualizados para evitar versões misturadas.
+- Limpeza: removidos readmes históricos e qa-temp.html não utilizado.
+
+Importante: o pacote NÃO altera Firebase Security Rules, credenciais, APIs, Google Maps,
+rotas de Deslocamento, motor de geração, PIX, Mercado Pago ou rotinas de envio de documentos.
+A seleção por cidade preserva IDs de etapas, inclusive retornos à mesma cidade.
+A utilização em produção requer testes com login real no Firebase; apenas verificações
+estáticas/estrutura e integridade do pacote foram realizadas aqui.

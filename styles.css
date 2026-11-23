@@ -2308,3 +2308,78 @@ body.hidden-nav .bottom-nav{display:none!important;}
 .ipa92-city-option small{font-size:11px;color:inherit;opacity:.8}
 .ipa92-city-option.active,.ipa92-city-option[aria-pressed="true"]{background:#045b6d;border-color:#045b6d;color:#fff}
 .ipa92-city-option:focus-visible{outline:3px solid #fdc750;outline-offset:3px}
+
+/* Beta 6.30.103 — ADM compacto e padronizado; cliente permanece inalterado */
+.ipa103-admin {--ipa103-ink:#083e50;--ipa103-line:#d7e6e9;--ipa103-soft:#f2f9f8}
+.ipa103-admin .ipa-admin-panel{border:1px solid var(--ipa103-line);border-radius:24px;padding:clamp(16px,2.5vw,26px);box-shadow:0 6px 22px rgba(7,69,81,.035);margin-bottom:16px}
+.ipa103-admin .ipa-admin-panel h2{font-size:clamp(21px,2.3vw,27px);line-height:1.2;margin:8px 0 14px}
+.ipa103-admin .ipa-admin-panel p{line-height:1.5;margin:8px 0 14px}
+.ipa103-admin .section-head{display:flex;align-items:center;gap:12px;flex-wrap:wrap;justify-content:space-between}
+.ipa103-admin .section-head .btn{min-height:42px;padding:9px 15px;border-radius:13px}
+.ipa103-admin .eyebrow{font-size:12px;letter-spacing:.12em}
+.ipa103-admin .trip-editor-hero{background:linear-gradient(135deg,#f5fbfb 0%,#ffffff 74%);border:1px solid var(--ipa103-line);border-radius:23px;padding:20px 24px;display:flex;align-items:flex-start;gap:18px;flex-wrap:wrap}
+.ipa103-admin .trip-editor-identity{flex:1;min-width:230px}
+.ipa103-admin .trip-editor-identity h1{font-size:clamp(28px,4vw,42px);line-height:1.1;margin:8px 0 12px}
+.ipa103-admin .trip-country-flags{display:flex;flex-wrap:wrap;gap:7px}
+.ipa103-admin .trip-country-flag{display:inline-flex;align-items:center;justify-content:center;width:48px;height:37px;border:1px solid #dce9ec;border-radius:11px;background:white}
+.ipa103-admin .ipa-flag-picture{display:inline-flex;align-items:center;vertical-align:middle;line-height:1}
+.ipa103-admin .ipa-flag-picture img{width:28px;height:21px;object-fit:contain}
+.ipa103-admin .ipa-flag-fallback{display:none}
+.ipa103-admin .trip-client-panel .ipa103-participants-inline{margin-top:18px;padding-top:15px;border-top:1px solid var(--ipa103-line)}
+.ipa103-admin .ipa103-participants-inline .section-head h2{font-size:20px;margin:4px 0}
+.ipa103-admin .ipa103-participants-inline .participant-list > div{border-radius:14px}
+.ipa103-admin .ipa103-multi{margin-top:12px;border:1px solid #c9e2e6;border-radius:16px;background:#f8fcfc;overflow:hidden}
+.ipa103-admin .ipa103-multi summary{cursor:pointer;list-style:none;min-height:48px;padding:14px 18px;font-weight:750;color:#075c6d;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.ipa103-admin .ipa103-multi summary::-webkit-details-marker{display:none}
+.ipa103-admin .ipa103-multi summary::after{content:'⌄';font-size:21px;line-height:1;transition:transform .2s}
+.ipa103-admin .ipa103-multi[open] summary::after{transform:rotate(180deg)}
+.ipa103-admin .ipa103-multi > div{border-top:1px solid var(--ipa103-line);padding:12px;max-height:330px;overflow:auto;background:white}
+.ipa103-admin .ipa103-multi .ipa-admin-module-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.ipa103-admin .ipa103-multi .ipa-admin-module-grid label{padding:10px 12px;min-height:52px;margin:0;border-radius:12px}
+.ipa103-admin .ipa103-multi .ipa-admin-module-grid label small{font-size:12px}
+.ipa103-admin .ipa-together-stages{display:grid;gap:6px;max-height:270px;overflow:auto}
+.ipa103-admin .ipa-together-check{padding:9px 10px;border-radius:10px}
+.ipa103-admin .ipa-travel-together-admin .ipa-travel-together-item{padding:14px;border:1px solid var(--ipa103-line);border-radius:15px}
+.ipa103-admin .admin-stage-list{display:grid;gap:0;border:1px solid var(--ipa103-line);border-radius:17px;overflow:hidden}
+.ipa103-admin .admin-stage-card{display:flex;align-items:center;gap:10px;padding:10px 12px;margin:0;border:0;border-bottom:1px solid var(--ipa103-line);border-radius:0;box-shadow:none;min-height:62px}
+.ipa103-admin .admin-stage-card:last-child{border-bottom:0}
+.ipa103-admin .admin-stage-card .btn{padding:7px 9px;min-width:37px;min-height:35px}
+.ipa103-admin .admin-stage-card small{font-size:12px}
+.ipa103-admin .ipa103-country-picker{border:0;padding:0;background:transparent;box-shadow:none}
+.ipa103-admin .ipa103-country-picker .ipa-country-picker-intro p{display:none}
+.ipa103-admin .ipa103-picker-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:12px 0}
+.ipa103-admin .ipa103-picker-field{display:flex;flex-direction:column;gap:7px;font-weight:750;font-size:14px;color:var(--ipa103-ink)}
+.ipa103-admin .ipa103-picker-field select{border:1px solid #bbdadd;background:white;border-radius:13px;width:100%;padding:13px 12px;min-height:48px;font:inherit;color:#073e50}
+.ipa103-admin .ipa103-current-stage{display:flex;align-items:center;gap:9px;padding:11px 13px;background:#eff8f7;border-radius:12px;flex-wrap:wrap}
+.ipa103-admin .ipa103-current-stage .ipa-flag-picture img{width:26px}
+.ipa103-admin .ipa-country-workspace-content{padding:12px;border:1px solid var(--ipa103-line);border-radius:16px}
+.ipa103-admin .ipa-country-workspace-tiles.ipa103-summary-list{display:flex;flex-direction:column;gap:0;border:1px solid var(--ipa103-line);border-radius:13px;overflow:hidden;background:white}
+.ipa103-admin .ipa103-summary-item{display:grid;grid-template-columns:32px 1fr auto;align-items:center;gap:8px;padding:12px 16px;border:0;border-bottom:1px solid #e2eff0;border-radius:0;min-height:53px;box-shadow:none}
+.ipa103-admin .ipa103-summary-item:last-child{border:0}
+.ipa103-admin .ipa103-summary-item span{font-size:20px}
+.ipa103-admin .ipa103-summary-item b{font-size:15px}
+.ipa103-admin .ipa103-summary-item small{font-size:12px}
+.ipa103-admin .trip-hotel-list{display:grid;gap:8px}
+.ipa103-admin .ipa-booking-card{padding:11px;gap:12px;min-height:80px;border-radius:15px;align-items:center}
+.ipa103-admin .ipa-booking-cover{width:90px;min-width:90px;height:70px;overflow:hidden;border-radius:11px}
+.ipa103-admin .ipa-booking-cover img{width:100%;height:100%;object-fit:cover}
+.ipa103-admin .ipa87-logistics-panel{padding:15px;border-radius:17px}
+.ipa103-admin .ipa87-logistics-title{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.ipa103-admin .ipa87-logistics-title h3{font-size:20px;margin:4px 0}
+.ipa103-admin .ipa87-logistics-title p{font-size:13px;margin:3px 0}
+.ipa103-admin .ipa87-logistics-empty{margin:8px 0}
+.ipa103-admin .ipa103-hotel-timeline{padding:12px 14px;border-radius:16px}
+.ipa103-admin .ipa103-hotel-timeline .ipa84-timeline-row{margin:6px 0;padding:10px 12px;border-radius:12px}
+.ipa103-admin .ipa103-hotel-timeline .ipa84-date-dot{font-size:13px;min-width:120px}
+.ipa103-admin .ipa77-unstarted-stages{padding:14px;border-radius:16px}
+.ipa103-admin .ipa77-unstarted-head{gap:8px}
+.ipa103-admin .climate-admin-grid > div{padding:15px;border-radius:17px}
+.ipa103-admin .admin-doc-list > div{padding:12px;border-radius:13px;min-height:54px}
+.ipa103-admin .ipa103-flight-details > div{max-height:none;overflow:visible}
+.ipa103-admin #ipaCountryFlight .flight-admin-grid{gap:10px}
+.ipa103-admin .ipa-save-to-clients{padding:18px}
+.ipa103-admin .ipa-publication-actions{gap:10px;flex-wrap:wrap}
+.ipa103-admin .admin-publish-actions{padding:18px;border-radius:16px}
+.ipa103-admin .btn,.ipa103-admin button{transition:background-color .15s,border-color .15s,box-shadow .15s}
+.ipa103-admin button:focus-visible,.ipa103-admin select:focus-visible,.ipa103-admin summary:focus-visible{outline:3px solid #ffbe66;outline-offset:2px}
+@media(max-width:620px){.ipa103-admin .ipa103-picker-grid{grid-template-columns:1fr}.ipa103-admin .ipa103-multi .ipa-admin-module-grid{grid-template-columns:1fr}.ipa103-admin .ipa103-summary-item{grid-template-columns:28px 1fr}.ipa103-admin .ipa103-summary-item small{grid-column:2}.ipa103-admin .trip-editor-hero{padding:16px}.ipa103-admin .ipa-admin-panel{padding:14px}.ipa103-admin .ipa-booking-cover{width:72px;min-width:72px;height:65px}}
