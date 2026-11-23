@@ -1,0 +1,6 @@
+Beta 6.30.87 — dia de deslocamento com data independente.
+ADM: Viagens > abrir viagem > Destinos e dias > Dias de deslocamento > Adicionar dia de deslocamento. Selecione um ponto já cadastrado em Deslocamentos (p.ex. GRU) e a data 2026-12-03.
+Visão cliente: o dia logístico aparece antes da seleção da cidade, com botão Ir até este lugar (Google Maps).
+Preserva numeração dos dias turísticos, datas das reservas, viagens multipaís e dados existentes. Não cria nenhuma viagem de exemplo no Firebase.
+
+Guia Deslocamentos simplificada: sem módulos de fotografia e sem campos turísticos (custos, interesses, prioridade e reservas) nos formulários de cadastrar/editar. Dados existentes preservados.

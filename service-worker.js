@@ -1,4 +1,4 @@
-const CACHE = "indo-por-ai-v2-beta-6-30-85-flags-web";
+const CACHE = "indo-por-ai-v2-beta-6-30-87-logistics";
 const CORE = [
   "./",
   "index.html",

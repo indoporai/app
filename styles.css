@@ -2270,3 +2270,21 @@ body.hidden-nav .bottom-nav{display:none!important;}
 .ipa-transport-note{background:#e8f5f3;border:1px solid #c9e7e1;border-radius:12px;color:#08717c;padding:12px 14px;font-weight:700}
 .ipa-admin-integrated .ipa77-unstarted-card.is-started .ipa77-delete-stage{background:#fff4f2!important;color:#a6463c!important;border:1px solid #efd0ca!important;box-shadow:none!important}
 @media(max-width:650px){.ipa84-city-nav .ipa84-city-buttons{grid-template-columns:1fr}}
+
+/* Beta 6.30.87 — dias logísticos com data independente */
+.ipa87-logistics-panel{border:1px solid #d7e8e9;background:#fff;border-radius:22px;padding:18px;margin:14px 0 20px;box-shadow:0 7px 20px rgba(5,70,80,.045)}
+.ipa87-logistics-title{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:14px}
+.ipa87-logistics-title h3{margin:6px 0 4px;color:#073f49;font-size:22px}
+.ipa87-logistics-title p{font-size:13px;color:#647e83;margin:0;line-height:1.5}
+.ipa87-logistics-title .btn{border-radius:12px;padding:10px 13px;white-space:normal}
+.ipa87-logistics-day{background:#f5faf9;border:1px solid #dcebea;border-radius:17px;padding:15px;margin-top:10px;display:grid;gap:12px}
+.ipa87-logistics-head{display:flex;align-items:center;gap:12px;min-width:0}
+.ipa87-logistics-head>span{width:42px;height:42px;flex:none;display:grid;place-items:center;border-radius:13px;background:#e2f2ef;font-size:20px}
+.ipa87-logistics-head>div,.ipa87-logistics-stop>div{min-width:0}
+.ipa87-logistics-head b,.ipa87-logistics-stop b{display:block;color:#064653;line-height:1.4;overflow-wrap:anywhere}
+.ipa87-logistics-head small,.ipa87-logistics-stop small{display:block;color:#6d8588;font-size:12px;margin-top:3px;overflow-wrap:anywhere}
+.ipa87-logistics-stop{background:#fff;border:1px solid #dcebea;border-radius:13px;padding:12px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.ipa87-go{border:0;background:#087e89;color:#fff;font-weight:800;font-size:13px;padding:10px 14px;border-radius:12px;cursor:pointer}
+.ipa87-admin-actions{text-align:right}.ipa87-admin-actions .btn{border-radius:12px;font-size:12px;padding:8px 12px}
+.ipa87-logistics-empty{color:#71868a;font-size:13px;margin:0}
+@media(max-width:600px){.ipa87-logistics-panel{padding:14px}.ipa87-logistics-title .btn,.ipa87-go{width:100%}.ipa87-logistics-title{align-items:stretch}}
