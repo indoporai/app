@@ -6037,6 +6037,39 @@ function showAdminPreview(){
  showModal(`<div class="v2-admin-preview"><span class="eyebrow">Modo administrador</span><h2>Portugal 2026</h2><div class="v2-admin-metrics"><div><strong>32</strong><small>viajantes</small></div><div><strong>29</strong><small>online</small></div><div><strong>6</strong><small>avisos</small></div></div><div class="v2-admin-actions"><button onclick="toast('Aviso enviado ao grupo');modal.close()">📣 Enviar aviso</button><button onclick="toast('Van marcada como a caminho');modal.close()">🚐 Atualizar van</button><button onclick="toast('Roteiro aberto para edição');modal.close()">🗓️ Editar roteiro</button><button onclick="window.location.href='live-real.html'">🔴 Iniciar Live</button></div></div>`);
 }
 
+/* Beta 6.30.97: solicitação explícita de autenticação, sem alterar permissões Firebase.
+   Evita que o editor de roteiro em cache apresente apenas um toast sem ação. */
+async function ipa97RequireAdminForRouteSave(){
+ const service=window.IPAFirebase;
+ if(service?.user && typeof service.saveTripItineraryFast==='function')return true;
+ if(!service || typeof service.login!=='function' || typeof service.saveTripItineraryFast!=='function'){
+  toast('Firebase indisponível. Recarregue a página e entre no ADM.');return false;
+ }
+ return await new Promise(resolve=>{
+  let settled=false;
+  const finish=ok=>{if(settled)return;settled=true;resolve(ok)};
+  showModal(`<span class="eyebrow">🔒 ACESSO ADMINISTRATIVO</span><h2>Confirme sua sessão ADM</h2><p>Para salvar a ordem do roteiro no Firebase, entre com sua conta administrativa. A alteração continuará após o login.</p><label>E-mail ADM<input id="ipa97AdminEmail" type="email" autocomplete="username" class="v2-concierge-input"></label><label>Senha ADM<input id="ipa97AdminPassword" type="password" autocomplete="current-password" class="v2-concierge-input"></label><p id="ipa97AdminError" role="alert" aria-live="polite"></p><button type="button" id="ipa97AdminSubmit" class="btn btn-primary btn-block">Entrar e salvar alteração</button><button type="button" id="ipa97AdminCancel" class="btn btn-light btn-block">Cancelar</button>`);
+  const dialog=document.querySelector('#ipa97AdminSubmit');
+  document.querySelector('#ipa97AdminCancel')?.addEventListener('click',()=>{modal.close();finish(false)});
+  modal.addEventListener('close',()=>finish(false),{once:true});
+  dialog.onclick=async()=>{
+   const email=document.querySelector('#ipa97AdminEmail')?.value?.trim();
+   const pass=document.querySelector('#ipa97AdminPassword')?.value||'';
+   const err=document.querySelector('#ipa97AdminError');
+   if(!email||!pass){if(err)err.textContent='Informe seu e-mail e senha ADM.';return}
+   dialog.disabled=true;dialog.textContent='Autenticando...';
+   try{
+    await service.login(email,pass);
+    if(!service.user)throw new Error('Sessão administrativa não confirmada.');
+    finish(true);modal.close();
+   }catch(e){
+    if(err)err.textContent='Não foi possível entrar no ADM: '+(e?.message||'verifique as credenciais');
+    dialog.disabled=false;dialog.textContent='Entrar e salvar alteração';
+   }
+  };
+ });
+}
+
 /* Beta 6.30.94 — controlador próprio dos quatro botões dos lugares no ADM.
    Sem dependência dos onclick reconstruídos por bind().
    Não altera os eventos de Maps/Deslocamento. */
@@ -6058,9 +6091,8 @@ if(!window.__ipaAdminPlaceActions63094){
   const place=typeof current==='string'?{name:current}:({...current});
   async function save(nextPlaces,ok){
    const next=before.map(d=>Number(d.day)===dayNumber?{...d,places:nextPlaces}:d);
-   if(!window.IPAFirebase?.user || typeof window.IPAFirebase.saveTripItineraryFast!=='function'){
-    toast('Faça login no ADM para salvar no Firebase.');return;
-   }
+   // Não efetuar gravações locais antes de confirmar a sessão Firebase.
+   if(!(await ipa97RequireAdminForRouteSave()))return;
    // O botão responde imediatamente; a gravação é confirmada em segundo plano.
    window.__ipaRouteSaving95=window.__ipaRouteSaving95||new Set();
    if(window.__ipaRouteSaving95.has(tripId)){toast('Aguarde a confirmação da alteração anterior.');return;}
