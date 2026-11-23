@@ -1,0 +1,16 @@
+INDO POR AÍ — BETA 6.30.76
+
+Base: Beta 6.30.75.
+
+Alterações desta versão:
+- Banco de Lugares permite categorias de deslocamento: aeroportos, estações de trem, rodoviárias, terminais marítimos e outros pontos. Google Places continua sendo utilizado no cadastro.
+- No ADM → Viagens, a montagem por destino foi reunida com a edição dos dias em uma única seção.
+- Em cada dia, use + Adicionar lugar ou deslocamento para selecionar um terminal já cadastrado e organizar a ordem com Subir e Descer.
+- Aeroportos e outros terminais cadastrados são excluídos da seleção automática de atrações e da contagem de atrações.
+- Seção separada de Deslocamentos Planejados removida do cliente. Painel autônomo de deslocamentos removido do ADM, sem apagar os dados históricos travelBlocks.
+- Ao renderizar o roteiro, tenta evitar duplicidade entre um ponto logístico inserido manualmente e um ponto gerado de travelBlocks com mesmo identificador/nome/endereço.
+
+LIMITAÇÕES E CUIDADOS:
+- Os travelBlocks de versões anteriores permanecem no Firebase e podem continuar gerando paradas do roteiro.
+- O usuário deve verificar a posição dos pontos já cadastrados em viagens antigas e a sincronização no Firebase.
+- Nenhum deploy no Cloudflare ou teste ponta-a-ponta foi realizado aqui.

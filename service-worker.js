@@ -1,16 +1,16 @@
-const CACHE = "indo-por-ai-v2-beta-6-30-75-roteiro-hotel";
+const CACHE = "indo-por-ai-v2-beta-6-30-76-roteiro-hotel";
 const CORE = [
   "./",
   "index.html",
-  "styles.css?v=v2-beta-6-30-75",
-  "app.js?v=v2-beta-6-30-75",
-  "data-service.js?v=v2-beta-6-30-75",
-  "firebase-service.js?v=v2-beta-6-30-75",
+  "styles.css?v=v2-beta-6-30-76",
+  "app.js?v=v2-beta-6-30-76",
+  "data-service.js?v=v2-beta-6-30-76",
+  "firebase-service.js?v=v2-beta-6-30-76",
   "admin.html",
-  "admin.js?v=v2-beta-6-30-75",
+  "admin.js?v=v2-beta-6-30-76",
   "admin.css",
   "manifest.webmanifest?v=63047",
-  "pwa-install.js?v=v2-beta-6-30-75",
+  "pwa-install.js?v=v2-beta-6-30-76",
   "assets/apple-touch-icon-6347.png",
   "assets/icon-192-6347.png",
   "assets/icon-512-6347.png",
