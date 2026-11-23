@@ -1867,8 +1867,9 @@ function bind(){
  document.querySelectorAll('[data-ipa87-add]').forEach(b=>b.onclick=()=>{
   const id=b.dataset.ipa87Add,trip=(adminData().trips||[]).find(x=>String(x.id)===String(id));if(!trip)return;
   const transports=(adminData().placeCatalog||[]).filter(ipa76IsTransportCatalogPlace);
-  const initialDate=tripStages(trip)[0]?.startDate||trip.startDate||'';
-  showModal(`<span class="eyebrow">✈️ DIA DE DESLOCAMENTO</span><h2>Adicionar dia de partida ou conexão</h2><p>O dia será exibido na linha do tempo da viagem, separado das etapas turísticas. Não altera os números de Lisboa, Porto ou outras cidades.</p>
+  const targetStage=ipa84SelectedStage(trip,true);
+  const initialDate=targetStage?.startDate||trip.startDate||'';
+  showModal(`<span class="eyebrow">✈️ DIA DE DESLOCAMENTO</span><h2>Adicionar dia de partida ou conexão</h2><p>Associado à cidade: <b>${ipaEscape(targetStage?.destination||'Etapa não definida')}</b>. O dia será exibido separado das etapas turísticas, sem alterar seus números.</p>
    <label>Data do deslocamento<input id="ipa87Date" class="v2-concierge-input" type="date" value="${ipaEscape(initialDate)}" required></label>
    <label>Nome do dia<input id="ipa87Title" class="v2-concierge-input" value="Saída para o aeroporto" maxlength="90"></label>
    <label>Selecionar ponto no Banco de Deslocamentos<select id="ipa87Place" class="v2-concierge-input" required><option value="">Selecione o aeroporto, estação ou terminal...</option>${transports.map(p=>`<option value="${ipaEscape(p.id)}">${ipaEscape(p.name)} · ${ipaEscape([p.city,p.country].filter(Boolean).join(', '))}</option>`).join('')}</select></label>
@@ -1882,7 +1883,7 @@ function bind(){
    const before=trip.itinerary||[],number=Math.max(0,...before.map(x=>Number(x.day)||0),...ipa70StageDayEntries(trip).map(x=>Number(x.day)||0))+1;
    const time=document.querySelector('#ipa87Time')?.value||'';
    const item={...place,category:'🚚 Deslocamento',logistics:true,manual:true,addedByAdmin:true,time};
-   const next=[...before,{day:number,title,date,country:place.country||'Brasil',city:place.city||'',logisticsOnly:true,logisticsDay:true,attractionTarget:0,places:[item]}];
+   const next=[...before,{day:number,title,date,country:place.country||'Brasil',city:place.city||'',stageId:targetStage?.id||'',destinationCity:targetStage?.destination||'',logisticsOnly:true,logisticsDay:true,attractionTarget:0,places:[item]}];
    save.disabled=true;save.textContent='Salvando no Firebase…';
    try{if(!window.IPAFirebase?.user||!window.IPAFirebase?.syncNow)throw Error('Sessão ADM não conectada');IPAData.updateTrip(id,{itinerary:next});await window.IPAFirebase.syncNow();modal.close();view.innerHTML=adminTripEditor(id);bind();toast('Dia de deslocamento cadastrado ✓');}
    catch(e){IPAData.updateTrip(id,{itinerary:before});save.disabled=false;save.textContent='Tentar novamente';toast('Não foi possível confirmar o salvamento: '+(e.message||e));}
@@ -2609,16 +2610,42 @@ function ipa87LogisticsDays(trip){
  return (trip?.itinerary||[]).filter(d=>d?.logisticsOnly===true&&d?.logisticsDay===true)
   .sort((a,b)=>String(a.date||'').localeCompare(String(b.date||''))||Number(a.day)-Number(b.day));
 }
+// Beta 6.30.99: a cidade de embarque (ex.: Guarulhos) nao e necessariamente
+// a etapa da viagem (ex.: Lisboa). Associar o dia a uma etapa, sem regravar
+// registros legados e sem alterar a ordem dos roteiros turisticos.
+function ipa99LogisticsStage(trip,day){
+ const stages=tripStages(trip).slice().sort((a,b)=>String(a.startDate||'').localeCompare(String(b.startDate||''))||Number(a.order||0)-Number(b.order||0));
+ if(!stages.length)return null;
+ const assigned=String(day?.stageId||day?.destinationStageId||'');
+ if(assigned){const matched=stages.find(st=>String(st.id)===assigned);if(matched)return matched;}
+ const destination=ipaNormText(day?.destinationCity||day?.stageCity||'');
+ if(destination){const matched=stages.find(st=>ipaNormText(st.destination)===destination);if(matched)return matched;}
+ const date=String(day?.date||'');
+ if(date){
+  const active=stages.find(st=>st.startDate&&date>=st.startDate&&(!st.endDate||date<=st.endDate));
+  if(active)return active;
+  // Partidas anteriores e conexoes entre cidades acompanham a proxima etapa.
+  const upcoming=stages.find(st=>st.startDate&&date<st.startDate);
+  if(upcoming)return upcoming;
+  return stages[stages.length-1];
+ }
+ return stages.length===1?stages[0]:null;
+}
+function ipa99LogisticsDaysForStage(trip,stage){
+ if(!stage)return [];
+ return ipa87LogisticsDays(trip).filter(day=>String(ipa99LogisticsStage(trip,day)?.id||'')===String(stage.id));
+}
 function ipa87LogisticsPanel(trip,admin=false){
  if(!trip)return '';
- const days=ipa87LogisticsDays(trip),first=tripStages(trip)[0]?.startDate||trip.startDate||'';
+ const stage=ipa84SelectedStage(trip,admin);
+ const days=ipa99LogisticsDaysForStage(trip,stage),first=stage?.startDate||trip.startDate||'';
  const rows=days.map(d=>{
   const date=/^\d{4}-\d{2}-\d{2}$/.test(d.date||'')?d.date.split('-').reverse().join('/'):(d.date||'Data pendente');
   const places=normalizedPlaces(d);
   return `<article class="ipa87-logistics-day"><div class="ipa87-logistics-head"><span>🧭</span><div><b>${ipaEscape(date)} · ${ipaEscape(d.title||'Dia de deslocamento')}</b><small>${ipaEscape(d.country||'Origem da viagem')} · Sem atrações turísticas</small></div></div>${places.map((place,i)=>`<div class="ipa87-logistics-stop"><div><b>📍 ${ipaEscape(place.name||'Local de partida')}</b><small>${ipaEscape(place.address||'')}${place.time?' · '+ipaEscape(place.time):''}</small></div>${admin?'':`<button type="button" class="ipa87-go" data-ipa87-go="${Number(d.day)}:${i}">📍 Ir até este lugar</button>`}</div>`).join('')}${admin?`<div class="ipa87-admin-actions"><button type="button" data-ipa87-delete="${ipaEscape(trip.id)}:${Number(d.day)}" class="btn btn-light">🗑 Excluir este dia</button></div>`:''}</article>`;
  }).join('');
  if(!admin&&!days.length)return '';
- return `<section class="ipa87-logistics-panel ${admin?'ipa87-logistics-admin':''}"><div class="ipa87-logistics-title"><div><span class="eyebrow">✈️ ORIGEM E CONEXÕES</span><h3>Dias de deslocamento</h3><p>Paradas de transporte com data própria, sem alterar a numeração dos roteiros das cidades.</p></div>${admin?`<button type="button" class="btn btn-primary" data-ipa87-add="${ipaEscape(trip.id)}">+ Adicionar dia de deslocamento</button>`:''}</div>${rows||`<p class="ipa87-logistics-empty">Nenhum dia logístico cadastrado.${first?' A primeira cidade começa em '+ipaEscape(first)+'.':''}</p>`}</section>`;
+ return `<section class="ipa87-logistics-panel ${admin?'ipa87-logistics-admin':''}"><div class="ipa87-logistics-title"><div><span class="eyebrow">✈️ ORIGEM E CONEXÕES</span><h3>Dias de deslocamento${stage?.destination?' · '+ipaEscape(stage.destination):''}</h3><p>Paradas de transporte vinculadas à cidade selecionada, sem alterar a numeração dos roteiros.</p></div>${admin?`<button type="button" class="btn btn-primary" data-ipa87-add="${ipaEscape(trip.id)}">+ Adicionar dia de deslocamento</button>`:''}</div>${rows||`<p class="ipa87-logistics-empty">Nenhum dia logístico cadastrado.${first?' A primeira cidade começa em '+ipaEscape(first)+'.':''}</p>`}</section>`;
 }
 function ipa84CityNavigation(t,admin=false){
  const stages=tripStages(t),sel=ipa84SelectedStage(t,admin);if(!stages.length)return '';
@@ -6040,10 +6067,29 @@ function showAdminPreview(){
 /* Beta 6.30.97: solicitação explícita de autenticação, sem alterar permissões Firebase.
    Evita que o editor de roteiro em cache apresente apenas um toast sem ação. */
 async function ipa97RequireAdminForRouteSave(){
- const service=window.IPAFirebase;
- if(service?.user && typeof service.saveTripItineraryFast==='function')return true;
- if(!service || typeof service.login!=='function' || typeof service.saveTripItineraryFast!=='function'){
-  toast('Firebase indisponível. Recarregue a página e entre no ADM.');return false;
+ // Aguarda a inicialização assíncrona do módulo Firebase, em vez de
+ // interpretar o carregamento pendente como ausência de login.
+ let service=window.IPAFirebase;
+ if(!service){
+  await Promise.race([
+   new Promise(resolve=>window.addEventListener('ipa-firebase-service-loaded',resolve,{once:true})),
+   new Promise(resolve=>setTimeout(resolve,4500))
+  ]);
+  service=window.IPAFirebase;
+ }
+ if(!service){
+  toast('O módulo Firebase não carregou. Atualize o app pela internet e tente novamente.');
+  console.error('[ADM roteiro] Serviço Firebase ausente; verifique o carregamento do módulo.');
+  return false;
+ }
+ if(typeof service.saveTripItineraryFast!=='function'){
+  toast('Versões do aplicativo incompatíveis. Recarregue a página para atualizar os arquivos.');
+  console.error('[ADM roteiro] Versão antiga de firebase-service.js sem saveTripItineraryFast.');
+  return false;
+ }
+ if(service.user)return true;
+ if(typeof service.login!=='function'){
+  toast('O login Firebase não está disponível. Recarregue o app.');return false;
  }
  return await new Promise(resolve=>{
   let settled=false;
