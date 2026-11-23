@@ -1,0 +1,2 @@
+Beta 6.30.73: roteiro por cidade visível sob geração; limpar somente atrações identificadas como IA; hotel com coordenadas prioriza proximidade da primeira atração; horários de atrações ocultos (deslocamentos fixos preservados); exclusão mantém a tela.
+Atenção: roteiros anteriores não possuem flag gerada pela IA e não são limpos automaticamente. Se hospedagem não tiver coordenadas, motor mantém ordem anterior. Testar Firebase em ambiente de homologação.
