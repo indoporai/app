@@ -4027,19 +4027,75 @@ function ipa68BlocksHtml(trip,dayNo,country){
 }
 function ipa68AdminBlockPanel(t){return `<section class="ipa-admin-panel ipa68-admin-transport"><div class="section-head"><div><span class="eyebrow">✈️ ANTES DE GERAR O ROTEIRO</span><h2>Chegadas e deslocamentos</h2></div><button type="button" class="btn btn-primary" data-ipa68-add-block="${ipaEscape(t.id)}">+ Deslocamento</button></div><p>Cadastre terminais, hotéis, voos, trem, ônibus ou ferry com dias e horários. O período fica reservado e não vira atração.</p><div class="ipa68-block-cards">${ipa68TravelBlocks(t).map(b=>`<article><strong>${ipaEscape(b.title||'Deslocamento')}</strong><small>Dia ${Number(b.day)} ${ipaEscape(b.time)} → Dia ${Number(b.arrivalDay)} ${ipaEscape(b.arrivalTime)}</small><p>${ipaEscape(b.origin)} → ${ipaEscape(b.destination)}</p><div class="ipa68-actions"><button class="btn btn-light" data-ipa68-edit-block="${ipaEscape(t.id)}:${ipaEscape(b.id)}">✏️ Editar</button><button class="btn btn-light" data-ipa68-delete-block="${ipaEscape(t.id)}:${ipaEscape(b.id)}">🗑 Excluir</button></div></article>`).join('')||'<small>Nenhum deslocamento cadastrado.</small>'}</div></section>`}
 function ipa68BlockModal(tripId,blockId){
- const trip=adminData().trips.find(x=>String(x.id)===String(tripId));if(!trip)return;
+ const d=adminData(),trip=d.trips.find(x=>String(x.id)===String(tripId));if(!trip)return;
  const old=ipa68TravelBlocks(trip).find(b=>String(b.id)===String(blockId))||{};
  const n=Math.max(1,Number(trip.itinerary?.length||trip.stages?.length||1));
  const selectDay=(id,number)=>`<select id="${id}">${Array.from({length:Math.max(n,45)},(_,i)=>`<option value="${i+1}" ${Number(number||1)===i+1?'selected':''}>Dia ${i+1}</option>`).join('')}</select>`;
- showModal(`<div class="ipa68-block-modal"><span class="eyebrow">ROTEIRO MULTIDESTINO</span><h2>✈️ Compromisso de deslocamento</h2><p>O ADM informa os horários locais. Use dois registros para transfer ao terminal e deslocamento terminal → hotel, se necessário.</p><label>Nome da etapa<input id="ipa68Name" value="${ipaEscape(old.title||'')}" placeholder="Ex.: Aeroporto de Dublin → Hotel"></label><label>Transporte<select id="ipa68Kind">${[['transfer','Transfer / táxi'],['voo','Avião'],['trem','Trem'],['onibus','Rodoviária / ônibus'],['ferry','Ferry boat'],['carro','Carro']].map(([v,t])=>`<option value="${v}" ${old.kind===v?'selected':''}>${t}</option>`).join('')}</select></label><div class="ipa68-field-grid"><label>Local de partida<input id="ipa68Origin" value="${ipaEscape(old.origin||'')}" placeholder="Terminal, aeroporto ou hotel"></label><label>Destino<input id="ipa68Dest" value="${ipaEscape(old.destination||'')}" placeholder="Hotel, terminal ou aeroporto"></label><label>País de saída<input id="ipa68FromCountry" value="${ipaEscape(old.originCountry||'')}" placeholder="Ex.: Portugal"></label><label>País de chegada<input id="ipa68ToCountry" value="${ipaEscape(old.destinationCountry||'')}" placeholder="Ex.: Irlanda"></label><label>Dia de saída${selectDay('ipa68StartDay',old.day)}</label><label>Horário local de saída<input type="time" id="ipa68StartTime" value="${ipaEscape(old.time||'09:00')}"></label><label>Dia de chegada${selectDay('ipa68EndDay',old.arrivalDay||old.day)}</label><label>Horário local de chegada<input type="time" id="ipa68EndTime" value="${ipaEscape(old.arrivalTime||'11:00')}"></label></div><label>Modo no Maps<select id="ipa68Mode"><option value="driving">Carro</option><option value="transit" ${old.mode==='transit'?'selected':''}>Transporte público</option><option value="walking" ${old.mode==='walking'?'selected':''}>A pé</option></select></label><button id="ipa68SaveBlock" class="btn btn-primary btn-block">Salvar deslocamento</button><small>Horários de voo devem ser informados em seus fusos locais; a duração real não é calculada pela diferença de relógios entre países.</small></div>`);
- setTimeout(()=>{document.querySelector('#ipa68SaveBlock').onclick=async()=>{
-  const v=id=>document.querySelector(id)?.value?.trim()||'';
-  const next={id:old.id||'transfer-'+Date.now(),title:v('#ipa68Name'),kind:v('#ipa68Kind'),origin:v('#ipa68Origin'),destination:v('#ipa68Dest'),originCountry:v('#ipa68FromCountry'),destinationCountry:v('#ipa68ToCountry'),day:Number(v('#ipa68StartDay')),time:v('#ipa68StartTime'),arrivalDay:Number(v('#ipa68EndDay')),arrivalTime:v('#ipa68EndTime'),mode:v('#ipa68Mode')};
-  if(!next.title||!next.origin||!next.destination||ipa68Minute(next.time)===null||ipa68Minute(next.arrivalTime)===null)return toast('Preencha nome, locais e horários.');
-  if(next.arrivalDay<next.day||next.arrivalDay===next.day&&next.kind!=='voo'&&ipa68Minute(next.arrivalTime)<=ipa68Minute(next.time))return toast('A chegada deve acontecer após a saída.');
-  const blocks=ipa68TravelBlocks(trip).filter(b=>String(b.id)!==String(next.id));blocks.push(next);blocks.sort((a,b)=>a.day-b.day||ipa68Minute(a.time)-ipa68Minute(b.time));
-  try{IPAData.updateTrip(trip.id,{travelBlocks:blocks});if(window.IPAFirebase?.user)await window.IPAFirebase.syncNow();modal.close();view.innerHTML=adminTripEditor(trip.id);bind();toast('Deslocamento salvo ✓')}catch(e){toast('Falha ao salvar deslocamento: '+(e.message||e))}
- };},0);
+ const allHotels=d.hotelCatalog||[],bookings=trip.hotelBookings||[];
+ const bookedIds=new Set(bookings.map(b=>String(b.hotelId||'')));
+ const hotels=[...allHotels].sort((a,b)=>Number(bookedIds.has(String(b.id)))-Number(bookedIds.has(String(a.id))));
+ const hotelOptions=hotels.map(h=>`<option value="${ipaEscape(h.id)}" ${String(old.destinationHotelId||'')===String(h.id)?'selected':''}>${bookedIds.has(String(h.id))?'★ Da viagem · ':''}${ipaEscape(h.name||'Hospedagem')} · ${ipaEscape([h.city,h.country].filter(Boolean).join(', '))}</option>`).join('');
+ const destinationType=old.destinationHotelId?'hotel':old.destinationType==='hotel'?'hotel':'places';
+ showModal(`<div class="ipa68-block-modal ipa71-block-modal"><span class="eyebrow">ROTEIRO MULTIDESTINO</span><h2>✈️ Compromisso de deslocamento</h2><p>Escolha os locais reais antes de gerar o roteiro. A IA respeitará os horários cadastrados e poderá começar as atrações no hotel.</p>
+ <label>Nome da etapa<input id="ipa68Name" value="${ipaEscape(old.title||'')}" placeholder="Ex.: Aeroporto de Lisboa → Hotel"></label>
+ <label>Transporte<select id="ipa68Kind">${[['transfer','Transfer / táxi'],['voo','Avião'],['trem','Trem'],['onibus','Rodoviária / ônibus'],['ferry','Ferry boat'],['carro','Carro']].map(([v,t])=>`<option value="${v}" ${old.kind===v?'selected':''}>${t}</option>`).join('')}</select></label>
+ <div class="ipa71-location-wrap">
+ <div class="ipa71-location-field"><label for="ipa68Origin">📍 Local de partida · Google Maps</label><input id="ipa68Origin" autocomplete="off" value="${ipaEscape(old.origin||'')}" placeholder="Pesquise aeroporto, estação ou endereço"><div id="ipa71OriginResults" class="place-suggestions ipa71-results" aria-live="polite"></div><small>Selecione uma sugestão para vincular o endereço e o ID do Google Places.</small></div>
+ <div class="ipa71-location-field"><label for="ipa71DestinationType">🏁 Destino do deslocamento</label><select id="ipa71DestinationType"><option value="hotel" ${destinationType==='hotel'?'selected':''}>🏨 Hospedagem do banco</option><option value="places" ${destinationType==='places'?'selected':''}>📍 Outro local pelo Google Maps</option></select>
+ <div id="ipa71HotelWrap" ${destinationType==='places'?'hidden':''}><label for="ipa71HotelSelect">Selecionar hospedagem cadastrada</label><input id="ipa71HotelFilter" autocomplete="off" placeholder="Filtrar por hotel ou cidade"><select id="ipa71HotelSelect"><option value="">Selecione a hospedagem...</option>${hotelOptions}</select><small>${hotels.length?'★ Hotéis desta viagem aparecem primeiro.':'Nenhuma hospedagem no banco. Cadastre em ADM → Hospedagens.'}</small></div>
+ <div id="ipa71PlacesWrap" ${destinationType==='hotel'?'hidden':''}><label for="ipa68Dest">Buscar destino pelo Google Maps</label><input id="ipa68Dest" autocomplete="off" value="${ipaEscape(old.destination||'')}" placeholder="Aeroporto, estação ou endereço"><div id="ipa71DestResults" class="place-suggestions ipa71-results" aria-live="polite"></div></div>
+ <div id="ipa71SelectedDest" class="ipa71-selected"></div></div></div>
+ <div class="ipa68-field-grid"><label>País de saída<input id="ipa68FromCountry" value="${ipaEscape(old.originCountry||'')}" placeholder="Preenchido pelo Google"></label><label>País de chegada<input id="ipa68ToCountry" value="${ipaEscape(old.destinationCountry||'')}" placeholder="Preenchido pelo local selecionado"></label><label>Dia de saída${selectDay('ipa68StartDay',old.day)}</label><label>Horário local de saída<input type="time" id="ipa68StartTime" value="${ipaEscape(old.time||'09:00')}"></label><label>Dia de chegada${selectDay('ipa68EndDay',old.arrivalDay||old.day)}</label><label>Horário local de chegada<input type="time" id="ipa68EndTime" value="${ipaEscape(old.arrivalTime||'11:00')}"></label></div>
+ <label>Modo no Maps<select id="ipa68Mode"><option value="driving" ${old.mode==='driving'?'selected':''}>Carro</option><option value="transit" ${old.mode==='transit'?'selected':''}>Transporte público</option><option value="walking" ${old.mode==='walking'?'selected':''}>A pé</option></select></label>
+ <div class="ipa71-route-preview"><b>🗺️ Rota do deslocamento</b><small id="ipa71RouteSummary">Selecione origem e destino para conferir o trajeto.</small><a id="ipa71RouteLink" href="#" target="_blank" rel="noopener noreferrer" hidden>Conferir trajeto no Google Maps ↗</a><small>O Maps abre a rota. Horários de voo, trem e check-in continuam sob controle do ADM; duração estimada não substitui reservas.</small></div>
+ <button id="ipa68SaveBlock" class="btn btn-primary btn-block">Salvar deslocamento</button><small>Horários de voos em seus fusos locais. O relógio entre países não determina a duração do voo.</small></div>`);
+ setTimeout(()=>{
+  const el=id=>document.getElementById(id),val=id=>el(id)?.value?.trim()||'';
+  const originMeta={id:old.originPlaceId||'',lat:old.originLat??null,lng:old.originLng??null};
+  const destMeta={id:old.destinationPlaceId||'',lat:old.destinationLat??null,lng:old.destinationLng??null};
+  const type=el('ipa71DestinationType'),hotelSelect=el('ipa71HotelSelect');
+  let selectedHotel=null;
+  const mapsAddress=(name,meta)=>meta.id?name:name;
+  function routePreview(){
+   const hotel=type.value==='hotel';const a=val('ipa68Origin');const b=hotel?selectedHotel?([selectedHotel.address,selectedHotel.city,selectedHotel.country].filter(Boolean).join(', ')||selectedHotel.name):'':val('ipa68Dest');
+   el('ipa71RouteSummary').textContent=a&&b?`${a} → ${selectedHotel&&hotel?selectedHotel.name:b}`:'Selecione origem e destino para conferir o trajeto.';
+   const link=el('ipa71RouteLink');link.hidden=!a||!b;
+   if(a&&b)link.href='https://www.google.com/maps/dir/?api=1&origin='+encodeURIComponent(mapsAddress(a,originMeta))+'&destination='+encodeURIComponent(b)+'&travelmode='+encodeURIComponent(val('ipa68Mode')==='transit'?'transit':val('ipa68Mode')==='walking'?'walking':'driving')+(originMeta.id?'&origin_place_id='+encodeURIComponent(originMeta.id):'')+((hotel?selectedHotel?.placeId:destMeta.id)?'&destination_place_id='+encodeURIComponent(hotel?selectedHotel.placeId:destMeta.id):'');
+  }
+  function fillHotel(){selectedHotel=hotels.find(h=>String(h.id)===hotelSelect.value)||null;
+   if(selectedHotel){el('ipa68ToCountry').value=selectedHotel.country||'';Object.assign(destMeta,{id:selectedHotel.placeId||'',lat:selectedHotel.lat??null,lng:selectedHotel.lng??null});el('ipa71SelectedDest').textContent='✓ '+selectedHotel.name+' · '+([selectedHotel.address,selectedHotel.city,selectedHotel.country].filter(Boolean).join(', ')||'Endereço ainda não cadastrado');}
+   else{el('ipa71SelectedDest').textContent='';}routePreview();}
+  function changeType(){const isHotel=type.value==='hotel';el('ipa71HotelWrap').hidden=!isHotel;el('ipa71PlacesWrap').hidden=isHotel;
+   if(isHotel){fillHotel()}else{selectedHotel=null;el('ipa71SelectedDest').textContent='';routePreview()}}
+  type.onchange=changeType;hotelSelect.onchange=fillHotel;
+  el('ipa71HotelFilter').oninput=()=>{const q=val('ipa71HotelFilter').toLocaleLowerCase('pt-BR');for(const opt of hotelSelect.options){if(!opt.value)continue;const h=hotels.find(h=>String(h.id)===opt.value);opt.hidden=!!q&&!([h?.name,h?.city,h?.country].join(' ').toLocaleLowerCase('pt-BR').includes(q));} };
+  const context=()=>{const day=Number(val('ipa68StartDay'));const matched=(trip.itinerary||[]).find(x=>Number(x.day)===day);const stage=(trip.stages||[]).find(s=>s.id===matched?.stageId||s.destination===matched?.city);return [matched?.city,matched?.country,stage?.destination,stage?.country].filter(Boolean).join(', ')};
+  function wirePlaces(inputId,resultsId,meta,countryId){let timer=0,requestId=0;const input=el(inputId),results=el(resultsId);
+   input.addEventListener('input',()=>{meta.id='';meta.lat=null;meta.lng=null;routePreview();clearTimeout(timer);const q=input.value.trim();const seq=++requestId;if(q.length<2){results.innerHTML='';return}
+    timer=setTimeout(async()=>{results.innerHTML='<small>Pesquisando no Google Places...</small>';try{
+     const r=await fetch('/api/places/search?q='+encodeURIComponent(q)+'&destination='+encodeURIComponent(context()),{cache:'no-store'}),j=await r.json();if(seq!==requestId||!input.isConnected)return;
+     if(!r.ok||!j.ok)throw Error(j.error||'Busca indisponível');const matches=(j.places||[]).slice(0,8);results.replaceChildren();
+     if(!matches.length){results.innerHTML='<small>Nenhum local encontrado. Confira a pesquisa ou informe o endereço manualmente.</small>';return}
+     for(const place of matches){const button=document.createElement('button');button.type='button';const b=document.createElement('b'),small=document.createElement('small');b.textContent=place.name||place.address||'Local';small.textContent=place.address||[place.city,place.country].filter(Boolean).join(', ');button.append(b,small);button.onclick=()=>{
+      input.value=[place.name,place.address].filter(Boolean).join(' · ');meta.id=place.id||'';meta.lat=place.lat??null;meta.lng=place.lng??null;if(place.country)el(countryId).value=place.country;results.replaceChildren();routePreview();};results.append(button)}
+    }catch(e){if(seq===requestId)results.innerHTML='<small>'+ipaEscape(e.message||'Erro na busca')+'</small>'}},350);
+   });
+  }
+  wirePlaces('ipa68Origin','ipa71OriginResults',originMeta,'ipa68FromCountry');wirePlaces('ipa68Dest','ipa71DestResults',destMeta,'ipa68ToCountry');
+  if(destinationType==='hotel'&&old.destinationHotelId)hotelSelect.value=String(old.destinationHotelId);
+  changeType();el('ipa68Mode').onchange=routePreview;
+  el('ipa68SaveBlock').onclick=async()=>{
+   const hotel=type.value==='hotel'?selectedHotel:null;
+   if(type.value==='hotel'&&!hotel)return toast('Selecione uma hospedagem do banco.');
+   if(hotel&&!hotel.address&&!hotel.placeId&&!(hotel.lat!==null&&hotel.lat!==undefined&&Number.isFinite(Number(hotel.lat))))return toast('Cadastre o endereço da hospedagem no Banco de Hospedagens.');
+   const dest=hotel?([hotel.address,hotel.city,hotel.country].filter(Boolean).join(', ')||hotel.name):val('ipa68Dest');
+   const next={...old,id:old.id||'transfer-'+Date.now(),title:val('ipa68Name'),kind:val('ipa68Kind'),origin:val('ipa68Origin'),destination:dest,originCountry:val('ipa68FromCountry'),destinationCountry:val('ipa68ToCountry'),day:Number(val('ipa68StartDay')),time:val('ipa68StartTime'),arrivalDay:Number(val('ipa68EndDay')),arrivalTime:val('ipa68EndTime'),mode:val('ipa68Mode'),destinationType:type.value,destinationHotelId:hotel?.id||'',destinationHotelName:hotel?.name||'',originPlaceId:originMeta.id||'',originLat:originMeta.lat,destinationPlaceId:hotel?.placeId||destMeta.id||'',destinationLat:hotel?.lat??destMeta.lat,destinationLng:hotel?.lng??destMeta.lng,originLng:originMeta.lng};
+   if(!next.title||!next.origin||!next.destination||ipa68Minute(next.time)===null||ipa68Minute(next.arrivalTime)===null)return toast('Preencha nome, locais e horários.');
+   if(next.arrivalDay<next.day||next.arrivalDay===next.day&&next.kind!=='voo'&&ipa68Minute(next.arrivalTime)<=ipa68Minute(next.time))return toast('A chegada deve acontecer após a saída.');
+   const blocks=ipa68TravelBlocks(trip).filter(b=>String(b.id)!==String(next.id));blocks.push(next);blocks.sort((a,b)=>a.day-b.day||ipa68Minute(a.time)-ipa68Minute(b.time));
+   try{IPAData.updateTrip(trip.id,{travelBlocks:blocks});if(window.IPAFirebase?.user)await window.IPAFirebase.syncNow();modal.close();view.innerHTML=adminTripEditor(trip.id);bind();toast('Deslocamento salvo ✓')}catch(e){toast('Falha ao salvar deslocamento: '+(e.message||e))}
+  };
+ },0);
 }
 // Beta 6.30.70 — geração parcial por etapa, preservando dias e locais já aprovados.
 function ipa70CityPlannerPanel(trip){
@@ -4083,7 +4139,7 @@ async function ipa70GenerateStage(tripId,index,dayOnly){
 }
 function ipa70StartLocation(trip,dayNo,city){
  const blocks=ipa68TravelBlocks(trip);
- const hotelArrival=blocks.filter(b=>Number(b.arrivalDay)===Number(dayNo)&&/hotel|hospedagem|airbnb|apartamento/i.test(String(b.destination||''))).at(-1);
+ const hotelArrival=blocks.filter(b=>Number(b.arrivalDay)===Number(dayNo)&&(!!b.destinationHotelId||b.destinationType==='hotel'||/hotel|hospedagem|airbnb|apartamento/i.test(String(b.destination||'')))).at(-1);
  if(hotelArrival)return hotelArrival.destination;
  const book=(trip.hotelBookings||[]).find(h=>ipaNormText(h.city)===ipaNormText(city));
  return book?.hotelName||book?.name||city;
@@ -4092,7 +4148,7 @@ function ipa70StageScheduleBlocks(trip,entries){
  const entryDays=entries.map(x=>x.day),offset=entryDays[0]-1;
  const result=ipa68TravelBlocks(trip).filter(b=>entryDays.includes(Number(b.day))||entryDays.includes(Number(b.arrivalDay))).map(b=>({...b,day:Number(b.day)-offset,arrivalDay:Number(b.arrivalDay)-offset}));
  // Chegada ao hotel: não recomendar atrações antes do cliente estar instalado.
- for(const b of [...result])if(/hotel|hospedagem|airbnb|apartamento/i.test(String(b.destination||''))){
+ for(const b of [...result])if((!!b.destinationHotelId||b.destinationType==='hotel'||/hotel|hospedagem|airbnb|apartamento/i.test(String(b.destination||'')))){
   const arrival=ipa68Minute(b.arrivalTime);if(arrival!==null&&Number(b.arrivalDay)>=1&&Number(b.arrivalDay)<=entries.length){result.push({kind:'transfer',day:b.arrivalDay,arrivalDay:b.arrivalDay,time:'00:00',arrivalTime:b.arrivalTime});}
  }
  // Bate e volta: reservar os períodos de transporte conforme horários informados; atrações limitadas à janela do passeio.
