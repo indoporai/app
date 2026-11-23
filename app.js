@@ -57,7 +57,7 @@ document.addEventListener('click',function(event){
  if(!ipaAdminPreviewAuthenticated())return;
  const target=event.target.closest('button,a,input,label,[role="button"]');
  if(!target||target.closest('#ipaPreviewAdminBar'))return;
- if(target.closest('.nav-item,[data-route],[data-mode],[data-day],[data-client-trip-select],[data-ipa-client-country]'))return;
+ if(target.closest('.nav-item,[data-route],[data-mode],[data-day],[data-client-trip-select],[data-ipa-client-country],[data-ipa84-select-stage],[data-go]'))return;
  event.preventDefault();event.stopImmediatePropagation();
  toast('Prévia somente leitura. Volte ao ADM para realizar alterações.');
 },true);

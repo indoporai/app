@@ -1,0 +1,1 @@
+Beta 6.30.86 — Prévia ADM: liberar a navegação por cidade (data-ipa84-select-stage) e os atalhos de navegação (data-go) na visão cliente. Continuam bloqueadas ações de escrita, mensagens, exclusão, pagamento e outros controles. Arquivos de cache da página versionados para 6.30.86.
