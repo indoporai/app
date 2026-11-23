@@ -709,6 +709,16 @@ window.IPAFirebase = {
     await setDoc(doc(firestore,'settings','main'),{instagramFollowers:n,updatedAt:serverTimestamp()},{merge:true});
     return n;
   },
+  async saveTripHotelBookingsConfirmed(tripId,bookings,expectedBookingId){
+    if(!currentUser || currentUser.uid!==ADMIN_UID)throw Error('Entre como ADM para salvar a hospedagem.');
+    if(!tripId||!Array.isArray(bookings))throw Error('Dados da hospedagem inválidos.');
+    const ref=doc(firestore,'trips',String(tripId));
+    await setDoc(ref,{hotelBookings:bookings},{merge:true});
+    const fresh=await getDocFromServer(ref);
+    const found=(fresh.exists()?fresh.data().hotelBookings:[]||[]).find(x=>String(x.id)===String(expectedBookingId));
+    if(!found)throw Error('Hospedagem não confirmada no Firebase.');
+    return true;
+  },
   async saveTripDocument(record){
     if(!currentUser || currentUser.uid!==ADMIN_UID)throw new Error("Somente o ADM pode salvar documentos.");
     if(!record?.id||!record.tripId||!record.clientId)throw new Error("Viagem ou cliente não identificado.");
