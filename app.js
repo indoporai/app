@@ -6021,3 +6021,45 @@ function showAdminPreview(){
 window.addEventListener('ipa-client-experience-ready',()=>{if(!ipaExperiencesLoaded)void ipaFetchExperiences()});
 
 // O carregamento também é acionado pelo render após login; não depende de temporizador.
+
+
+/* Beta 6.30.90 — links Maps e editor de deslocamento do roteiro ADM.
+   Delegação em captura: os cartões são recriados frequentemente após saves,
+   sem exigir novo bind() e sem alterar o layout ou a persistência existente. */
+if(!window.__ipaAdminRouteLinks63090){
+ window.__ipaAdminRouteLinks63090=true;
+ document.addEventListener('click',function(event){
+  const button=event.target?.closest?.('.ipa67-stop-travel [data-external-route], .ipa67-stop-travel [data-admin-transport]');
+  if(!button || button.disabled)return;
+  // Restrito aos cartões de roteiro da área ADM.
+  if(!button.closest('.ipa-admin-days'))return;
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  if(button.hasAttribute('data-admin-transport')){
+   const value=button.getAttribute('data-admin-transport')||'';
+   const last=value.lastIndexOf(':'),middle=value.lastIndexOf(':',last-1);
+   if(last<0||middle<0){toast('Deslocamento inválido. Reabra a viagem.');return;}
+   const tripId=value.slice(0,middle),day=Number(value.slice(middle+1,last)),index=Number(value.slice(last+1));
+   if(!Number.isFinite(day)||!Number.isFinite(index)){toast('Trecho inválido.');return;}
+   try{ipaAdminEditTransport(tripId,day,index);}catch(error){console.error('Falha ao abrir deslocamento:',error);toast('Não foi possível abrir o deslocamento.');}
+   return;
+  }
+  let url=button.getAttribute('data-external-route')||'';
+  try{
+   let parsed=new URL(url,location.href);
+   if(!['https:','http:'].includes(parsed.protocol))throw new Error('Protocolo inválido');
+   // Nunca navegar para a própria página por URL vazia.
+   if(!url.trim())throw new Error('URL vazia');
+   url=parsed.href;
+  }catch(error){
+   const card=button.closest('.ipa67-stop-card, .ipa67-stop, .ipa67-place-card');
+   const place=card?.querySelector('b, strong, h3')?.textContent?.trim()||'';
+   const address=card?.querySelector('.ipa67-address')?.textContent?.trim()||'';
+   if(!place&&!address){toast('Local sem endereço para abrir no Maps.');return;}
+   url='https://www.google.com/maps/search/?api=1&query='+encodeURIComponent([place,address].filter(Boolean).join(', '));
+  }
+  // Link acionado diretamente pelo clique: compatível com bloqueadores de pop-up.
+  const a=document.createElement('a');a.href=url;a.target='_blank';a.rel='noopener noreferrer';
+  document.body.appendChild(a);a.click();a.remove();
+ },true);
+}
