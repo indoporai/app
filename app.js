@@ -4517,15 +4517,16 @@ function adminTripEditor(id){
  <section class="ipa-admin-panel trip-client-panel"><div class="section-head"><div><span class="eyebrow">👤 CLIENTE DA VIAGEM</span><h2>${c?'Cliente da viagem':'Vincular cliente cadastrado'}</h2></div><span class="chip">${c?'✓ Vinculado':'Sem cliente'}</span></div>
  ${c?`<div class="trip-linked-client"><strong>${ipaEscape(c.name)}</strong><small>${ipaEscape(c.email||'')}</small></div>`:`<p>Selecione quem receberá esta viagem para publicar e enviar o acesso.</p>`}
  <div class="admin-trip-fields trip-client-fields"><label>${c?'Alterar cliente vinculado':'Cliente'}<select data-trip-client-select="${t.id}"><option value="">Selecione um cliente...</option>${(d.clients||[]).map(client=>`<option value="${client.id}" ${client.id===t.clientId?'selected':''}>${ipaEscape(client.name)}${client.email?' · '+ipaEscape(client.email):''}${client.approvalStatus?' · '+ipaEscape(client.approvalStatus):''}</option>`).join('')}</select></label><button class="btn btn-light" data-admin-link-client="${t.id}">${c?'✏️ Alterar cliente':'Vincular cliente'}</button></div>${!c?`<small>⚠️ Vincule um cliente antes de publicar/enviar o acesso.</small>`:''}</section>
- ${ipaTripCountries(t).length>1?`<section class="ipa-admin-panel ipa-admin-country-workspace"><div class="section-head"><div><span class="eyebrow">🌍 MULTIPAÍS 2.0</span><h2>Gerenciar conteúdo por país</h2></div></div>${ipaCountrySelectorHtml(t,true)}${ipaAdminCountryWorkspace(t,d)}<p>Financeiro, acompanhantes e Mochilito continuam únicos. Os dados não identificados precisam ser classificados antes de aparecerem no país correto.</p></section>`:''}
- <section class="ipa-admin-panel"><div class="section-head"><div><span class="eyebrow">🧭 VIAGEM MULTIDESTINO</span><h2>Destinos / etapas</h2></div><button class="btn btn-light" data-admin-add-stage="${t.id}">+ Adicionar destino</button></div><p>Uma única viagem pode ter várias cidades ou países. O app muda automaticamente o destino ativo conforme as datas.</p><div class="admin-stage-list">${tripStages(t).map((st,i)=>`<div class="admin-stage-card"><strong>${i+1}</strong><div><b>${countryFlag(st.country)} ${ipaEscape(st.destination||'Destino')}</b><small>${st.startDate||'--/--'} → ${st.endDate||'--/--'} · ${ipaEscape(st.country||'')}</small></div><button class="btn btn-light" data-admin-edit-stage="${t.id}:${i}">✏️</button>${tripStages(t).length>1?`<button class="btn btn-light" data-admin-delete-stage="${t.id}:${i}">🗑</button>`:''}</div>`).join('')}</div></section>
  ${ipaAdminTravelTogetherPanel(t,d)}
- <section class="ipa-admin-panel" id="ipaCountryHotels"><div class="section-head"><div><span class="eyebrow">🏨 HOSPEDAGENS CONTRATADAS</span><h2>Hospedagens ${ipaTripCountries(t).length>1?'· '+ipaEscape(ipaAdminCountry(t))+' / '+ipaEscape(ipa84SelectedStage(t,true)?.destination||''):'do cliente'}</h2></div><button class="btn btn-primary" data-admin-add-hotel-booking="${t.id}">+ Vincular hospedagem</button></div><p>Selecione do Banco de Hospedagens. Ao confirmar, o card aparece automaticamente no app do cliente.</p><div class="trip-hotel-list">${(t.hotelBookings||[]).filter(st=>(ipaTripCountries(t).length<2||ipaRecordInCountry(t,st,ipaAdminCountry(t))||!ipaCountryOfRecord(t,st))&&ipa92CityScopedRecords([st],ipa84SelectedStage(t,true)).length).map(st=>{const h=ipaFindBookedHotel(st,d.hotelCatalog);return `<div class="ipa-booking-card"><div class="ipa-booking-cover">${ipaBookedHotelImage(h,st)}</div><div><b>${ipaEscape(h.name||st.hotelName)}</b><small>${ipaEscape([st.city||h.city,st.startDate&&('de '+st.startDate),st.endDate&&('até '+st.endDate)].filter(Boolean).join(' · '))}</small><em>Venda ${adminMoney(st.sale||0)} · Custo ${adminMoney(st.cost||0)} · Margem ${adminMoney((st.sale||0)-(st.cost||0))}</em></div>${ipaTripCountries(t).length>1?`<label class="ipa-stay-country-label">País<select data-ipa-classify-stay="${ipaEscape(t.id)}:${ipaEscape(st.id)}"><option value="" ${!st.country?'selected':''}>⚠️ Não definido</option>${ipaTripCountries(t).map(c=>`<option value="${ipaEscape(c)}" ${ipaSameCountry(st.country,c)?'selected':''}>${ipaEscape(c)}</option>`).join('')}</select></label>`:''}<button class="btn btn-light" data-admin-remove-hotel-booking="${t.id}:${st.id}">🗑</button></div>`}).join('')||'<small>Nenhuma hospedagem vinculada.</small>'}</div></section>
  <section class="ipa-admin-panel"><div class="section-head"><div><span class="eyebrow">VIAGEM</span><h2>Escolha do pacote</h2></div><b class="ipa-plan">${t.plan}</b></div>
  <p class="ipa70-primary-note">📍 Início da viagem: <strong>${ipaEscape(stages[0]?.destination||tripDestination(t))} · ${ipaEscape(stages[0]?.country||country)}</strong>. Calculado automaticamente pelas etapas.</p>
  <div class="ipa-admin-plan-grid">${['Free','Explore','Signature','Elite','Groups'].map(p=>`<button data-admin-plan="${p}" class="${t.plan===p?'active':''}"><b>${p}</b><small>${p==='Explore'?'Roteiro + app':p==='Signature'?'Pré-embarque + compras':p==='Elite'?'Experiência completa':'Grandes grupos'}</small></button>`).join('')}</div>
  <div class="package-native-box"><span class="eyebrow">NATIVO DO ${t.plan.toUpperCase()}</span><div>${packageIncluded(t.plan).map(x=>`<span>✓ ${x}</span>`).join('')}</div><small>Ao trocar de pacote, estes recursos são habilitados automaticamente. Você ainda pode ajustar os módulos manualmente abaixo.</small></div></section>
  <section class="ipa-admin-panel"><span class="eyebrow">EXPERIÊNCIA DO CLIENTE</span><h2>O que aparece no app</h2><div class="ipa-admin-module-grid">${Object.entries(labels).map(([k,v])=>`<label class="${t.modules?.[k]?'on':''}"><div><b>${v}</b><small>${t.modules?.[k]?'Visível':'Oculto'}</small></div><input type="checkbox" data-admin-module="${k}" ${t.modules?.[k]?'checked':''}></label>`).join('')}</div></section>
+ ${ipaTripCountries(t).length>1?`<section class="ipa-admin-panel ipa-admin-country-workspace"><div class="section-head"><div><span class="eyebrow">🌍 MULTIPAÍS 2.0</span><h2>Gerenciar conteúdo por país</h2></div></div>${ipaCountrySelectorHtml(t,true)}${ipaAdminCountryWorkspace(t,d)}<p>Financeiro, acompanhantes e Mochilito continuam únicos. Os dados não identificados precisam ser classificados antes de aparecerem no país correto.</p></section>`:''}
+
+ <section class="ipa-admin-panel"><div class="section-head"><div><span class="eyebrow">🧭 VIAGEM MULTIDESTINO</span><h2>Destinos / etapas</h2></div><button class="btn btn-light" data-admin-add-stage="${t.id}">+ Adicionar destino</button></div><p>Uma única viagem pode ter várias cidades ou países. O app muda automaticamente o destino ativo conforme as datas.</p><div class="admin-stage-list">${tripStages(t).map((st,i)=>`<div class="admin-stage-card"><strong>${i+1}</strong><div><b>${countryFlag(st.country)} ${ipaEscape(st.destination||'Destino')}</b><small>${st.startDate||'--/--'} → ${st.endDate||'--/--'} · ${ipaEscape(st.country||'')}</small></div><button class="btn btn-light" data-admin-edit-stage="${t.id}:${i}">✏️</button>${tripStages(t).length>1?`<button class="btn btn-light" data-admin-delete-stage="${t.id}:${i}">🗑</button>`:''}</div>`).join('')}</div></section>
+ <section class="ipa-admin-panel" id="ipaCountryHotels"><div class="section-head"><div><span class="eyebrow">🏨 HOSPEDAGENS CONTRATADAS</span><h2>Hospedagens ${ipaTripCountries(t).length>1?'· '+ipaEscape(ipaAdminCountry(t))+' / '+ipaEscape(ipa84SelectedStage(t,true)?.destination||''):'do cliente'}</h2></div><button class="btn btn-primary" data-admin-add-hotel-booking="${t.id}">+ Vincular hospedagem</button></div><p>Selecione do Banco de Hospedagens. Ao confirmar, o card aparece automaticamente no app do cliente.</p><div class="trip-hotel-list">${(t.hotelBookings||[]).filter(st=>(ipaTripCountries(t).length<2||ipaRecordInCountry(t,st,ipaAdminCountry(t))||!ipaCountryOfRecord(t,st))&&ipa92CityScopedRecords([st],ipa84SelectedStage(t,true)).length).map(st=>{const h=ipaFindBookedHotel(st,d.hotelCatalog);return `<div class="ipa-booking-card"><div class="ipa-booking-cover">${ipaBookedHotelImage(h,st)}</div><div><b>${ipaEscape(h.name||st.hotelName)}</b><small>${ipaEscape([st.city||h.city,st.startDate&&('de '+st.startDate),st.endDate&&('até '+st.endDate)].filter(Boolean).join(' · '))}</small><em>Venda ${adminMoney(st.sale||0)} · Custo ${adminMoney(st.cost||0)} · Margem ${adminMoney((st.sale||0)-(st.cost||0))}</em></div>${ipaTripCountries(t).length>1?`<label class="ipa-stay-country-label">País<select data-ipa-classify-stay="${ipaEscape(t.id)}:${ipaEscape(st.id)}"><option value="" ${!st.country?'selected':''}>⚠️ Não definido</option>${ipaTripCountries(t).map(c=>`<option value="${ipaEscape(c)}" ${ipaSameCountry(st.country,c)?'selected':''}>${ipaEscape(c)}</option>`).join('')}</select></label>`:''}<button class="btn btn-light" data-admin-remove-hotel-booking="${t.id}:${st.id}">🗑</button></div>`}).join('')||'<small>Nenhuma hospedagem vinculada.</small>'}</div></section>
  <section class="ipa-admin-panel" id="ipaCountryRoute"><div class="section-head"><div><span class="eyebrow">ROTEIRO INTELIGENTE</span><h2>Dias, lugares e dicas ${ipaTripCountries(t).length>1?'· '+ipaEscape(ipaAdminCountry(t)):''}</h2></div><button class="btn btn-light" data-admin-add-day="${t.id}">+ Adicionar dia</button></div>
  <div class="smart-route-banner"><span>✨</span><div><b>Dica Inteligente</b><small>Selecione atrações e terminais do Banco de Lugares. Use ↑ ↓ para reordenar e Editar / Excluir para ajustar sem recriar o roteiro. As alterações são salvas no Firebase.</small></div></div>
  ${ipa84CityNavigation(t,true)}${ipa84StageTimelineHtml(t,ipa84SelectedStage(t,true),true)}${ipa77MissingStagesPanel(t)}<div class="ipa-admin-days">${ipa84DaysForStage(t,ipa84SelectedStage(t,true)).sort((a,b)=>a.day-b.day).map(day=>`<div class="admin-day-expanded ipa81-day-card"><div class="ipa81-day-top"><span class="ipa81-day-number">${day.day}</span><div class="ipa81-day-title"><b>${ipaEscape(day.title||'Dia '+day.day)}</b><small>${day.date?ipaEscape(day.date.split('-').reverse().join('/')):''} · ${ipaCountryOfDay(t,day)?countryFlagMarkup(ipaCountryOfDay(t,day))+' '+ipaEscape(ipaCountryOfDay(t,day)):'⚠️ País não identificado'}</small></div></div><div class="ipa81-day-controls">${ipaTripCountries(t).length>1&&!ipaCountryOfDay(t,day)?`<select class="ipa-admin-day-country" data-ipa-classify-day="${ipaEscape(t.id)}:${day.day}" aria-label="País do dia ${day.day}">${ipaTripCountries(t).map(c=>`<option value="${ipaEscape(c)}" ${ipaSameCountry(c,ipaCountryOfDay(t,day))?'selected':''}>${ipaEscape(c)}</option>`).join('')}<option value="" ${!ipaCountryOfDay(t,day)?'selected':''}>⚠️ Não identificado</option></select>`:''}${ipa77DayGenerationControls(t,day)}</div><div class="ipa81-day-secondary"><button type="button" class="btn btn-light ipa70-daytrip-btn" data-ipa70-daytrip="${ipaEscape(t.id)}:${day.day}">🚌 ${day.dayTrip?.city?'Bate e volta: '+ipaEscape(day.dayTrip.city):'Bate e volta'}</button>${day.dayTrip?.city?`<button type="button" class="btn btn-primary ipa81-generate-daytrip" data-ipa70-generate-daytrip="${ipaEscape(t.id)}:${day.day}">✨ Gerar atrações de ${ipaEscape(day.dayTrip.city)}</button>`:''}<button type="button" class="admin-add-place-btn" data-admin-add-place="${ipaEscape(t.id)}:${day.day}">+ Adicionar item</button></div><div class="ipa64-day-target"><div><b>🎯 Atrações planejadas: ${Math.max(1,Math.min(10,Number(day.attractionTarget)||4))}</b><small>${normalizedPlaces(day).filter(p=>!(/transfer|deslocamento|aeroporto|estaç|rodovi|terminal|ferry|navio|refeiç|restaurante|café/i).test(String(p.category||''))).length} atrações no roteiro · Transfers e aeroportos não entram na meta</small></div><button type="button" data-admin-attraction-target="${ipaEscape(t.id)}:${day.day}">⚙ Ajustar meta</button></div><div class="admin-place-list ipa67-place-list">${normalizedPlaces(day).map((p,i)=>`<article class="ipa67-stop-card"><div class="ipa67-stop-head"><span class="ipa67-stop-number">${i+1}</span><div class="ipa67-stop-info"><b>${ipa73IsFixedStop(p)&&p.time?`${ipaEscape(p.time)} · `:''}${ipaEscape(p.name||'Parada')}</b><small>${ipaEscape(p.category||'📍 Atração')}</small><small class="ipa67-address">${ipaEscape(p.address||p.note||'')}</small>${p.smartTip?`<em>💡 ${ipaEscape(p.smartTip)}</em>`:''}</div></div><div class="ipa67-stop-travel">${p.mapsUrl?`<button type="button" class="ipa67-action ipa67-travel-button" data-external-route="${ipaEscape(p.mapsUrl)}" aria-label="Abrir ${ipaEscape(p.name)} no Google Maps">📍 Maps</button>`:''}${i<normalizedPlaces(day).length-1?`<button type="button" class="ipa67-action ipa67-travel-button" data-admin-transport="${ipaEscape(t.id)}:${day.day}:${i}">🚆 Deslocamento</button>`:''}</div><div class="ipa67-stop-actions"><button type="button" class="ipa67-action" data-admin-place-move data-trip="${ipaEscape(t.id)}" data-day="${day.day}" data-index="${i}" data-direction="-1" ${i===0?'disabled':''}>↑ <span>Subir</span></button><button type="button" class="ipa67-action" data-admin-place-move data-trip="${ipaEscape(t.id)}" data-day="${day.day}" data-index="${i}" data-direction="1" ${i===normalizedPlaces(day).length-1?'disabled':''}>↓ <span>Descer</span></button><button type="button" class="ipa67-action" data-admin-place-edit data-trip="${ipaEscape(t.id)}" data-day="${day.day}" data-index="${i}">✏️ <span>Editar</span></button><button type="button" class="ipa67-action ipa67-delete" data-admin-place-delete data-trip="${ipaEscape(t.id)}" data-day="${day.day}" data-index="${i}">🗑 <span>Excluir</span></button></div></article>`)
@@ -6037,27 +6038,73 @@ function showAdminPreview(){
  showModal(`<div class="v2-admin-preview"><span class="eyebrow">Modo administrador</span><h2>Portugal 2026</h2><div class="v2-admin-metrics"><div><strong>32</strong><small>viajantes</small></div><div><strong>29</strong><small>online</small></div><div><strong>6</strong><small>avisos</small></div></div><div class="v2-admin-actions"><button onclick="toast('Aviso enviado ao grupo');modal.close()">📣 Enviar aviso</button><button onclick="toast('Van marcada como a caminho');modal.close()">🚐 Atualizar van</button><button onclick="toast('Roteiro aberto para edição');modal.close()">🗓️ Editar roteiro</button><button onclick="window.location.href='live-real.html'">🔴 Iniciar Live</button></div></div>`);
 }
 
-/* Beta 6.30.91 — somente os quatro controles de ordenação/edição das paradas ADM.
-   Captura o clique antes dos delegadores gerais e recupera o bind do cartão
-   caso a lista tenha sido recriada após uma edição ou sincronização.
-   Nenhuma rotina ou evento de Maps/Deslocamento é modificado. */
-if(!window.__ipaAdminPlaceActions63091){
- window.__ipaAdminPlaceActions63091=true;
- document.addEventListener('click',function(event){
-  const button=event.target?.closest?.('[data-admin-place-move], [data-admin-place-edit], [data-admin-place-delete]');
-  if(!button || !button.closest('.ipa-admin-days') || button.disabled)return;
-  event.preventDefault();
-  event.stopImmediatePropagation();
-  try{
-   // bind() popula os manipuladores originais. Não substituímos sua lógica
-   // (confirmação de exclusão, modal de edição e gravação no Firebase).
-   if(typeof button.onclick!=='function')bind();
-   if(typeof button.onclick==='function')button.onclick.call(button,event);
-   else toast('Não foi possível ativar esta ação. Reabra a viagem.');
-  }catch(error){
-   console.error('Ação da parada do roteiro ADM',error);
-   toast('Não foi possível executar a ação: '+(error?.message||'erro'));
+/* Beta 6.30.94 — controlador próprio dos quatro botões dos lugares no ADM.
+   Sem dependência dos onclick reconstruídos por bind().
+   Não altera os eventos de Maps/Deslocamento. */
+if(!window.__ipaAdminPlaceActions63094){
+ window.__ipaAdminPlaceActions63094=true;
+ document.addEventListener('click',async function(event){
+  const btn=event.target?.closest?.('.ipa67-stop-actions [data-admin-place-move], .ipa67-stop-actions [data-admin-place-edit], .ipa67-stop-actions [data-admin-place-delete]');
+  if(!btn||!btn.closest('.ipa-admin-days')||btn.disabled)return;
+  event.preventDefault();event.stopImmediatePropagation();
+  const tripId=btn.getAttribute('data-trip'),dayNumber=Number(btn.getAttribute('data-day')),
+   index=Number(btn.getAttribute('data-index'));
+  const trip=(adminData().trips||[]).find(t=>String(t.id)===String(tripId));
+  const day=trip?.itinerary?.find(d=>Number(d.day)===dayNumber);
+  if(!day||!Number.isInteger(index)||index<0||index>=(day.places||[]).length){toast('Parada não encontrada. Atualize a viagem.');return;}
+  const action=btn.hasAttribute('data-admin-place-move')?'move':btn.hasAttribute('data-admin-place-delete')?'delete':'edit';
+  const before=trip.itinerary||[];
+  const current=day.places[index];
+  const place=typeof current==='string'?{name:current}:({...current});
+  async function save(nextPlaces,ok){
+   btn.disabled=true;
+   const next=before.map(d=>Number(d.day)===dayNumber?{...d,places:nextPlaces}:d);
+   try{
+    if(!window.IPAFirebase?.user||typeof window.IPAFirebase.syncNow!=='function')throw Error('Faça login no ADM para salvar no Firebase.');
+    IPAData.updateTrip(tripId,{itinerary:next});
+    await window.IPAFirebase.syncNow();
+    const y=window.scrollY;
+    view.innerHTML=adminTripEditor(tripId);bind();window.scrollTo(0,y);
+    toast(ok);
+   }catch(e){
+    IPAData.updateTrip(tripId,{itinerary:before});
+    view.innerHTML=adminTripEditor(tripId);bind();
+    console.error('Controles da parada ADM',e);toast('Não foi possível salvar: '+(e?.message||e));
+   }
   }
+  if(action==='move'){
+   const to=index+Number(btn.getAttribute('data-direction'));
+   if(!Number.isInteger(to)||to<0||to>=day.places.length)return;
+   const arr=day.places.slice();arr.splice(to,0,arr.splice(index,1)[0]);
+   await save(arr,'Nova ordem salva ✓');return;
+  }
+  if(action==='delete'){
+   if(!confirm('Excluir "'+(place.name||'esta parada')+'" do dia '+dayNumber+'?'))return;
+   await save(day.places.filter((_,i)=>i!==index),'Parada excluída ✓');return;
+  }
+  const esc=x=>ipaEscape(String(x??''));
+  const cats=['🏛️ Atração','☕ Cafeteria','🍽️ Restaurante','🛍️ Loja','🌳 Parque','🏨 Hotel','🎟️ Experiência','🚚 Deslocamento','📍 Outro'];
+  showModal(`<span class="eyebrow">ROTEIRO OFICIAL · DIA ${dayNumber}</span><h2>Editar parada ${index+1}</h2><p>As alterações serão salvas no roteiro do cliente.</p>
+  <label>Nome do local ou deslocamento<input id="ipaPlaceEditName" class="v2-concierge-input" value="${esc(place.name)}"></label>
+  <label>Categoria<select id="ipaPlaceEditCategory" class="v2-concierge-input">${[...new Set([...cats,place.category||'📍 Outro'])].map(c=>`<option value="${esc(c)}" ${c===place.category?'selected':''}>${esc(c)}</option>`).join('')}</select></label>
+  <label>Endereço ou destino<input id="ipaPlaceEditAddress" class="v2-concierge-input" value="${esc(place.address)}"></label>
+  <label>Horário sugerido<input id="ipaPlaceEditTime" type="time" class="v2-concierge-input" value="${esc(place.time)}"></label>
+  <label>Duração estimada (minutos)<input id="ipaPlaceEditDuration" type="number" min="0" max="1440" class="v2-concierge-input" value="${esc(place.durationMinutes||'')}"></label>
+  <label>Orientações e observações<textarea id="ipaPlaceEditNote" class="rating-text">${esc(place.note)}</textarea></label>
+  <label>Dica Indo por Aí<textarea id="ipaPlaceEditTip" class="rating-text">${esc(place.smartTip||place.tip)}</textarea></label>
+  <button type="button" id="ipaPlaceEditSave" class="btn btn-primary btn-block">💾 Salvar parada</button>`);
+  const saveBtn=document.querySelector('#ipaPlaceEditSave');
+  if(!saveBtn){toast('Não foi possível abrir o editor.');return;}
+  saveBtn.onclick=async()=>{
+   const get=id=>document.getElementById(id)?.value||'';
+   const name=get('ipaPlaceEditName').trim();if(!name)return toast('Informe o nome da parada.');
+   const mins=get('ipaPlaceEditDuration');
+   const updated={...place,name,category:get('ipaPlaceEditCategory'),address:get('ipaPlaceEditAddress').trim(),time:get('ipaPlaceEditTime'),note:get('ipaPlaceEditNote').trim(),smartTip:get('ipaPlaceEditTip').trim(),durationMinutes:mins===''?'':Math.max(0,Math.min(1440,Number(mins)||0))};
+   saveBtn.disabled=true;modal.close();
+   const latest=(adminData().trips||[]).find(t=>String(t.id)===String(tripId))?.itinerary?.find(d=>Number(d.day)===dayNumber)?.places;
+   if(!latest||index>=latest.length){toast('A parada foi alterada. Reabra para editar.');return;}
+   await save(latest.map((p,i)=>i===index?updated:p),'Parada atualizada ✓');
+  };
  },true);
 }
 

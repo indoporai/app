@@ -1,0 +1,10 @@
+Indo por Aí — Beta 6.30.93
+Base: Beta 6.30.92.
+
+Ajuste visual do editor da viagem no ADM:
+- Após Cliente da viagem: seleção de país/cidade, Destinos compartilhados,
+  Escolha do pacote, Experiência do cliente (O que aparece no app).
+- Destinos / etapas e Hospedagens permanecem a seguir.
+- Nenhuma alteração nos manipuladores de Maps ou Deslocamento.
+
+Observação: os quatro botões Subir, Descer, Editar e Excluir ainda exigem validação em navegador real; não foram alterados nesta entrega de reposicionamento.

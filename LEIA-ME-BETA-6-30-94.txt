@@ -1,0 +1,16 @@
+Indo por Aí — Beta 6.30.94
+Base: Beta 6.30.93-menu-superior-experiencia.
+
+ADM — Ordem superior:
+1. Cliente da viagem
+2. Destinos compartilhados
+3. Escolha do pacote
+4. Experiência do cliente — O que aparece no app
+5. Seleção de país e cidade (após a experiência do cliente)
+6. Cadastros detalhados (Destinos/etapas, hotéis, roteiros etc.)
+
+Correção restrita dos quatro botões de cada parada do roteiro:
+Subir, Descer, Editar e Excluir passam a ter tratamento independente dos onclick antigos, com sincronização e retorno em caso de falha.
+
+Google Maps e Deslocamento: nenhum código de seus manipuladores foi alterado.
+Validação: node --check app.js e integridade do ZIP. Teste real com Firebase ainda necessário.
