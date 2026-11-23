@@ -1,0 +1,1 @@
+Beta 6.30.102: diagnósticos de upload de documentos no Firebase Storage. Progresso percentual, cancelamento em 30 segundos sem avanço, limite total de 90 segundos e limite de 20 segundos para URL. Erros permanecem no formulário. Não altera permissões do Firebase Storage nem os dados existentes. Maps, Deslocamento e layout preservados.

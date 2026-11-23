@@ -2267,8 +2267,9 @@ function bind(){
  saveBtn.disabled=true;saveBtn.setAttribute('aria-busy','true');
  progress(file?'Enviando arquivo para o Firebase Storage...':'Salvando documento...');
  try{
+   document.querySelector('#ipaDocumentSaveError')?.remove();
    let uploaded={url:'',path:''};
-   if(file)uploaded=await window.IPAFirebase.uploadTripDocument(file,clientId,tripId);
+   if(file)uploaded=await window.IPAFirebase.uploadTripDocument(file,clientId,tripId,pct=>progress('Enviando ao Firebase Storage... '+pct+'%'));
    progress('Confirmando no Firebase...');
    const documentRecord={...fields,...uploaded,id:'doc-'+Date.now()+'-'+Math.random().toString(36).slice(2,8),createdAt:new Date().toISOString()};
    if(!window.IPAFirebase.saveTripDocument)throw new Error('Serviço de documentos indisponível. Atualize o aplicativo.');
@@ -2282,6 +2283,9 @@ function bind(){
    const code=e?.code||'';
    const msg=/storage\/unauthorized|permission-denied/.test(code)?'Sem permissão no Firebase Storage/Firestore. Verifique as regras de acesso.':/storage\/quota-exceeded/.test(code)?'Limite de armazenamento atingido.':/storage\/canceled/.test(code)?'Envio interrompido ou expirado. Verifique a conexão e tente novamente.':/storage\/retry-limit-exceeded|storage\/unknown/.test(code)?'O envio ao Firebase Storage não foi concluído. Verifique conexão e permissões.':e?.message||'Não foi possível salvar o documento.';
    toast(msg);saveBtn.disabled=false;saveBtn.removeAttribute('aria-busy');saveBtn.innerHTML=original;
+   let errorEl=document.querySelector('#ipaDocumentSaveError');
+   if(!errorEl){errorEl=document.createElement('div');errorEl.id='ipaDocumentSaveError';errorEl.setAttribute('role','alert');errorEl.style.cssText='margin-top:12px;padding:12px;border:1px solid #d99;border-radius:10px;background:#fff4f3;color:#7a2525;white-space:normal;font-size:14px;line-height:1.4';saveBtn.insertAdjacentElement('afterend',errorEl)}
+   errorEl.textContent=msg+' (Código: '+(code||'desconhecido')+'). O formulário continua aberto; confira o erro antes de reenviar.';
  }
  };},0);
  });

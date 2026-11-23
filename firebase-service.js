@@ -744,21 +744,39 @@ window.IPAFirebase = {
     const snap=await uploadBytes(storageRef(storage,path),file,{contentType:file.type});
     return {url:await getDownloadURL(snap.ref),path};
   },
-  async uploadTripDocument(file,clientId,tripId){
-    if(!currentUser || currentUser.uid!==ADMIN_UID)throw new Error("Somente o ADM pode enviar documentos.");
+  async uploadTripDocument(file,clientId,tripId,onProgress){
+    if(!currentUser || currentUser.uid!==ADMIN_UID)throw new Error("Entre como ADM para enviar documentos.");
+    if(!file || !clientId || !tripId)throw new Error("Arquivo, cliente ou viagem não identificados.");
     const safe=(file.name||"documento").replace(/[^a-zA-Z0-9._-]/g,"_");
     const path=`documents/${clientId}/${tripId}/${Date.now()}-${safe}`;
-    const task=uploadBytesResumable(storageRef(storage,path),file,{contentType:file.type||"application/octet-stream"});
+    const target=storageRef(storage,path);
+    const task=uploadBytesResumable(target,file,{contentType:file.type||"application/octet-stream"});
     const snap=await new Promise((resolve,reject)=>{
-      let finished=false;
-      const timer=setTimeout(()=>{
+      let finished=false,lastBytes=-1;
+      let idleTimer=null;
+      const cleanup=()=>{clearTimeout(idleTimer);clearTimeout(totalTimer);unsubscribe?.()};
+      const fail=(err)=>{if(finished)return;finished=true;cleanup();try{task.cancel()}catch(_e){}reject(err)};
+      const idle=()=>{clearTimeout(idleTimer);idleTimer=setTimeout(()=>fail(Object.assign(new Error("O Firebase Storage não respondeu durante 30 segundos. Confira conexão, permissões e configuração do Storage."),{code:"storage/timeout"})),30000)};
+      const totalTimer=setTimeout(()=>fail(Object.assign(new Error("O upload não terminou em 90 segundos. Tente novamente ou confira as permissões do Storage."),{code:"storage/timeout"})),90000);
+      let unsubscribe=null;
+      idle();
+      unsubscribe=task.on("state_changed",snapshot=>{
         if(finished)return;
-        finished=true;task.cancel();
-        reject(Object.assign(new Error("O upload excedeu 90 segundos. Verifique conexão e permissões do Firebase Storage."),{code:"storage/retry-limit-exceeded"}));
-      },90000);
-      task.on("state_changed",null,err=>{if(finished)return;finished=true;clearTimeout(timer);reject(err)},()=>{if(finished)return;finished=true;clearTimeout(timer);resolve(task.snapshot)});
+        if(snapshot.bytesTransferred!==lastBytes){lastBytes=snapshot.bytesTransferred;idle()}
+        const pct=snapshot.totalBytes?Math.min(100,Math.round(snapshot.bytesTransferred/snapshot.totalBytes*100)):0;
+        if(typeof onProgress==="function")onProgress(pct);
+      },err=>fail(err),()=>{if(finished)return;finished=true;cleanup();resolve(task.snapshot)});
     });
-    return {url:await getDownloadURL(snap.ref),path};
+    // A conclusão do upload não garante que a URL de leitura possa ser obtida.
+    // Esse segundo limite impede o formulário de ficar preso depois de 100%.
+    let timer;
+    try{
+      const url=await Promise.race([
+        getDownloadURL(snap.ref),
+        new Promise((_,reject)=>{timer=setTimeout(()=>reject(Object.assign(new Error("Arquivo enviado, mas o Firebase não retornou o link de leitura. Confira as regras do Storage antes de reenviar."),{code:"storage/download-url-timeout"})),20000)})
+      ]);
+      return {url,path};
+    }finally{clearTimeout(timer)}
   },
 
   get user(){ return currentUser; },
