@@ -1,0 +1,13 @@
+INDO POR AÍ — BETA 6.30.105
+
+Base: 6.30.104. Consolida correções de Luxemburgo e Países Baixos/Amsterdam no módulo Entre no clima.
+- Curadoria dos Países Baixos com seis itens e URLs de fontes culturais verificáveis.
+- Compatibilidade com Amsterdam/Amsterdã, Países Baixos, Holanda e Netherlands/Nederland.
+- Dados culturais vinculados ao país; Lisboa e Porto não recebem conteúdo neerlandês.
+- Itens alterados manualmente continuam protegidos pela lógica já existente.
+- Erros de pesquisa e rede seguem diferenciados.
+- Versão do cache PWA atualizada.
+- Não adicionados atalhos Uber/Bolt (aprovados para versão futura; fora do escopo desta correção).
+- Maps, Deslocamento, Firebase e layout mantidos sem modificações.
+
+VALIDAÇÕES: sintaxe JS, integridade de ZIP e testes de seleção cultural feitos localmente. Teste com Firebase real ainda necessário.

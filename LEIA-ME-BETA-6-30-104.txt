@@ -1,0 +1,1 @@
+Beta 6.30.104 — Curadoria cultural Luxemburgo; separação erro de pesquisa/ausência de resultados; cache atualizado. Conteúdos manuais preservados. Maps, Deslocamento, Firebase e layout não modificados. Testar salvamento no ambiente real.

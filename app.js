@@ -1064,7 +1064,7 @@ function bind(){
        IPAData.updateTrip(tripId,{climateContent:generated,climateGeneratedAt:new Date().toISOString(),climateSource:'destination-curation',climateCurationVersion:IPA_CLIMATE_CURATED_VERSION});
      }
      toast('Conteúdo com fontes salvo no Firebase ✓');view.innerHTML=adminTripEditor(tripId);bind();
-   }catch(e){console.error(e);toast('Não foi possível confirmar a curadoria no Firebase: '+(e?.message||'erro'));}
+   }catch(e){console.error(e);if(e?.message==='CLIMATE_SEARCH_UNAVAILABLE')toast('A pesquisa cultural está temporariamente indisponível. Confira a conexão e tente novamente; nenhum conteúdo foi alterado.');else toast('Não foi possível concluir o Entre no clima: '+(e?.message||'erro'));}
    finally{if(b.isConnected){b.disabled=false;b.textContent='🔄 Atualizar conteúdo';}}
  });
  document.querySelectorAll('[data-admin-edit-climate]').forEach(b=>b.onclick=()=>{
@@ -3207,6 +3207,25 @@ function ipaClimateLegacyAutomatic(t){
 }
 function ipaClimateCuratedRows(t){
  const dest=tripDestination(t), country=tripCountry(t), k=(dest+' '+country).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+ // Luxemburgo: curadoria por país. Identificadores aceitos: Luxemburgo, Luxembourg City, Lëtzebuerg.
+ if(/(?:luxemburg|luxembourg|letzebuerg|lëtzebuerg)/i.test(k))return [
+  ['🎬','Filme / série','De Superjhemp Retörns','Comédia luxemburguesa de super-herói lançada em 2018, dirigida por Félix Koch.','https://filmfund.lu/en/catalogue/film/superjhemp-retorns/'],
+  ['🎵','Música','Serge Tonnar','Cantor e compositor do Luxemburgo. Conheça a música local por meio de seu repertório; a disponibilidade em streaming não foi verificada.','https://www.fondation-eme.lu/en/artists/serge-tonnar'],
+  ['📚','Livro','Neubrasilien — Guy Helminger','Obra de Guy Helminger indicada pelo Luxemburgo no projeto europeu Readers of Europe em 2021.','https://www.consilium.europa.eu/en/documents-publications/library/library-blog/posts/readers-of-europe-2021-luxembourg-recommendation/'],
+  ['🗣️','Expressão local','Moien!','Saudação comum em luxemburguês, equivalente a “olá”.','https://luxembourg.public.lu/en/emoxies/moien-hello-language-luxembourg.html'],
+  ['🍽️','Prato típico','Judd mat Gaardebounen','Prato tradicional com carne suína defumada, favas e batatas.','https://www.luxembourg-city.com/en/about-luxembourg-city/meng-stad-my-city/luxembourg-cuisine'],
+  ['💡','Curiosidade','Centro histórico e fortificações','A cidade antiga e suas fortificações são patrimônio mundial da UNESCO desde 1994.','https://luxembourg.public.lu/en/visit/arts-and-culture/unesco-heritage-luxembourg.html']
+ ];
+ // Países Baixos: curadoria vinculada ao PAÍS, nunca à seleção anterior de cidade.
+ // As opções de nome vêm da interface web, do formulário e de cadastros históricos.
+ if(/(?:pais(?:es)? baixo|netherland|nederland|holland|holanda|amsterd[ãa]|amsterdam)/i.test(k))return [
+  ['🎬','Filme / série','Amsterdamned','Suspense neerlandês de 1988, dirigido por Dick Maas, ambientado nos canais de Amsterdam. A disponibilidade em streaming não foi verificada.','https://www.eyefilm.nl/en/whats-on/amsterdamned/1451807'],
+  ['🎵','Música','André Hazes e Johnny Jordaan','Conheça a tradição musical popular de Amsterdam por meio de artistas ligados à cidade. Não é uma playlist específica ou link de reprodução.','https://www.iamsterdam.com/en/see-and-do/shopping-and-markets/best-record-stores-in-amsterdam'],
+  ['📚','Livro','O Diário de Anne Frank','Relato escrito por Anne Frank enquanto estava escondida em Amsterdam durante a Segunda Guerra Mundial.','https://www.annefrank.org/en/anne-frank/diary/how-did-annes-diary-become-so-famous/'],
+  ['🗣️','Expressão local','Gezellig','Palavra neerlandesa que evoca um ambiente acolhedor, agradável e de convivência.','https://www.iamsterdam.com/en/see-and-do/amsterdam-like-a-local'],
+  ['🍽️','Prato típico','Stroopwafel','Doce neerlandês feito com duas finas bolachas e recheio de calda caramelizada, encontrado em mercados de Amsterdam.','https://www.iamsterdam.com/en/see-and-do/restaurant-and-bars/dutch-foods-to-try'],
+  ['💡','Curiosidade','Cinturão de canais de Amsterdam','A área dos canais do século XVII foi inscrita como Patrimônio Mundial da UNESCO em 2010.','https://whc.unesco.org/en/list/1349']
+ ];
  if(k.includes('dublin')||k.includes('irlanda')||k.includes('ireland'))return [
   ['🎬','Filme / série','Once (Apenas Uma Vez)','Filme musical irlandês de 2007, dirigido por John Carney, ambientado em Dublin e ligado à cena de músicos de rua da cidade.'],
   ['🎵','Música','The Dubliners','Grupo de música folk irlandesa formado em Dublin. Procure suas gravações na plataforma musical de sua preferência.'],
@@ -3259,12 +3278,14 @@ async function ipaDiscoverClimateWorldwide(t){
   ['💡','Cultura e história',`${dest} história`]
  ];
  const rows=[];
+ let succeeded=0;
  for(const [icon,type,term] of terms){
   const u='https://pt.wikipedia.org/w/api.php?origin=*&action=opensearch&format=json&limit=5&search='+encodeURIComponent(term);
   try{
    const response=await fetch(u,{mode:'cors',cache:'no-store'});
    if(!response.ok)continue;
    const result=await response.json();
+   succeeded++;
    const titles=Array.isArray(result?.[1])?result[1]:[];
    const descriptions=Array.isArray(result?.[2])?result[2]:[];
    const links=Array.isArray(result?.[3])?result[3]:[];
@@ -3274,6 +3295,7 @@ async function ipaDiscoverClimateWorldwide(t){
    rows.push({icon,type,title:titles[index],description:(descriptions[index]||'Referência cultural relacionada ao destino. Consulte a fonte antes de recomendar.').slice(0,300),url:links[index],source:'wikipedia-opensearch'});
   }catch(e){console.warn('Pesquisa cultural indisponível',type,e);}
  }
+ if(!succeeded)throw new Error('CLIMATE_SEARCH_UNAVAILABLE');
  return rows;
 }
 function climateForTrip(t){
