@@ -1,0 +1,8 @@
+INDO POR AÍ — BETA 6.30.106
+Base: 6.30.105.
+Entre no clima: curadoria cultural compartilhada pelo Reino Unido / Inglaterra para etapas Liverpool e Manchester.
+Seis categorias: filme, música, literatura, expressão, gastronomia e curiosidade.
+Preserva alterações manuais, pesquisas e conteúdos de outros países.
+Atualização de cache do PWA e referências de scripts.
+Não modifica Maps, Deslocamento, Firebase, pagamentos, telas ou layouts.
+Validações: sintaxe JS e integridade ZIP; teste remoto com Firebase ainda pendente.

@@ -3226,6 +3226,16 @@ function ipaClimateCuratedRows(t){
   ['🍽️','Prato típico','Stroopwafel','Doce neerlandês feito com duas finas bolachas e recheio de calda caramelizada, encontrado em mercados de Amsterdam.','https://www.iamsterdam.com/en/see-and-do/restaurant-and-bars/dutch-foods-to-try'],
   ['💡','Curiosidade','Cinturão de canais de Amsterdam','A área dos canais do século XVII foi inscrita como Patrimônio Mundial da UNESCO em 2010.','https://whc.unesco.org/en/list/1349']
  ];
+ // Reino Unido / Inglaterra: Liverpool e Manchester compartilham o conteúdo
+ // cultural por país. A cidade ativa não sobrescreve a seleção da outra etapa.
+ if(/(?:reino unido|inglaterra|united kingdom|great britain|britain|england|liverpool|manchester)/i.test(k))return [
+  ['🎬','Filme / série','Nowhere Boy','Filme biográfico de 2009 sobre a juventude de John Lennon em Liverpool; disponibilidade em streaming não verificada.','https://www.visitbritain.com/en/things-to-do/discover-beatles-and-beyond-liverpool'],
+  ['🎵','Música','The Beatles e Oasis','Duas cenas musicais marcantes: The Beatles são de Liverpool; Oasis está ligado a Manchester. Busque o repertório na plataforma de sua preferência.','https://www.visitbritain.com/en/itineraries/5-days-north-west-england'],
+  ['📚','Livro','Manchester — cidade da literatura','Manchester integra a Rede de Cidades Criativas da UNESCO como Cidade da Literatura. Explore autores como Elizabeth Gaskell e Anthony Burgess.','https://unesco.org.uk/our-network/creative-cities/manchester'],
+  ['🗣️','Expressão local','Cheers!','No inglês britânico, além de um brinde, também pode significar informalmente “obrigado”.','https://www.visitbritain.com/en'],
+  ['🍽️','Gastronomia','Scouse e Manchester tart','Conheça o scouse, ensopado associado a Liverpool, e a Manchester tart, sobremesa tradicional de Manchester.','https://www.visitbritain.org/destinations/liverpool'],
+  ['💡','Curiosidade','Música e literatura no Noroeste inglês','Liverpool é Cidade da Música da UNESCO e Manchester é Cidade da Literatura da UNESCO.','https://unesco.org.uk/our-network/creative-cities/liverpool']
+ ];
  if(k.includes('dublin')||k.includes('irlanda')||k.includes('ireland'))return [
   ['🎬','Filme / série','Once (Apenas Uma Vez)','Filme musical irlandês de 2007, dirigido por John Carney, ambientado em Dublin e ligado à cena de músicos de rua da cidade.'],
   ['🎵','Música','The Dubliners','Grupo de música folk irlandesa formado em Dublin. Procure suas gravações na plataforma musical de sua preferência.'],
